@@ -1,0 +1,589 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                  Int       @id @default(autoincrement())
+  username            String    @unique
+  email               String    @unique
+  password            String
+  role                String
+  failedLoginAttempts Int       @default(0)
+  lockoutUntil        DateTime?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  courses            Course[]               @relation("InstructorCourses")
+  enrollments        Enrollment[]
+  submissions        Submission[]
+  payments           Payment[]
+  securityLogs       SecurityLog[]
+  materials          Material[]
+  videos             Video[]
+  liveStreams        LiveStream[]
+  streamQuestions    StreamQuestion[]
+  streamPolls        StreamPoll[]
+  pollResponses      PollResponse[]
+  courseModules      CourseModule[]
+  quizAttempts       QuizAttempt[]
+  quizGraded         QuizAttempt[]          @relation("QuizGrader")
+  createdQuizzes     Quiz[]
+  createdAssignments Assignment[]
+  progress           Progress[]
+  achievements       Achievement[]
+  certificates       Certificate[]
+  recommendations    CourseRecommendation[]
+  interactions       UserInteraction[]
+  createdEvents      CalendarEvent[]
+  eventAttendees     EventAttendee[]
+  eventReminders     EventReminder[]
+  Poll               Poll[]
+  Notification       Notification[]
+  AuditLog           AuditLog[]
+  Interaction        Interaction[]
+}
+
+model SecurityLog {
+  id        Int      @id @default(autoincrement())
+  user      User     @relation(fields: [userId], references: [id])
+  userId    Int
+  eventType String // e.g., 'failed_login', 'successful_login', 'password_change'
+  metadata  Json?
+  createdAt DateTime @default(now())
+}
+
+model Course {
+  id          Int      @id @default(autoincrement())
+  title       String
+  description String?
+  price       Float
+  order       Int
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  createdBy   Int
+
+  instructorId Int
+  instructor   User @relation("InstructorCourses", fields: [instructorId], references: [id])
+
+  enrollments     Enrollment[]
+  lessons         Lesson[]
+  quizzes         Quiz[]
+  polls           Poll[]
+  assignments     Assignment[]
+  payments        Payment[]
+  materials       Material[]
+  videos          Video[]
+  liveStreams     LiveStream[]
+  modules         CourseModule[]
+  progress        Progress[]
+  achievements    Achievement[]
+  certificates    Certificate[]
+  recommendations CourseRecommendation[]
+  interactions    UserInteraction[]
+  events          CalendarEvent[]
+  Interaction     Interaction[]
+}
+
+model Enrollment {
+  id        Int    @id @default(autoincrement())
+  courseId  Int
+  course    Course @relation(fields: [courseId], references: [id])
+  studentId Int
+  student   User   @relation(fields: [studentId], references: [id])
+
+  paymentId Int?     @unique
+  payment   Payment? @relation(fields: [paymentId], references: [id])
+
+  createdAt DateTime @default(now())
+}
+
+model Payment {
+  id        Int    @id @default(autoincrement())
+  studentId Int
+  student   User   @relation(fields: [studentId], references: [id])
+  courseId  Int
+  course    Course @relation(fields: [courseId], references: [id])
+
+  enrollment Enrollment?
+
+  amount        Float
+  currency      String   @default("USD")
+  status        String // e.g. "PENDING", "COMPLETED", "FAILED"
+  provider      String // e.g. "stripe", "paypal"
+  transactionId String? // ID from payment gateway
+  createdAt     DateTime @default(now())
+}
+
+model Material {
+  id         Int      @id @default(autoincrement())
+  courseId   Int
+  course     Course   @relation(fields: [courseId], references: [id])
+  type       String // "pdf","image","link","video","zip","document"
+  key        String // R2 object key
+  filename   String
+  size       Int
+  mimeType   String
+  url        String // Public URL for the file
+  uploadedBy Int
+  uploader   User     @relation(fields: [uploadedBy], references: [id])
+  meta       Json? // Additional metadata
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+model Lesson {
+  id        Int      @id @default(autoincrement())
+  courseId  Int
+  course    Course   @relation(fields: [courseId], references: [id])
+  title     String
+  content   Json?
+  order     Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  quizzes   Quiz[]
+}
+
+model Quiz {
+  id           Int           @id @default(autoincrement())
+  courseId     Int
+  course       Course        @relation(fields: [courseId], references: [id])
+  moduleId     Int?
+  module       CourseModule? @relation(fields: [moduleId], references: [id])
+  lessonId     Int?
+  title        String
+  description  String?
+  instructions String?
+  timeLimit    Int? // Time limit in minutes
+  maxAttempts  Int? // Maximum number of attempts
+  passingScore Float? // Minimum score to pass
+  isPublished  Boolean       @default(false)
+  publishedAt  DateTime?
+  dueDate      DateTime?
+  createdBy    Int
+  creator      User          @relation(fields: [createdBy], references: [id])
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  questions   QuizQuestion[]
+  attempts    QuizAttempt[]
+  events      CalendarEvent[]
+  Lesson      Lesson?         @relation(fields: [lessonId], references: [id])
+  Interaction Interaction[]
+}
+
+model QuizQuestion {
+  id            Int      @id @default(autoincrement())
+  quizId        Int
+  quiz          Quiz     @relation(fields: [quizId], references: [id])
+  question      String
+  type          String // "multiple_choice", "true_false", "fill_blank", "essay"
+  options       Json? // For multiple choice questions
+  correctAnswer Json? // Correct answer(s)
+  points        Int      @default(1)
+  order         Int // Question order
+  explanation   String? // Explanation for correct answer
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model QuizAttempt {
+  id          Int       @id @default(autoincrement())
+  quizId      Int
+  quiz        Quiz      @relation(fields: [quizId], references: [id])
+  studentId   Int
+  student     User      @relation(fields: [studentId], references: [id])
+  score       Float?
+  maxScore    Float
+  percentage  Float?
+  isPassed    Boolean   @default(false)
+  timeSpent   Int? // Time spent in seconds
+  startedAt   DateTime  @default(now())
+  submittedAt DateTime?
+  gradedAt    DateTime?
+  gradedBy    Int?
+  grader      User?     @relation("QuizGrader", fields: [gradedBy], references: [id])
+  answers     Json? // Student answers
+  feedback    String? // Instructor feedback
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@unique([quizId, studentId, startedAt])
+}
+
+model Assignment {
+  id           Int           @id @default(autoincrement())
+  courseId     Int
+  course       Course        @relation(fields: [courseId], references: [id])
+  moduleId     Int?
+  module       CourseModule? @relation(fields: [moduleId], references: [id])
+  title        String
+  description  String?
+  instructions String?
+  type         String // "essay", "file_upload", "peer_review", "group_project"
+  maxScore     Float?
+  dueDate      DateTime?
+  isPublished  Boolean       @default(false)
+  publishedAt  DateTime?
+  createdBy    Int
+  creator      User          @relation(fields: [createdBy], references: [id])
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  submissions Submission[]
+  events      CalendarEvent[]
+}
+
+model Submission {
+  id           Int        @id @default(autoincrement())
+  assignmentId Int
+  assignment   Assignment @relation(fields: [assignmentId], references: [id])
+  studentId    Int
+  student      User       @relation(fields: [studentId], references: [id])
+  content      String?
+  attachments  Json?
+  submittedAt  DateTime   @default(now())
+  gradedAt     DateTime?
+  grade        Float?
+  feedback     String?
+}
+
+model Poll {
+  id           Int          @id @default(autoincrement())
+  courseId     Int
+  title        String
+  description  String?
+  moduleId     Int?
+  course       Course       @relation(fields: [courseId], references: [id])
+  liveStreamId Int?
+  liveStream   LiveStream?  @relation(fields: [liveStreamId], references: [id])
+  createdBy    Int
+  creator      User         @relation(fields: [createdBy], references: [id])
+  question     String
+  options      PollOption[]
+  isActive     Boolean      @default(true)
+  expiresAt    DateTime?
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  responses PollResponse[]
+}
+
+model PollOption {
+  id     Int    @id @default(autoincrement())
+  pollId Int
+  poll   Poll   @relation(fields: [pollId], references: [id])
+  text   String
+  order  Int
+  votes  Int    @default(0)
+}
+
+model Video {
+  id           Int       @id @default(autoincrement())
+  courseId     Int
+  course       Course    @relation(fields: [courseId], references: [id])
+  streamId     String    @unique // Cloudflare Stream video ID
+  title        String
+  description  String?
+  type         String    @default("on-demand") // "on-demand" or "live"
+  status       String    @default("pending") // "pending", "ready", "live", "ended", "failed"
+  playbackUrl  String? // HLS playback URL
+  thumbnailUrl String? // Video thumbnail URL
+  duration     Int? // Duration in seconds
+  size         Int? // File size in bytes
+  uploadedBy   Int
+  uploader     User      @relation(fields: [uploadedBy], references: [id])
+  scheduledAt  DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+}
+
+model LiveStream {
+  id          Int       @id @default(autoincrement())
+  courseId    Int
+  course      Course    @relation(fields: [courseId], references: [id])
+  streamId    String    @unique // Cloudflare Stream live input ID
+  title       String
+  description String?
+  status      String    @default("ready") // "ready", "live", "ended"
+  playbackUrl String? // HLS playback URL
+  rtmpUrl     String? // RTMP input URL
+  streamKey   String? // Stream key for broadcasting
+  isActive    Boolean   @default(false)
+  startedAt   DateTime?
+  endedAt     DateTime?
+  createdBy   Int
+  creator     User      @relation(fields: [createdBy], references: [id])
+  scheduledAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  questions StreamQuestion[]
+  polls     StreamPoll[]
+  Poll      Poll[]
+}
+
+model StreamQuestion {
+  id         Int        @id @default(autoincrement())
+  streamId   String
+  stream     LiveStream @relation(fields: [streamId], references: [streamId])
+  studentId  Int
+  student    User       @relation(fields: [studentId], references: [id])
+  question   String
+  timestamp  Int // Timestamp in the video/stream
+  isAnswered Boolean    @default(false)
+  answeredBy Int?
+  answer     String?
+  answeredAt DateTime?
+  createdAt  DateTime   @default(now())
+}
+
+model StreamPoll {
+  id           Int        @id @default(autoincrement())
+  streamId     String
+  stream       LiveStream @relation(fields: [streamId], references: [streamId])
+  instructorId Int
+  instructor   User       @relation(fields: [instructorId], references: [id])
+  question     String
+  options      String[]
+  isActive     Boolean    @default(true)
+  expiresAt    DateTime?
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  responses PollResponse[] // back relation, no need to map unless conflicts exist
+}
+
+model PollResponse {
+  id        Int        @id @default(autoincrement())
+  pollId    Int
+  poll      StreamPoll @relation(fields: [pollId], references: [id], map: "pollresponse_poll_fkey")
+  studentId Int
+  student   User       @relation(fields: [studentId], references: [id], map: "pollresponse_student_fkey")
+  option    String
+  createdAt DateTime   @default(now())
+  Poll      Poll       @relation(fields: [pollId], references: [id])
+
+  @@unique([pollId, studentId])
+}
+
+model Notification {
+  id        Int       @id @default(autoincrement())
+  toUserId  Int
+  toUser    User      @relation(fields: [toUserId], references: [id])
+  title     String
+  message   String
+  type      String // "reminder", "announcement", "poll", "assignment", etc.
+  metadata  Json?
+  isRead    Boolean   @default(false)
+  createdAt DateTime  @default(now())
+  readAt    DateTime?
+}
+
+model CourseModule {
+  id          Int       @id @default(autoincrement())
+  courseId    Int
+  course      Course    @relation(fields: [courseId], references: [id])
+  title       String
+  content     Json?
+  description String?
+  order       Int // Module order within course
+  isPublished Boolean   @default(false)
+  publishedAt DateTime?
+  createdBy   Int
+  creator     User      @relation(fields: [createdBy], references: [id])
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  quizzes     Quiz[]
+  assignments Assignment[]
+  progress    Progress[]
+  Interaction Interaction[]
+}
+
+model Progress {
+  id           Int           @id @default(autoincrement())
+  studentId    Int
+  student      User          @relation(fields: [studentId], references: [id])
+  courseId     Int
+  course       Course        @relation(fields: [courseId], references: [id])
+  moduleId     Int?
+  module       CourseModule? @relation(fields: [moduleId], references: [id])
+  type         String // "module", "quiz", "assignment", "video", "material"
+  itemId       Int // ID of the specific item (module, quiz, etc.)
+  status       String // "not_started", "in_progress", "completed", "passed", "failed"
+  progress     Float         @default(0) // Progress percentage (0-100)
+  score        Float? // Score achieved
+  timeSpent    Int? // Time spent in seconds
+  lastAccessed DateTime      @default(now())
+  completedAt  DateTime?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  @@unique([studentId, courseId, type, itemId])
+}
+
+model Achievement {
+  id        Int      @id @default(autoincrement())
+  studentId Int
+  student   User     @relation(fields: [studentId], references: [id])
+  courseId  Int?
+  course    Course?  @relation(fields: [courseId], references: [id])
+  badgeName String // Badge name/type
+  badgeIcon String? // Badge icon URL
+  earnedAt  DateTime @default(now())
+  metadata  Json? // Additional achievement data
+
+  @@unique([studentId, courseId, badgeName])
+}
+
+model Certificate {
+  id          Int       @id @default(autoincrement())
+  studentId   Int
+  student     User      @relation(fields: [studentId], references: [id])
+  courseId    Int
+  course      Course    @relation(fields: [courseId], references: [id])
+  title       String
+  description String?
+  template    String? // Certificate template
+  issuedAt    DateTime  @default(now())
+  expiresAt   DateTime?
+  isActive    Boolean   @default(true)
+  metadata    Json? // Certificate metadata
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@unique([studentId, courseId])
+}
+
+// Recommendation Engine Models
+model CourseRecommendation {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id])
+  courseId  Int
+  course    Course   @relation(fields: [courseId], references: [id])
+  score     Float // Recommendation score (0-1)
+  reason    String // Reason for recommendation
+  algorithm String // Algorithm used (e.g., "collaborative", "content_based", "popularity")
+  metadata  Json? // Additional recommendation data
+  isViewed  Boolean  @default(false)
+  isClicked Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, courseId])
+  @@index([userId, score])
+}
+
+model UserInteraction {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id])
+  courseId  Int?
+  course    Course?  @relation(fields: [courseId], references: [id])
+  type      String // "view", "enroll", "complete", "rate", "search"
+  value     Float? // Rating value, time spent, etc.
+  metadata  Json? // Additional interaction data
+  createdAt DateTime @default(now())
+
+  @@index([userId, type])
+  @@index([courseId, type])
+}
+
+// Calendar & Scheduling Models
+model CalendarEvent {
+  id          Int       @id @default(autoincrement())
+  title       String
+  description String?
+  type        String // "live_class", "deadline", "assignment_due", "quiz_due", "custom"
+  startTime   DateTime
+  endTime     DateTime?
+  isAllDay    Boolean   @default(false)
+  location    String? // Physical location or meeting URL
+  courseId    Int?
+  course      Course?   @relation(fields: [courseId], references: [id])
+  createdBy   Int
+  creator     User      @relation(fields: [createdBy], references: [id])
+
+  // Related entities
+  assignmentId Int?
+  assignment   Assignment? @relation(fields: [assignmentId], references: [id])
+  quizId       Int?
+  quiz         Quiz?       @relation(fields: [quizId], references: [id])
+
+  // Recurrence settings
+  isRecurring    Boolean @default(false)
+  recurrenceRule String? // RRULE format for recurring events
+
+  // Notification settings
+  reminderMinutes Int[] @default([15]) // Minutes before event to send reminders
+
+  metadata  Json? // Additional event data
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  attendees EventAttendee[]
+  reminders EventReminder[]
+
+  @@index([courseId, startTime])
+  @@index([createdBy, startTime])
+}
+
+model EventAttendee {
+  id        Int           @id @default(autoincrement())
+  eventId   Int
+  event     CalendarEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  userId    Int
+  user      User          @relation(fields: [userId], references: [id])
+  status    String        @default("invited") // "invited", "accepted", "declined", "maybe"
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  @@unique([eventId, userId])
+}
+
+model EventReminder {
+  id         Int           @id @default(autoincrement())
+  eventId    Int
+  event      CalendarEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  userId     Int
+  user       User          @relation(fields: [userId], references: [id])
+  reminderAt DateTime
+  type       String        @default("email") // "email", "push", "sms"
+  isSent     Boolean       @default(false)
+  createdAt  DateTime      @default(now())
+
+  @@index([reminderAt, isSent])
+}
+
+model AuditLog {
+  id        Int      @id @default(autoincrement())
+  userId    Int?
+  user      User?    @relation(fields: [userId], references: [id])
+  action    String
+  entity    String
+  entityId  Int?
+  metadata  Json?
+  createdAt DateTime @default(now())
+}
+
+model Interaction {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  courseId  Int?
+  moduleId  Int?
+  quizId    Int?
+  eventType String // 'view', 'attempt', 'search', 'rating', etc.
+  metadata  Json? // extra info like search terms or rating score
+  createdAt DateTime @default(now())
+
+  user   User          @relation(fields: [userId], references: [id])
+  course Course?       @relation(fields: [courseId], references: [id])
+  module CourseModule? @relation(fields: [moduleId], references: [id])
+  quiz   Quiz?         @relation(fields: [quizId], references: [id])
+}

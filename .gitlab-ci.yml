@@ -1,0 +1,63 @@
+stages:
+  - install
+  - lint
+  - build
+  - test
+  - deploy
+
+variables:
+  NODE_ENV: development
+  POSTGRES_DB: skillstream
+  POSTGRES_USER: skillstream
+  POSTGRES_PASSWORD: password
+  MONGO_URI: mongodb://mongodb:27017/skillstream
+
+services:
+  - name: postgres:15
+    alias: postgres
+  - name: mongo:7
+    alias: mongodb
+  - name: wurstmeister/kafka:latest
+    alias: kafka
+
+cache:
+  paths:
+    - node_modules/
+
+before_script:
+  - npm ci
+
+lint:
+  stage: lint
+  script:
+    - npx eslint "src/**/*.ts"
+  only:
+    - merge_requests
+    - main
+
+build:
+  stage: build
+  script:
+    - npm run build
+  only:
+    - merge_requests
+    - main
+
+test:
+  stage: test
+  script:
+    - npm run test
+  only:
+    - merge_requests
+    - main
+
+deploy:
+  stage: deploy
+  script:
+    - echo "Deploying SkillStream backend..."
+    - docker-compose -f docker-compose.prod.yml up -d --build
+  environment:
+    name: production
+    url: http://your-production-url
+  only:
+    - main

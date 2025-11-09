@@ -2,9 +2,9 @@ name: Node.js Backend CI
 
 on:
   push:
-    branches: [ main ]      # Run on push to main branch
+    branches: [ main, master ]      # Run on push to main branch
   pull_request:
-    branches: [ main ]      # Run on PR to main
+    branches: [ main, master ]      # Run on PR to main
 
 jobs:
   build:

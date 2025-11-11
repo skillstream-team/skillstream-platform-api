@@ -19,6 +19,7 @@
     "@types/graphql": "^14.2.3",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^24.5.2",
+    "@types/nodemailer": "^7.0.3",
     "@types/socket.io": "^3.0.1",
     "@types/swagger-jsdoc": "^6.0.4",
     "@types/swagger-ui-express": "^4.1.8",

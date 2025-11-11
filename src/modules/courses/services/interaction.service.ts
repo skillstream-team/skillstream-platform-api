@@ -152,14 +152,16 @@ async function getRecommendedCourses(userId: number) {
 
     const courseScores: Record<number, number> = {};
 
-    // @ts-ignore
     interactions.forEach(i => {
         if (!i.courseId) return;
         let score = 0;
         switch (i.eventType) {
             case 'view': score += 1; break;
             case 'attempt': score += 3; break;
-            case 'rating': score += i.metadata?.score || 0; break;
+            case 'rating': 
+                const metadata = i.metadata as { score?: number } | null;
+                score += (metadata?.score || 0); 
+                break;
             case 'search': score += 2; break;
         }
         courseScores[i.courseId] = (courseScores[i.courseId] || 0) + score;

@@ -329,6 +329,45 @@ export class MediaService {
 
     /**
      * @swagger
+     * /media/live-streams/{streamId}/questions:
+     *   get:
+     *     summary: Get all questions for a live stream
+     *     tags: [Live Streams]
+     */
+    async getStreamQuestions(streamId: string): Promise<StreamQuestionDto[]> {
+        const questions = await prisma.streamQuestion.findMany({
+            where: { streamId },
+            include: { student: { select: { id: true, username: true, email: true } } },
+            orderBy: { createdAt: 'desc' },
+        });
+
+        return questions as StreamQuestionDto[];
+    }
+
+    /**
+     * @swagger
+     * /media/live-streams/questions/{questionId}/answer:
+     *   post:
+     *     summary: Answer a question during a live stream
+     *     tags: [Live Streams]
+     */
+    async answerQuestion(questionId: number, answeredBy: number, answer: string): Promise<StreamQuestionDto> {
+        const question = await prisma.streamQuestion.update({
+            where: { id: questionId },
+            data: {
+                isAnswered: true,
+                answeredBy,
+                answer,
+                answeredAt: new Date(),
+            },
+            include: { student: { select: { id: true, username: true, email: true } } },
+        });
+
+        return question as StreamQuestionDto;
+    }
+
+    /**
+     * @swagger
      * /media/live-streams/{streamId}/polls:
      *   get:
      *     summary: Get all polls for a live stream
@@ -347,5 +386,75 @@ export class MediaService {
         });
 
         return polls as StreamPollDto[];
+    }
+
+    /**
+     * @swagger
+     * /media/live-streams/{streamId}/polls:
+     *   post:
+     *     summary: Create a poll for a live stream
+     *     tags: [Live Streams]
+     */
+    async createPoll(data: CreateStreamPollDto): Promise<StreamPollDto> {
+        const poll = await prisma.streamPoll.create({
+            data: {
+                streamId: data.streamId,
+                instructorId: data.instructorId,
+                question: data.question,
+                options: data.options,
+                expiresAt: data.expiresAt,
+                isActive: true,
+            },
+            include: {
+                instructor: { select: { id: true, username: true, email: true } },
+                responses: {
+                    include: { student: { select: { id: true, username: true, email: true } } },
+                },
+            },
+        });
+
+        return poll as StreamPollDto;
+    }
+
+    /**
+     * @swagger
+     * /media/live-streams/polls/{pollId}/respond:
+     *   post:
+     *     summary: Respond to a poll
+     *     tags: [Live Streams]
+     */
+    async respondToPoll(data: CreatePollResponseDto): Promise<PollResponseDto> {
+        const response = await prisma.pollResponse.create({
+            data: {
+                pollId: data.pollId,
+                studentId: data.studentId,
+                option: data.option,
+            },
+            include: { student: { select: { id: true, username: true, email: true } } },
+        });
+
+        return response as PollResponseDto;
+    }
+
+    /**
+     * @swagger
+     * /media/live-streams/polls/{pollId}/end:
+     *   patch:
+     *     summary: End a poll
+     *     tags: [Live Streams]
+     */
+    async endPoll(pollId: number): Promise<StreamPollDto> {
+        const poll = await prisma.streamPoll.update({
+            where: { id: pollId },
+            data: { isActive: false },
+            include: {
+                instructor: { select: { id: true, username: true, email: true } },
+                responses: {
+                    include: { student: { select: { id: true, username: true, email: true } } },
+                },
+            },
+        });
+
+        return poll as StreamPollDto;
     }
 }

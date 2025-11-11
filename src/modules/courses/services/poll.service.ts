@@ -5,9 +5,12 @@ export { prisma };
 
 class PollService {
     async createPoll(data: CreatePollDto, creatorId: number) {
+        // Use title as question if question is not provided separately
+        // The Poll model requires both title and question fields
         return prisma.poll.create({
             data: {
                 title: data.title,
+                question: data.title, // Using title as question, or you could add question to DTO
                 description: data.description,
                 courseId: data.courseId,
                 moduleId: data.moduleId,
@@ -22,8 +25,32 @@ class PollService {
     }
 
     async respondToPoll(pollId: number, optionId: number, userId: number) {
+        // Find the poll option to get its text
+        const pollOption = await prisma.pollOption.findUnique({
+            where: { id: optionId },
+            include: { poll: true }
+        });
+
+        if (!pollOption || pollOption.pollId !== pollId) {
+            throw new Error('Invalid poll option');
+        }
+
+        // Increment votes on the PollOption
+        await prisma.pollOption.update({
+            where: { id: optionId },
+            data: { votes: { increment: 1 } }
+        });
+
+        // Create PollResponse record
+        // Note: PollResponse uses 'option' (string) not 'optionId'
+        // The schema has both StreamPoll and Poll relations sharing the same pollId
+        // We'll let Prisma handle the relation based on which poll exists
         return prisma.pollResponse.create({
-            data: { pollId, optionId, userId }
+            data: { 
+                pollId, 
+                studentId: userId,
+                option: pollOption.text
+            }
         });
     }
 
@@ -31,9 +58,7 @@ class PollService {
         return prisma.poll.findUnique({
             where: { id: pollId },
             include: {
-                options: {
-                    include: { votes: true }
-                }
+                options: true // votes is an Int field on PollOption, not a relation
             }
         });
     }

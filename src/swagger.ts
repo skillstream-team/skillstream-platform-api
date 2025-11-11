@@ -2,6 +2,10 @@ import swaggerJsdoc from 'swagger-jsdoc';
 import swaggerUi from 'swagger-ui-express';
 import { Express } from 'express';
 
+// Use environment-aware file extensions
+const fileExt = process.env.NODE_ENV === 'production' ? 'js' : 'ts';
+const baseDir = process.env.NODE_ENV === 'production' ? './dist' : './src';
+
 const options: swaggerJsdoc.Options = {
   definition: {
     openapi: '3.0.0',
@@ -18,12 +22,22 @@ const options: swaggerJsdoc.Options = {
     ],
   },
   apis: [
-    './src/modules/**/routes/**/*.ts',
-    './src/modules/**/services/*.ts',
+    `${baseDir}/modules/**/routes/**/*.${fileExt}`,
+    `${baseDir}/modules/**/services/*.${fileExt}`,
   ],
 };
 
-const specs = swaggerJsdoc(options);
+let specs: any;
+try {
+  specs = swaggerJsdoc(options);
+} catch (error) {
+  console.warn('⚠️  Swagger documentation generation failed:', error instanceof Error ? error.message : error);
+  // Fallback to empty spec to prevent app crash
+  specs = {
+    ...options.definition,
+    paths: {},
+  };
+}
 
 export const setupSwagger = (app: Express) => {
   app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(specs));

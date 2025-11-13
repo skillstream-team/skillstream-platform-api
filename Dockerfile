@@ -10,13 +10,16 @@ RUN apk add --no-cache bash git python3 make g++
 # Copy package.json and package-lock.json first (for caching)
 COPY package*.json ./
 
+# Copy Prisma schema (needed for postinstall script)
+COPY prisma ./prisma
+
 # Install dependencies (including dev dependencies for build)
-RUN npm ci
+RUN npm install
 
 # Copy all source files
 COPY . .
 
-# Generate Prisma client
+# Generate Prisma client (now that we have the schema)
 RUN npx prisma generate
 
 # Build TypeScript

@@ -10,8 +10,8 @@ RUN apk add --no-cache bash git python3 make g++
 # Copy package.json and package-lock.json first (for caching)
 COPY package*.json ./
 
-# Install dependencies
-RUN npm ci --only=production=false
+# Install dependencies (including dev dependencies for build)
+RUN npm ci
 
 # Copy all source files
 COPY . .

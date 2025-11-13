@@ -6,6 +6,9 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.setupSwagger = void 0;
 const swagger_jsdoc_1 = __importDefault(require("swagger-jsdoc"));
 const swagger_ui_express_1 = __importDefault(require("swagger-ui-express"));
+// Use environment-aware file extensions
+const fileExt = process.env.NODE_ENV === 'production' ? 'js' : 'ts';
+const baseDir = process.env.NODE_ENV === 'production' ? './dist' : './src';
 const options = {
     definition: {
         openapi: '3.0.0',
@@ -22,11 +25,22 @@ const options = {
         ],
     },
     apis: [
-        './src/modules/**/routes/**/*.ts',
-        './src/modules/**/services/*.ts',
+        `${baseDir}/modules/**/routes/**/*.${fileExt}`,
+        `${baseDir}/modules/**/services/*.${fileExt}`,
     ],
 };
-const specs = (0, swagger_jsdoc_1.default)(options);
+let specs;
+try {
+    specs = (0, swagger_jsdoc_1.default)(options);
+}
+catch (error) {
+    console.warn('⚠️  Swagger documentation generation failed:', error instanceof Error ? error.message : error);
+    // Fallback to empty spec to prevent app crash
+    specs = {
+        ...options.definition,
+        paths: {},
+    };
+}
 const setupSwagger = (app) => {
     app.use('/api-docs', swagger_ui_express_1.default.serve, swagger_ui_express_1.default.setup(specs));
 };

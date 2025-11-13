@@ -1,0 +1,64 @@
+# Render.com Blueprint Configuration
+# This file defines the services to be deployed on Render
+
+services:
+  - type: web
+    name: skillstream-api
+    env: node
+    plan: starter
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3000
+      # Database connection (provided by Render PostgreSQL service)
+      - key: DATABASE_URL
+        sync: false  # Set this in Render dashboard after creating PostgreSQL service
+      # Redis connection (provided by Render Redis service)
+      - key: REDIS_URL
+        sync: false  # Set this in Render dashboard after creating Redis service
+      # Kafka connection (if using external Kafka service)
+      - key: KAFKA_BROKERS
+        sync: false  # Set this in Render dashboard (e.g., "broker1:9092,broker2:9092")
+      - key: KAFKA_CLIENT_ID
+        value: skillstream-backend
+      - key: KAFKA_GROUP_ID
+        value: skillstream-group
+      # JWT Configuration
+      - key: JWT_SECRET
+        sync: false  # Set a strong secret in Render dashboard
+      - key: RESET_TOKEN_SECRET
+        sync: false  # Set a strong secret in Render dashboard
+      # Supabase Configuration
+      - key: SUPABASE_URL
+        sync: false  # Set your Supabase project URL
+      - key: SUPABASE_KEY
+        sync: false  # Set your Supabase anon key
+      # Frontend URL for CORS
+      - key: FRONTEND_URL
+        sync: false  # Set your frontend URL
+      # Server URL for Swagger
+      - key: SERVER_URL
+        sync: false  # Set your production server URL
+      # Cloudflare R2 (if using)
+      - key: R2_ACCOUNT_ID
+        sync: false
+      - key: R2_ACCESS_KEY_ID
+        sync: false
+      - key: R2_SECRET_ACCESS_KEY
+        sync: false
+      - key: R2_BUCKET_NAME
+        sync: false
+      # Cloudflare Stream (if using)
+      - key: CLOUDFLARE_STREAM_API_TOKEN
+        sync: false
+      - key: CLOUDFLARE_ACCOUNT_ID
+        sync: false
+
+# Note: You'll need to create separate services in Render for:
+# 1. PostgreSQL database
+# 2. Redis instance (optional but recommended)
+# 3. External Kafka service (if needed)
+

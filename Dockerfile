@@ -11,7 +11,7 @@ RUN apk add --no-cache bash git python3 make g++
 COPY package*.json ./
 
 # Install dependencies
-RUN npm ci
+RUN npm ci --only=production=false
 
 # Copy all source files
 COPY . .
@@ -22,7 +22,7 @@ RUN npx prisma generate
 # Build TypeScript
 RUN npm run build
 
-# Expose port
+# Expose port (Render will set PORT env var, but EXPOSE needs a fixed number)
 EXPOSE 3000
 
 # Set environment

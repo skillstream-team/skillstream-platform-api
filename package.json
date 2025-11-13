@@ -4,9 +4,10 @@
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "ts-node src/server.ts",
-    "build": "tsc",
-    "dev": "ts-node-dev --respawn --transpile-only src/server.ts"
+    "start": "node dist/server.js",
+    "build": "tsc && npx prisma generate",
+    "dev": "ts-node-dev --respawn --transpile-only src/server.ts",
+    "postinstall": "npx prisma generate"
   },
   "keywords": [],
   "author": "",
@@ -14,6 +15,7 @@
   "description": "",
   "devDependencies": {
     "@types/bcrypt": "^6.0.0",
+    "@types/cors": "^2.8.17",
     "@types/express": "^5.0.3",
     "@types/express-graphql": "^0.8.2",
     "@types/graphql": "^14.2.3",
@@ -35,6 +37,7 @@
     "@supabase/supabase-js": "^2.58.0",
     "axios": "^1.12.2",
     "bcrypt": "^6.0.0",
+    "cors": "^2.8.5",
     "express": "^5.1.0",
     "express-graphql": "^0.12.0",
     "express-rate-limit": "^8.1.0",

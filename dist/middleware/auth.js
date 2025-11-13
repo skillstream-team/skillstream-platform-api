@@ -12,7 +12,11 @@ const requireAuth = async (req, res, next) => {
         if (!token) {
             return res.status(401).json({ error: 'Access denied. No token provided.' });
         }
-        const jwtSecret = process.env.JWT_SECRET || 'your-secret-key';
+        const jwtSecret = process.env.JWT_SECRET;
+        if (!jwtSecret) {
+            console.error('JWT_SECRET is not configured');
+            return res.status(500).json({ error: 'Server configuration error' });
+        }
         const decoded = jsonwebtoken_1.default.verify(token, jwtSecret);
         // Get user from database
         const user = await prisma_1.prisma.user.findUnique({
@@ -41,7 +45,11 @@ const optionalAuth = async (req, res, next) => {
         if (!token) {
             return next();
         }
-        const jwtSecret = process.env.JWT_SECRET || 'your-secret-key';
+        const jwtSecret = process.env.JWT_SECRET;
+        if (!jwtSecret) {
+            // If JWT_SECRET is not configured, skip auth
+            return next();
+        }
         const decoded = jsonwebtoken_1.default.verify(token, jwtSecret);
         // Get user from database
         const user = await prisma_1.prisma.user.findUnique({

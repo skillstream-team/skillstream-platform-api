@@ -23,6 +23,8 @@ try {
 }
 
 const app = express();
+// Trust first proxy (Render/Cloudflare) so rate limiting and IP-based features work correctly
+app.set('trust proxy', 1);
 const server = http.createServer(app);
 const io = new Server(server, {
     cors: corsOptions,

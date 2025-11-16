@@ -9,20 +9,14 @@ const getRedisConfig = () => {
       url: process.env.REDIS_URL,
     };
   }
-  
-  // Otherwise, use individual connection parameters
-  return {
-    host: process.env.REDIS_HOST || '127.0.0.1',
-    port: Number(process.env.REDIS_PORT) || 6379,
-    password: process.env.REDIS_PASSWORD || undefined,
-  };
 };
 
 let redisClient: RedisClient | null = null;
 
 try {
   const config = getRedisConfig();
-  if ('url' in config && config.url) {
+  // @ts-ignore
+    if ('url' in config && config.url) {
     redisClient = new Redis(config.url, {
       retryStrategy: (times) => {
         const delay = Math.min(times * 50, 2000);
@@ -30,19 +24,9 @@ try {
       },
       maxRetriesPerRequest: 3,
     });
-  } else if (!('url' in config)) {
-    redisClient = new Redis({
-      host: config.host,
-      port: config.port,
-      password: config.password,
-      retryStrategy: (times) => {
-        const delay = Math.min(times * 50, 2000);
-        return delay;
-      },
-      maxRetriesPerRequest: 3,
-    });
+  } else {
+      console.error('Redis URL must be provided.');
   }
-
   if (redisClient) {
     redisClient.on('error', (err) => {
       console.error('Redis connection error:', err);

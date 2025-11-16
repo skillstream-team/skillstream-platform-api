@@ -1,25 +1,25 @@
 export interface CreateMaterialDto {
-  courseId: number;
+  courseId: string;
   type: 'pdf' | 'image' | 'document' | 'zip' | 'other';
   filename: string;
   size: number;
   mimeType: string;
-  uploadedBy: number;
+  uploadedBy: string;
   file: Buffer;
 }
 
 export interface MaterialResponseDto {
-  id: number;
-  courseId: number;
+  id: string;
+  courseId: string;
   type: string;
   key: string;
   filename: string;
   size: number;
   mimeType: string;
   url: string;
-  uploadedBy: number;
+  uploadedBy: string;
   uploader: {
-    id: number;
+    id: string;
     username: string;
     email: string;
   };
@@ -29,18 +29,18 @@ export interface MaterialResponseDto {
 }
 
 export interface CreateVideoDto {
-  courseId: number;
+  courseId: string;
   title: string;
   description?: string;
   type: 'on-demand' | 'live';
   duration?: number;
-  uploadedBy: number;
+  uploadedBy: string;
   scheduledAt?: Date;
 }
 
 export interface VideoResponseDto {
-  id: number;
-  courseId: number;
+  id: string;
+  courseId: string;
   streamId: string;
   title: string;
   description?: string;
@@ -50,9 +50,9 @@ export interface VideoResponseDto {
   thumbnailUrl?: string;
   duration?: number;
   size?: number;
-  uploadedBy: number;
+  uploadedBy: string;
   uploader: {
-    id: number;
+    id: string;
     username: string;
     email: string;
   };
@@ -62,16 +62,16 @@ export interface VideoResponseDto {
 }
 
 export interface CreateLiveStreamDto {
-  courseId: number;
+  courseId: string;
   title: string;
   description?: string;
-  createdBy: number;
+  createdBy: string;
   scheduledAt?: Date;
 }
 
 export interface LiveStreamResponseDto {
-  id: number;
-  courseId: number;
+  id: string;
+  courseId: string;
   streamId: string;
   title: string;
   description?: string;
@@ -82,9 +82,9 @@ export interface LiveStreamResponseDto {
   isActive: boolean;
   startedAt?: Date;
   endedAt?: Date;
-  createdBy: number;
+  createdBy: string;
   creator: {
-    id: number;
+    id: string;
     username: string;
     email: string;
   };
@@ -94,18 +94,18 @@ export interface LiveStreamResponseDto {
 }
 
 export interface StreamQuestionDto {
-  id: number;
+  id: string;
   streamId: string;
-  studentId: number;
+  studentId: string;
   student: {
-    id: number;
+    id: string;
     username: string;
     email: string;
   };
   question: string;
   timestamp: number;
   isAnswered: boolean;
-  answeredBy?: number;
+  answeredBy?: string | null;
   answer?: string;
   answeredAt?: Date;
   createdAt: Date;
@@ -113,17 +113,17 @@ export interface StreamQuestionDto {
 
 export interface CreateStreamQuestionDto {
   streamId: string;
-  studentId: number;
+  studentId: string;
   question: string;
   timestamp: number;
 }
 
 export interface StreamPollDto {
-  id: number;
+  id: string;
   streamId: string;
-  instructorId: number;
+  instructorId: string;
   instructor: {
-    id: number;
+    id: string;
     username: string;
     email: string;
   };
@@ -138,18 +138,18 @@ export interface StreamPollDto {
 
 export interface CreateStreamPollDto {
   streamId: string;
-  instructorId: number;
+  instructorId: string;
   question: string;
   options: string[];
   expiresAt?: Date;
 }
 
 export interface PollResponseDto {
-  id: number;
-  pollId: number;
-  studentId: number;
+  id: string;
+  pollId: string;
+  studentId: string;
   student: {
-    id: number;
+    id: string;
     username: string;
     email: string;
   };
@@ -158,8 +158,8 @@ export interface PollResponseDto {
 }
 
 export interface CreatePollResponseDto {
-  pollId: number;
-  studentId: number;
+  pollId: string;
+  studentId: string;
   option: string;
 }
 

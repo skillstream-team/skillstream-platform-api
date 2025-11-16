@@ -78,11 +78,9 @@ The project has been refactored to remove hardcoded service connections and make
 ## Environment Variables Required
 
 ### Required
-- `DATABASE_URL` - PostgreSQL connection string
+- `DATABASE_URL` - MongoDB connection string
 - `JWT_SECRET` - Secret for JWT token signing
 - `RESET_TOKEN_SECRET` - Secret for password reset tokens
-- `SUPABASE_URL` - Supabase project URL
-- `SUPABASE_KEY` - Supabase anon key
 
 ### Optional (but recommended)
 - `REDIS_URL` - Redis connection URL (for distributed rate limiting)

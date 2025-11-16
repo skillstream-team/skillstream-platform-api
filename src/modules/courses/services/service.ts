@@ -41,8 +41,8 @@ export class CoursesService {
         description?: string;
         price: number;
         order: number;
-        createdBy: number;
-        instructorId: number;
+        createdBy: string;
+        instructorId: string;
     }) {
         return prisma.course.create({ data });
     }
@@ -87,7 +87,7 @@ export class CoursesService {
      *       404:
      *         description: Course not found
      */
-    async getCourseById(id: number) {
+    async getCourseById(id: string) {
         return prisma.course.findUnique({
             where: { id },
             include: {
@@ -108,7 +108,7 @@ export class CoursesService {
      *     summary: Update course information
      *     tags: [Courses]
      */
-    async updateCourse(id: number, data: Prisma.CourseUpdateInput) {
+    async updateCourse(id: string, data: Prisma.CourseUpdateInput) {
         return prisma.course.update({
             where: { id },
             data,
@@ -123,7 +123,7 @@ export class CoursesService {
      *     summary: Delete a course by ID
      *     tags: [Courses]
      */
-    async deleteCourse(id: number) {
+    async deleteCourse(id: string) {
         return prisma.course.delete({ where: { id } });
     }
 
@@ -138,13 +138,13 @@ export class CoursesService {
      *     summary: Add a module to a course
      *     tags: [Modules]
      */
-    async addModuleToCourse(courseId: number, data: {
+    async addModuleToCourse(courseId: string, data: {
         title: string;
         content?: Prisma.InputJsonValue;
         description?: string;
         order: number;
         isPublished?: boolean;
-        createdBy: number;
+        createdBy: string;
     }) {
         return prisma.courseModule.create({
             data: { ...data, courseId, content: data.content ?? {}, description: data.description ?? '' },
@@ -158,7 +158,7 @@ export class CoursesService {
      *     summary: Get a module by ID
      *     tags: [Modules]
      */
-    async getModuleById(moduleId: number) {
+    async getModuleById(moduleId: string) {
         return prisma.courseModule.findUnique({
             where: { id: moduleId },
             include: {
@@ -177,7 +177,7 @@ export class CoursesService {
      *     summary: Update a module
      *     tags: [Modules]
      */
-    async updateModule(moduleId: number, data: Prisma.CourseModuleUpdateInput) {
+    async updateModule(moduleId: string, data: Prisma.CourseModuleUpdateInput) {
         return prisma.courseModule.update({ where: { id: moduleId }, data });
     }
 
@@ -188,7 +188,7 @@ export class CoursesService {
      *     summary: Delete a module
      *     tags: [Modules]
      */
-    async deleteModule(moduleId: number) {
+    async deleteModule(moduleId: string) {
         return prisma.courseModule.delete({ where: { id: moduleId } });
     }
 
@@ -203,11 +203,11 @@ export class CoursesService {
      *     summary: Add a lesson to a module
      *     tags: [Lessons]
      */
-    async addLessonToModule(moduleId: number, data: {
+    async addLessonToModule(moduleId: string, data: {
         title: string;
         content?: Prisma.InputJsonValue;
         order: number;
-        courseId: number;
+        courseId: string;
     }) {
         return prisma.lesson.create({ data });
     }
@@ -219,7 +219,7 @@ export class CoursesService {
      *     summary: Update lesson details
      *     tags: [Lessons]
      */
-    async updateLesson(lessonId: number, data: Partial<{ title: string; content: Prisma.InputJsonValue; order: number }>) {
+    async updateLesson(lessonId: string, data: Partial<{ title: string; content: Prisma.InputJsonValue; order: number }>) {
         return prisma.lesson.update({ where: { id: lessonId }, data });
     }
 
@@ -230,7 +230,7 @@ export class CoursesService {
      *     summary: Delete a lesson
      *     tags: [Lessons]
      */
-    async deleteLesson(lessonId: number) {
+    async deleteLesson(lessonId: string) {
         return prisma.lesson.delete({ where: { id: lessonId } });
     }
 
@@ -245,9 +245,9 @@ export class CoursesService {
      *     summary: Add a quiz to a lesson
      *     tags: [Quizzes]
      */
-    async addQuizToLesson(lessonId: number, data: {
+    async addQuizToLesson(lessonId: string, data: {
         title: string;
-        courseId: number;
+        courseId: string;
         description?: string;
         instructions?: string;
         timeLimit?: number;
@@ -256,7 +256,7 @@ export class CoursesService {
         dueDate?: Date;
         isPublished?: boolean;
         questions: CreateQuizQuestionDto[];
-        createdBy: number;
+        createdBy: string;
     }) {
         return prisma.quiz.create({
             data: {
@@ -294,7 +294,7 @@ export class CoursesService {
      *     summary: Update quiz details
      *     tags: [Quizzes]
      */
-    async updateQuiz(quizId: number, data: Partial<{ title: string; description: string; instructions: string; timeLimit: number; maxAttempts: number; passingScore: number; dueDate: Date; isPublished: boolean }>) {
+    async updateQuiz(quizId: string, data: Partial<{ title: string; description: string; instructions: string; timeLimit: number; maxAttempts: number; passingScore: number; dueDate: Date; isPublished: boolean }>) {
         return prisma.quiz.update({ where: { id: quizId }, data });
     }
 
@@ -305,7 +305,7 @@ export class CoursesService {
      *     summary: Delete a quiz
      *     tags: [Quizzes]
      */
-    async deleteQuiz(quizId: number) {
+    async deleteQuiz(quizId: string) {
         return prisma.quiz.delete({ where: { id: quizId } });
     }
 
@@ -319,7 +319,7 @@ export class CoursesService {
      *     summary: Add an assignment to a module
      *     tags: [Assignments]
      */
-    async addAssignmentToModule(moduleId: number, data: {
+    async addAssignmentToModule(moduleId: string, data: {
         title: string;
         description?: string;
         instructions?: string;
@@ -327,8 +327,8 @@ export class CoursesService {
         maxScore?: number;
         dueDate?: Date;
         isPublished?: boolean;
-        createdBy: number;
-        courseId: number;
+        createdBy: string;
+        courseId: string;
     }) {
         return prisma.assignment.create({ data: { ...data, moduleId } });
     }

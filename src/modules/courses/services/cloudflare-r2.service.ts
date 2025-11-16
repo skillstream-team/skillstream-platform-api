@@ -5,7 +5,7 @@ export interface UploadFileDto {
   file: Buffer;
   filename: string;
   contentType: string;
-  courseId: number;
+  courseId: string;
   type: 'pdf' | 'image' | 'document' | 'zip' | 'other';
 }
 
@@ -84,7 +84,7 @@ export class CloudflareR2Service {
     return `https://${this.bucketName}.${process.env.CLOUDFLARE_ACCOUNT_ID}.r2.cloudflarestorage.com/${key}`;
   }
 
-  private generateKey(courseId: number, type: string, filename: string): string {
+  private generateKey(courseId: string, type: string, filename: string): string {
     const timestamp = Date.now();
     const sanitizedFilename = filename.replace(/[^a-zA-Z0-9.-]/g, '_');
     return `courses/${courseId}/${type}/${timestamp}_${sanitizedFilename}`;
@@ -111,7 +111,7 @@ export class CloudflareR2Service {
   }
 
   // List files for a course
-  async listCourseFiles(courseId: number, type?: string) {
+  async listCourseFiles(courseId: string, type?: string) {
     // This would require implementing a list operation
     // For now, we'll rely on database records
     throw new Error('List operation not implemented - use database queries instead');

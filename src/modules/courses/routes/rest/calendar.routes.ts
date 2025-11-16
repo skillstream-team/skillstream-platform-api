@@ -151,13 +151,13 @@ router.post('/events', requireAuth, async (req, res) => {
 router.put('/events/:eventId', requireAuth, async (req, res) => {
   try {
     const userId = (req as any).user?.id;
-    const eventId = parseInt(req.params.eventId);
+    const eventId = req.params.eventId;
 
     if (!userId) {
       return res.status(401).json({ error: 'User not authenticated' });
     }
 
-    if (isNaN(eventId)) {
+    if (!eventId) {
       return res.status(400).json({ error: 'Invalid event ID' });
     }
 
@@ -210,13 +210,13 @@ router.put('/events/:eventId', requireAuth, async (req, res) => {
 router.delete('/events/:eventId', requireAuth, async (req, res) => {
   try {
     const userId = (req as any).user?.id;
-    const eventId = parseInt(req.params.eventId);
+    const eventId = req.params.eventId;
 
     if (!userId) {
       return res.status(401).json({ error: 'User not authenticated' });
     }
 
-    if (isNaN(eventId)) {
+    if (!eventId) {
       return res.status(400).json({ error: 'Invalid event ID' });
     }
 
@@ -281,7 +281,7 @@ router.get('/events', requireAuth, async (req, res) => {
     
     const filters = {
       userId,
-      courseId: req.query.courseId ? parseInt(req.query.courseId as string) : undefined,
+      courseId: req.query.courseId ? req.query.courseId as string : undefined,
       type: req.query.type as string,
       startDate: req.query.startDate ? new Date(req.query.startDate as string) : undefined,
       endDate: req.query.endDate ? new Date(req.query.endDate as string) : undefined,
@@ -383,10 +383,10 @@ router.get('/personal', requireAuth, async (req, res) => {
  */
 router.post('/events/:eventId/attendees', requireAuth, async (req, res) => {
   try {
-    const eventId = parseInt(req.params.eventId);
+    const eventId = req.params.eventId;
     const { userIds } = req.body;
 
-    if (isNaN(eventId)) {
+    if (!eventId) {
       return res.status(400).json({ error: 'Invalid event ID' });
     }
 
@@ -441,10 +441,10 @@ router.post('/events/:eventId/attendees', requireAuth, async (req, res) => {
  */
 router.delete('/events/:eventId/attendees', requireAuth, async (req, res) => {
   try {
-    const eventId = parseInt(req.params.eventId);
+    const eventId = req.params.eventId;
     const { userIds } = req.body;
 
-    if (isNaN(eventId)) {
+    if (!eventId) {
       return res.status(400).json({ error: 'Invalid event ID' });
     }
 
@@ -504,11 +504,11 @@ router.delete('/events/:eventId/attendees', requireAuth, async (req, res) => {
  */
 router.put('/events/:eventId/attendees/:userId/status', requireAuth, async (req, res) => {
   try {
-    const eventId = parseInt(req.params.eventId);
-    const userId = parseInt(req.params.userId);
+    const eventId = req.params.eventId;
+    const userId = req.params.userId;
     const { status } = req.body;
 
-    if (isNaN(eventId) || isNaN(userId)) {
+    if (!eventId || !userId) {
       return res.status(400).json({ error: 'Invalid event ID or user ID' });
     }
 
@@ -580,9 +580,9 @@ router.get('/reminders/pending', requireAuth, requireRole('ADMIN'), async (req, 
  */
 router.put('/reminders/:reminderId/sent', requireAuth, requireRole('ADMIN'), async (req, res) => {
   try {
-    const reminderId = parseInt(req.params.reminderId);
+    const reminderId = req.params.reminderId;
 
-    if (isNaN(reminderId)) {
+    if (!reminderId) {
       return res.status(400).json({ error: 'Invalid reminder ID' });
     }
 

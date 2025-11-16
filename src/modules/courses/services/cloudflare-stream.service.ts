@@ -1,7 +1,7 @@
 import axios, { AxiosInstance } from 'axios';
 
 export interface CreateVideoDto {
-  courseId: number;
+  courseId: string;
   title: string;
   description?: string;
   type: 'on-demand' | 'live';
@@ -21,12 +21,12 @@ export interface VideoResponseDto {
   duration?: number;
   scheduledAt?: Date;
   createdAt: Date;
-  courseId: number;
+  courseId: string;
 }
 
 export interface LiveStreamDto {
   streamId: string;
-  courseId: number;
+  courseId: string;
   title: string;
   description?: string;
   scheduledAt?: Date;
@@ -36,11 +36,11 @@ export interface LiveStreamDto {
 export interface StreamQuestionDto {
   id: string;
   streamId: string;
-  studentId: number;
+  studentId: string;
   question: string;
   timestamp: number;
   isAnswered: boolean;
-  answeredBy?: number;
+  answeredBy?: string;
   answer?: string;
   createdAt: Date;
 }
@@ -48,7 +48,7 @@ export interface StreamQuestionDto {
 export interface StreamPollDto {
   id: string;
   streamId: string;
-  instructorId: number;
+  instructorId: string;
   question: string;
   options: string[];
   isActive: boolean;

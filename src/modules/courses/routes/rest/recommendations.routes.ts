@@ -34,10 +34,10 @@ const recommendationService = new RecommendationService();
  */
 router.post('/generate/:userId', requireAuth, async (req, res) => {
   try {
-    const userId = parseInt(req.params.userId);
+    const userId = req.params.userId;
     const limit = parseInt(req.query.limit as string) || 10;
 
-    if (isNaN(userId)) {
+    if (!userId) {
       return res.status(400).json({ error: 'Invalid user ID' });
     }
 
@@ -97,9 +97,9 @@ router.post('/generate/:userId', requireAuth, async (req, res) => {
  */
 router.get('/:userId', requireAuth, async (req, res) => {
   try {
-    const userId = parseInt(req.params.userId);
+    const userId = req.params.userId;
     
-    if (isNaN(userId)) {
+    if (!userId) {
       return res.status(400).json({ error: 'Invalid user ID' });
     }
 
@@ -146,9 +146,9 @@ router.get('/:userId', requireAuth, async (req, res) => {
  */
 router.post('/refresh/:userId', requireAuth, async (req, res) => {
   try {
-    const userId = parseInt(req.params.userId);
+    const userId = req.params.userId;
     
-    if (isNaN(userId)) {
+    if (!userId) {
       return res.status(400).json({ error: 'Invalid user ID' });
     }
 
@@ -249,9 +249,9 @@ router.post('/interaction', requireAuth, async (req, res) => {
  */
 router.get('/stats/:userId', requireAuth, async (req, res) => {
   try {
-    const userId = parseInt(req.params.userId);
+    const userId = req.params.userId;
     
-    if (isNaN(userId)) {
+    if (!userId) {
       return res.status(400).json({ error: 'Invalid user ID' });
     }
 

@@ -164,12 +164,13 @@ async function getRecommendedCourses(userId) {
                 score += 2;
                 break;
         }
-        courseScores[i.courseId] = (courseScores[i.courseId] || 0) + score;
+        const key = i.courseId;
+        courseScores[key] = (courseScores[key] || 0) + score;
     });
     const topCourseIds = Object.entries(courseScores)
         .sort(([, a], [, b]) => b - a)
         .slice(0, 5)
-        .map(([courseId]) => Number(courseId));
+        .map(([courseId]) => courseId);
     return user_model_1.prisma.course.findMany({
         where: { id: { in: topCourseIds } }
     });

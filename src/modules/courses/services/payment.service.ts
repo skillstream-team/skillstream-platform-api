@@ -69,7 +69,7 @@ export class PaymentService {
      *             schema:
      *               $ref: '#/components/schemas/PaymentResponseDto'
      */
-    async updatePaymentStatus(paymentId: number, data: UpdatePaymentStatusDto): Promise<PaymentResponseDto> {
+    async updatePaymentStatus(paymentId: string, data: UpdatePaymentStatusDto): Promise<PaymentResponseDto> {
         const payment = await prisma.payment.update({
             where: { id: paymentId },
             data: {
@@ -108,7 +108,7 @@ export class PaymentService {
      *       404:
      *         description: Payment not found
      */
-    async getPaymentById(paymentId: number): Promise<PaymentResponseDto | null> {
+    async getPaymentById(paymentId: string): Promise<PaymentResponseDto | null> {
         const payment = await prisma.payment.findUnique({
             where: { id: paymentId },
             include: {
@@ -143,7 +143,7 @@ export class PaymentService {
      *               items:
      *                 $ref: '#/components/schemas/PaymentResponseDto'
      */
-    async getPaymentsByStudent(studentId: number): Promise<PaymentResponseDto[]> {
+    async getPaymentsByStudent(studentId: string): Promise<PaymentResponseDto[]> {
         const payments = await prisma.payment.findMany({
             where: { studentId },
             include: {
@@ -179,7 +179,7 @@ export class PaymentService {
      *               items:
      *                 $ref: '#/components/schemas/PaymentResponseDto'
      */
-    async getPaymentsByCourse(courseId: number): Promise<PaymentResponseDto[]> {
+    async getPaymentsByCourse(courseId: string): Promise<PaymentResponseDto[]> {
         const payments = await prisma.payment.findMany({
             where: { courseId },
             include: {
@@ -215,7 +215,7 @@ export class PaymentService {
      *               items:
      *                 $ref: '#/components/schemas/PaymentResponseDto'
      */
-    async getCompletedPaymentsByCourse(courseId: number): Promise<PaymentResponseDto[]> {
+    async getCompletedPaymentsByCourse(courseId: string): Promise<PaymentResponseDto[]> {
         const payments = await prisma.payment.findMany({
             where: { courseId, status: 'COMPLETED' },
             include: {

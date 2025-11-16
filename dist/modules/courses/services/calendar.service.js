@@ -215,8 +215,7 @@ class CalendarService {
             status: 'invited'
         }));
         await prisma_1.prisma.eventAttendee.createMany({
-            data: attendeeData,
-            skipDuplicates: true
+            data: attendeeData
         });
     }
     /**
@@ -268,8 +267,7 @@ class CalendarService {
         }
         if (reminderData.length > 0) {
             await prisma_1.prisma.eventReminder.createMany({
-                data: reminderData,
-                skipDuplicates: true
+                data: reminderData
             });
         }
     }

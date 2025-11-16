@@ -7,8 +7,14 @@ if (!JWT_SECRET) {
 }
 
 export interface TokenPayload {
-  userId: number;
+  id: string;
   role: string;
+}
+
+export interface JWTPayload {
+  id: string;
+  role: string;
+  userId?: string; // For backward compatibility with old tokens
 }
 
 export const signToken = (payload: TokenPayload): string => {

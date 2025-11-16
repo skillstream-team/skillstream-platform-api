@@ -6,13 +6,13 @@ export interface CreateCalendarEventDto {
   endTime?: Date;
   isAllDay?: boolean;
   location?: string;
-  courseId?: number;
-  assignmentId?: number;
-  quizId?: number;
+  courseId?: string;
+  assignmentId?: string;
+  quizId?: string;
   isRecurring?: boolean;
   recurrenceRule?: string;
   reminderMinutes?: number[];
-  attendeeIds?: number[];
+  attendeeIds?: string[];
   metadata?: any;
 }
 
@@ -30,7 +30,7 @@ export interface UpdateCalendarEventDto {
 }
 
 export interface CalendarEventResponseDto {
-  id: number;
+  id: string;
   title: string;
   description?: string;
   type: string;
@@ -38,9 +38,9 @@ export interface CalendarEventResponseDto {
   endTime?: Date;
   isAllDay: boolean;
   location?: string;
-  courseId?: number;
-  assignmentId?: number;
-  quizId?: number;
+  courseId?: string;
+  assignmentId?: string;
+  quizId?: string;
   isRecurring: boolean;
   recurrenceRule?: string;
   reminderMinutes: number[];
@@ -48,44 +48,44 @@ export interface CalendarEventResponseDto {
   createdAt: Date;
   updatedAt: Date;
   creator: {
-    id: number;
+    id: string;
     username: string;
   };
   course?: {
-    id: number;
+    id: string;
     title: string;
   };
   assignment?: {
-    id: number;
+    id: string;
     title: string;
   };
   quiz?: {
-    id: number;
+    id: string;
     title: string;
   };
   attendees: EventAttendeeDto[];
 }
 
 export interface EventAttendeeDto {
-  id: number;
-  userId: number;
+  id: string;
+  userId: string;
   status: 'invited' | 'accepted' | 'declined' | 'maybe';
   user: {
-    id: number;
+    id: string;
     username: string;
     email: string;
   };
 }
 
 export interface UpdateAttendeeStatusDto {
-  eventId: number;
-  userId: number;
+  eventId: string;
+  userId: string;
   status: 'accepted' | 'declined' | 'maybe';
 }
 
 export interface CalendarFiltersDto {
-  userId?: number;
-  courseId?: number;
+  userId?: string;
+  courseId?: string;
   type?: string;
   startDate?: Date;
   endDate?: Date;
@@ -96,13 +96,13 @@ export interface PersonalCalendarDto {
   events: CalendarEventResponseDto[];
   upcomingDeadlines: {
     assignments: Array<{
-      id: number;
+      id: string;
       title: string;
       dueDate: Date;
       courseTitle: string;
     }>;
     quizzes: Array<{
-      id: number;
+      id: string;
       title: string;
       dueDate: Date;
       courseTitle: string;
@@ -111,9 +111,9 @@ export interface PersonalCalendarDto {
 }
 
 export interface EventReminderDto {
-  id: number;
-  eventId: number;
-  userId: number;
+  id: string;
+  eventId: string;
+  userId: string;
   reminderAt: Date;
   type: 'email' | 'push' | 'sms';
   isSent: boolean;

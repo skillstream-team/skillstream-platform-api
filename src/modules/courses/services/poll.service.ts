@@ -4,7 +4,7 @@ import { prisma } from '../../../utils/prisma';
 export { prisma };
 
 class PollService {
-    async createPoll(data: CreatePollDto, creatorId: number) {
+    async createPoll(data: CreatePollDto, creatorId: string) {
         // Use title as question if question is not provided separately
         // The Poll model requires both title and question fields
         return prisma.poll.create({
@@ -24,7 +24,7 @@ class PollService {
         });
     }
 
-    async respondToPoll(pollId: number, optionId: number, userId: number) {
+    async respondToPoll(pollId: string, optionId: string, userId: string) {
         // Find the poll option to get its text
         const pollOption = await prisma.pollOption.findUnique({
             where: { id: optionId },
@@ -54,7 +54,7 @@ class PollService {
         });
     }
 
-    async getPollResults(pollId: number) {
+    async getPollResults(pollId: string) {
         return prisma.poll.findUnique({
             where: { id: pollId },
             include: {
@@ -64,7 +64,7 @@ class PollService {
     }
 
     // Optional: live stream poll emission
-    async emitPollToLiveSession(io: any, pollId: number) {
+    async emitPollToLiveSession(io: any, pollId: string) {
         const poll = await this.getPollResults(pollId);
         // @ts-ignore
         io.to(`live-${poll.liveStreamId}`).emit('poll', poll);

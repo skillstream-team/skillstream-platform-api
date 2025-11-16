@@ -9,14 +9,15 @@ This guide will help you deploy the SkillStream Platform API on Render.com.
 
 ## Step 1: Create Database Service
 
-1. In your Render dashboard, click "New +" → "PostgreSQL"
+1. In your Render dashboard, you'll need to set up a MongoDB database:
+   - Use MongoDB Atlas (recommended) or another MongoDB provider
+   - Or use Render's MongoDB service if available
 2. Configure:
    - **Name**: `skillstream-db` (or your preferred name)
    - **Database**: `skillstream`
-   - **User**: Auto-generated
    - **Region**: Choose closest to your users
    - **Plan**: Select based on your needs
-3. After creation, note the **Internal Database URL** and **External Database URL**
+3. After creation, note the **MongoDB connection string** (DATABASE_URL)
 
 ## Step 2: Create Redis Service (Optional but Recommended)
 
@@ -63,15 +64,11 @@ SERVER_URL=https://your-app-name.onrender.com
 FRONTEND_URL=https://your-frontend-url.com
 
 # Database (from Step 1)
-DATABASE_URL=<Internal Database URL from PostgreSQL service>
+DATABASE_URL=<MongoDB connection string>
 
 # JWT Configuration
 JWT_SECRET=<generate-a-strong-random-secret>
 RESET_TOKEN_SECRET=<generate-another-strong-random-secret>
-
-# Supabase
-SUPABASE_URL=https://your-project.supabase.co
-SUPABASE_KEY=your-supabase-anon-key
 ```
 
 ### Optional Variables

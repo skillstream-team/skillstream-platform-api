@@ -81,7 +81,6 @@ This document confirms that the SkillStream Platform API is production-ready and
 ### 2. Service Connections
 - ✅ Redis: Optional, graceful fallback
 - ✅ Kafka: Optional, graceful fallback
-- ✅ Supabase: Validated on startup
 - ✅ All connections properly closed on shutdown
 
 ## ✅ Graceful Shutdown
@@ -105,11 +104,9 @@ This document confirms that the SkillStream Platform API is production-ready and
 
 ### 1. Environment Variables
 Required:
-- `DATABASE_URL` - PostgreSQL connection string
+- `DATABASE_URL` - MongoDB connection string
 - `JWT_SECRET` - JWT signing secret (min 32 chars in production)
 - `RESET_TOKEN_SECRET` - Password reset secret (min 32 chars in production)
-- `SUPABASE_URL` - Supabase project URL
-- `SUPABASE_KEY` - Supabase anon key
 
 Optional:
 - `REDIS_URL` - Redis connection URL
@@ -120,7 +117,6 @@ Optional:
 - `NODE_ENV` - Environment (development/production)
 
 ### 2. Service Validation
-- ✅ Supabase client validated on import
 - ✅ Database connection tested on startup
 - ✅ All critical services validated before server starts
 

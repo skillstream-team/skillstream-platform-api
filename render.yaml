@@ -31,11 +31,6 @@ services:
         sync: false  # Set a strong secret in Render dashboard
       - key: RESET_TOKEN_SECRET
         sync: false  # Set a strong secret in Render dashboard
-      # Supabase Configuration
-      - key: SUPABASE_URL
-        sync: false  # Set your Supabase project URL
-      - key: SUPABASE_KEY
-        sync: false  # Set your Supabase anon key
       # Frontend URL for CORS
       - key: FRONTEND_URL
         sync: false  # Set your frontend URL

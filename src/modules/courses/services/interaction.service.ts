@@ -51,10 +51,10 @@ class InteractionService {
      *         description: Invalid request or missing parameters
      */
     async trackInteraction(data: {
-        userId: number;
-        courseId?: number;
-        moduleId?: number;
-        quizId?: number;
+        userId: string;
+        courseId?: string;
+        moduleId?: string;
+        quizId?: string;
         eventType: string;
         metadata?: object;
     }) {
@@ -105,7 +105,7 @@ class InteractionService {
      *                     type: string
      *                     format: date-time
      */
-    async getUserInteractions(userId: number) {
+    async getUserInteractions(userId: string) {
         return prisma.interaction.findMany({
             where: { userId }
         });
@@ -147,10 +147,10 @@ class InteractionService {
  *       404:
  *         description: No recommendations found for user
  */
-async function getRecommendedCourses(userId: number) {
+async function getRecommendedCourses(userId: string) {
     const interactions = await prisma.interaction.findMany({ where: { userId } });
 
-    const courseScores: Record<number, number> = {};
+    const courseScores: Record<string, number> = {};
 
     interactions.forEach(i => {
         if (!i.courseId) return;
@@ -164,13 +164,14 @@ async function getRecommendedCourses(userId: number) {
                 break;
             case 'search': score += 2; break;
         }
-        courseScores[i.courseId] = (courseScores[i.courseId] || 0) + score;
+        const key = i.courseId as unknown as string;
+        courseScores[key] = (courseScores[key] || 0) + score;
     });
 
     const topCourseIds = Object.entries(courseScores)
         .sort(([, a], [, b]) => b - a)
         .slice(0, 5)
-        .map(([courseId]) => Number(courseId));
+        .map(([courseId]) => courseId);
 
     return prisma.course.findMany({
         where: { id: { in: topCourseIds } }

@@ -3,12 +3,12 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "mongodb"
   url      = env("DATABASE_URL")
 }
 
 model User {
-  id                  Int       @id @default(autoincrement())
+  id                  String    @id @default(auto()) @map("_id") @db.ObjectId
   username            String    @unique
   email               String    @unique
   password            String
@@ -49,26 +49,26 @@ model User {
 }
 
 model SecurityLog {
-  id        Int      @id @default(autoincrement())
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
   user      User     @relation(fields: [userId], references: [id])
-  userId    Int
-  eventType String // e.g., 'failed_login', 'successful_login', 'password_change'
+  userId    String   @db.ObjectId
+  eventType String
   metadata  Json?
   createdAt DateTime @default(now())
 }
 
 model Course {
-  id          Int      @id @default(autoincrement())
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
   title       String
   description String?
   price       Float
   order       Int
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
-  createdBy   Int
+  createdBy   String   @db.ObjectId
 
-  instructorId Int
-  instructor   User @relation("InstructorCourses", fields: [instructorId], references: [id])
+  instructorId String @db.ObjectId
+  instructor   User   @relation("InstructorCourses", fields: [instructorId], references: [id])
 
   enrollments     Enrollment[]
   lessons         Lesson[]
@@ -90,55 +90,55 @@ model Course {
 }
 
 model Enrollment {
-  id        Int    @id @default(autoincrement())
-  courseId  Int
+  id        String @id @default(auto()) @map("_id") @db.ObjectId
+  courseId  String @db.ObjectId
   course    Course @relation(fields: [courseId], references: [id])
-  studentId Int
+  studentId String @db.ObjectId
   student   User   @relation(fields: [studentId], references: [id])
 
-  paymentId Int?     @unique
+  paymentId String?  @unique @db.ObjectId
   payment   Payment? @relation(fields: [paymentId], references: [id])
 
   createdAt DateTime @default(now())
 }
 
 model Payment {
-  id        Int    @id @default(autoincrement())
-  studentId Int
+  id        String @id @default(auto()) @map("_id") @db.ObjectId
+  studentId String @db.ObjectId
   student   User   @relation(fields: [studentId], references: [id])
-  courseId  Int
+  courseId  String @db.ObjectId
   course    Course @relation(fields: [courseId], references: [id])
 
   enrollment Enrollment?
 
   amount        Float
   currency      String   @default("USD")
-  status        String // e.g. "PENDING", "COMPLETED", "FAILED"
-  provider      String // e.g. "stripe", "paypal"
-  transactionId String? // ID from payment gateway
+  status        String
+  provider      String
+  transactionId String?
   createdAt     DateTime @default(now())
 }
 
 model Material {
-  id         Int      @id @default(autoincrement())
-  courseId   Int
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  courseId   String   @db.ObjectId
   course     Course   @relation(fields: [courseId], references: [id])
-  type       String // "pdf","image","link","video","zip","document"
-  key        String // R2 object key
+  type       String
+  key        String
   filename   String
   size       Int
   mimeType   String
-  url        String // Public URL for the file
-  uploadedBy Int
+  url        String
+  uploadedBy String   @db.ObjectId
   uploader   User     @relation(fields: [uploadedBy], references: [id])
-  meta       Json? // Additional metadata
+  meta       Json?
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 }
 
 model Lesson {
-  id        Int      @id @default(autoincrement())
-  courseId  Int
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  courseId  String   @db.ObjectId
   course    Course   @relation(fields: [courseId], references: [id])
   title     String
   content   Json?
@@ -149,22 +149,22 @@ model Lesson {
 }
 
 model Quiz {
-  id           Int           @id @default(autoincrement())
-  courseId     Int
+  id           String        @id @default(auto()) @map("_id") @db.ObjectId
+  courseId     String        @db.ObjectId
   course       Course        @relation(fields: [courseId], references: [id])
-  moduleId     Int?
+  moduleId     String?       @db.ObjectId
   module       CourseModule? @relation(fields: [moduleId], references: [id])
-  lessonId     Int?
+  lessonId     String?       @db.ObjectId
   title        String
   description  String?
   instructions String?
-  timeLimit    Int? // Time limit in minutes
-  maxAttempts  Int? // Maximum number of attempts
-  passingScore Float? // Minimum score to pass
+  timeLimit    Int?
+  maxAttempts  Int?
+  passingScore Float?
   isPublished  Boolean       @default(false)
   publishedAt  DateTime?
   dueDate      DateTime?
-  createdBy    Int
+  createdBy    String        @db.ObjectId
   creator      User          @relation(fields: [createdBy], references: [id])
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
@@ -177,38 +177,38 @@ model Quiz {
 }
 
 model QuizQuestion {
-  id            Int      @id @default(autoincrement())
-  quizId        Int
+  id            String   @id @default(auto()) @map("_id") @db.ObjectId
+  quizId        String   @db.ObjectId
   quiz          Quiz     @relation(fields: [quizId], references: [id])
   question      String
-  type          String // "multiple_choice", "true_false", "fill_blank", "essay"
-  options       Json? // For multiple choice questions
-  correctAnswer Json? // Correct answer(s)
+  type          String
+  options       Json?
+  correctAnswer Json?
   points        Int      @default(1)
-  order         Int // Question order
-  explanation   String? // Explanation for correct answer
+  order         Int
+  explanation   String?
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 }
 
 model QuizAttempt {
-  id          Int       @id @default(autoincrement())
-  quizId      Int
+  id          String    @id @default(auto()) @map("_id") @db.ObjectId
+  quizId      String    @db.ObjectId
   quiz        Quiz      @relation(fields: [quizId], references: [id])
-  studentId   Int
+  studentId   String    @db.ObjectId
   student     User      @relation(fields: [studentId], references: [id])
   score       Float?
   maxScore    Float
   percentage  Float?
   isPassed    Boolean   @default(false)
-  timeSpent   Int? // Time spent in seconds
+  timeSpent   Int?
   startedAt   DateTime  @default(now())
   submittedAt DateTime?
   gradedAt    DateTime?
-  gradedBy    Int?
+  gradedBy    String?   @db.ObjectId
   grader      User?     @relation("QuizGrader", fields: [gradedBy], references: [id])
-  answers     Json? // Student answers
-  feedback    String? // Instructor feedback
+  answers     Json?
+  feedback    String?
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
@@ -216,20 +216,20 @@ model QuizAttempt {
 }
 
 model Assignment {
-  id           Int           @id @default(autoincrement())
-  courseId     Int
+  id           String        @id @default(auto()) @map("_id") @db.ObjectId
+  courseId     String        @db.ObjectId
   course       Course        @relation(fields: [courseId], references: [id])
-  moduleId     Int?
+  moduleId     String?       @db.ObjectId
   module       CourseModule? @relation(fields: [moduleId], references: [id])
   title        String
   description  String?
   instructions String?
-  type         String // "essay", "file_upload", "peer_review", "group_project"
+  type         String
   maxScore     Float?
   dueDate      DateTime?
   isPublished  Boolean       @default(false)
   publishedAt  DateTime?
-  createdBy    Int
+  createdBy    String        @db.ObjectId
   creator      User          @relation(fields: [createdBy], references: [id])
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
@@ -239,10 +239,10 @@ model Assignment {
 }
 
 model Submission {
-  id           Int        @id @default(autoincrement())
-  assignmentId Int
+  id           String     @id @default(auto()) @map("_id") @db.ObjectId
+  assignmentId String     @db.ObjectId
   assignment   Assignment @relation(fields: [assignmentId], references: [id])
-  studentId    Int
+  studentId    String     @db.ObjectId
   student      User       @relation(fields: [studentId], references: [id])
   content      String?
   attachments  Json?
@@ -253,15 +253,15 @@ model Submission {
 }
 
 model Poll {
-  id           Int          @id @default(autoincrement())
-  courseId     Int
+  id           String       @id @default(auto()) @map("_id") @db.ObjectId
+  courseId     String       @db.ObjectId
   title        String
   description  String?
-  moduleId     Int?
+  moduleId     String?      @db.ObjectId
   course       Course       @relation(fields: [courseId], references: [id])
-  liveStreamId Int?
+  liveStreamId String?      @db.ObjectId
   liveStream   LiveStream?  @relation(fields: [liveStreamId], references: [id])
-  createdBy    Int
+  createdBy    String       @db.ObjectId
   creator      User         @relation(fields: [createdBy], references: [id])
   question     String
   options      PollOption[]
@@ -274,8 +274,8 @@ model Poll {
 }
 
 model PollOption {
-  id     Int    @id @default(autoincrement())
-  pollId Int
+  id     String @id @default(auto()) @map("_id") @db.ObjectId
+  pollId String @db.ObjectId
   poll   Poll   @relation(fields: [pollId], references: [id])
   text   String
   order  Int
@@ -283,19 +283,19 @@ model PollOption {
 }
 
 model Video {
-  id           Int       @id @default(autoincrement())
-  courseId     Int
+  id           String    @id @default(auto()) @map("_id") @db.ObjectId
+  courseId     String    @db.ObjectId
   course       Course    @relation(fields: [courseId], references: [id])
-  streamId     String    @unique // Cloudflare Stream video ID
+  streamId     String    @unique
   title        String
   description  String?
-  type         String    @default("on-demand") // "on-demand" or "live"
-  status       String    @default("pending") // "pending", "ready", "live", "ended", "failed"
-  playbackUrl  String? // HLS playback URL
-  thumbnailUrl String? // Video thumbnail URL
-  duration     Int? // Duration in seconds
-  size         Int? // File size in bytes
-  uploadedBy   Int
+  type         String    @default("on-demand")
+  status       String    @default("pending")
+  playbackUrl  String?
+  thumbnailUrl String?
+  duration     Int?
+  size         Int?
+  uploadedBy   String    @db.ObjectId
   uploader     User      @relation(fields: [uploadedBy], references: [id])
   scheduledAt  DateTime?
   createdAt    DateTime  @default(now())
@@ -303,20 +303,20 @@ model Video {
 }
 
 model LiveStream {
-  id          Int       @id @default(autoincrement())
-  courseId    Int
+  id          String    @id @default(auto()) @map("_id") @db.ObjectId
+  courseId    String    @db.ObjectId
   course      Course    @relation(fields: [courseId], references: [id])
-  streamId    String    @unique // Cloudflare Stream live input ID
+  streamId    String    @unique
   title       String
   description String?
-  status      String    @default("ready") // "ready", "live", "ended"
-  playbackUrl String? // HLS playback URL
-  rtmpUrl     String? // RTMP input URL
-  streamKey   String? // Stream key for broadcasting
+  status      String    @default("ready")
+  playbackUrl String?
+  rtmpUrl     String?
+  streamKey   String?
   isActive    Boolean   @default(false)
   startedAt   DateTime?
   endedAt     DateTime?
-  createdBy   Int
+  createdBy   String    @db.ObjectId
   creator     User      @relation(fields: [createdBy], references: [id])
   scheduledAt DateTime?
   createdAt   DateTime  @default(now())
@@ -328,25 +328,25 @@ model LiveStream {
 }
 
 model StreamQuestion {
-  id         Int        @id @default(autoincrement())
+  id         String     @id @default(auto()) @map("_id") @db.ObjectId
   streamId   String
   stream     LiveStream @relation(fields: [streamId], references: [streamId])
-  studentId  Int
+  studentId  String     @db.ObjectId
   student    User       @relation(fields: [studentId], references: [id])
   question   String
-  timestamp  Int // Timestamp in the video/stream
+  timestamp  Int
   isAnswered Boolean    @default(false)
-  answeredBy Int?
+  answeredBy String?    @db.ObjectId
   answer     String?
   answeredAt DateTime?
   createdAt  DateTime   @default(now())
 }
 
 model StreamPoll {
-  id           Int        @id @default(autoincrement())
+  id           String     @id @default(auto()) @map("_id") @db.ObjectId
   streamId     String
   stream       LiveStream @relation(fields: [streamId], references: [streamId])
-  instructorId Int
+  instructorId String     @db.ObjectId
   instructor   User       @relation(fields: [instructorId], references: [id])
   question     String
   options      String[]
@@ -355,15 +355,15 @@ model StreamPoll {
   createdAt    DateTime   @default(now())
   updatedAt    DateTime   @updatedAt
 
-  responses PollResponse[] // back relation, no need to map unless conflicts exist
+  responses PollResponse[]
 }
 
 model PollResponse {
-  id        Int        @id @default(autoincrement())
-  pollId    Int
-  poll      StreamPoll @relation(fields: [pollId], references: [id], map: "pollresponse_poll_fkey")
-  studentId Int
-  student   User       @relation(fields: [studentId], references: [id], map: "pollresponse_student_fkey")
+  id        String     @id @default(auto()) @map("_id") @db.ObjectId
+  pollId    String     @db.ObjectId
+  poll      StreamPoll @relation(fields: [pollId], references: [id])
+  studentId String     @db.ObjectId
+  student   User       @relation(fields: [studentId], references: [id])
   option    String
   createdAt DateTime   @default(now())
   Poll      Poll       @relation(fields: [pollId], references: [id])
@@ -372,12 +372,12 @@ model PollResponse {
 }
 
 model Notification {
-  id        Int       @id @default(autoincrement())
-  toUserId  Int
+  id        String    @id @default(auto()) @map("_id") @db.ObjectId
+  toUserId  String    @db.ObjectId
   toUser    User      @relation(fields: [toUserId], references: [id])
   title     String
   message   String
-  type      String // "reminder", "announcement", "poll", "assignment", etc.
+  type      String
   metadata  Json?
   isRead    Boolean   @default(false)
   createdAt DateTime  @default(now())
@@ -385,16 +385,16 @@ model Notification {
 }
 
 model CourseModule {
-  id          Int       @id @default(autoincrement())
-  courseId    Int
+  id          String    @id @default(auto()) @map("_id") @db.ObjectId
+  courseId    String    @db.ObjectId
   course      Course    @relation(fields: [courseId], references: [id])
   title       String
   content     Json?
   description String?
-  order       Int // Module order within course
+  order       Int
   isPublished Boolean   @default(false)
   publishedAt DateTime?
-  createdBy   Int
+  createdBy   String    @db.ObjectId
   creator     User      @relation(fields: [createdBy], references: [id])
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
@@ -406,19 +406,19 @@ model CourseModule {
 }
 
 model Progress {
-  id           Int           @id @default(autoincrement())
-  studentId    Int
+  id           String        @id @default(auto()) @map("_id") @db.ObjectId
+  studentId    String        @db.ObjectId
   student      User          @relation(fields: [studentId], references: [id])
-  courseId     Int
+  courseId     String        @db.ObjectId
   course       Course        @relation(fields: [courseId], references: [id])
-  moduleId     Int?
+  moduleId     String?       @db.ObjectId
   module       CourseModule? @relation(fields: [moduleId], references: [id])
-  type         String // "module", "quiz", "assignment", "video", "material"
-  itemId       Int // ID of the specific item (module, quiz, etc.)
-  status       String // "not_started", "in_progress", "completed", "passed", "failed"
-  progress     Float         @default(0) // Progress percentage (0-100)
-  score        Float? // Score achieved
-  timeSpent    Int? // Time spent in seconds
+  type         String
+  itemId       String        @db.ObjectId
+  status       String
+  progress     Float         @default(0)
+  score        Float?
+  timeSpent    Int?
   lastAccessed DateTime      @default(now())
   completedAt  DateTime?
   createdAt    DateTime      @default(now())
@@ -428,49 +428,48 @@ model Progress {
 }
 
 model Achievement {
-  id        Int      @id @default(autoincrement())
-  studentId Int
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  studentId String   @db.ObjectId
   student   User     @relation(fields: [studentId], references: [id])
-  courseId  Int?
+  courseId  String?  @db.ObjectId
   course    Course?  @relation(fields: [courseId], references: [id])
-  badgeName String // Badge name/type
-  badgeIcon String? // Badge icon URL
+  badgeName String
+  badgeIcon String?
   earnedAt  DateTime @default(now())
-  metadata  Json? // Additional achievement data
+  metadata  Json?
 
   @@unique([studentId, courseId, badgeName])
 }
 
 model Certificate {
-  id          Int       @id @default(autoincrement())
-  studentId   Int
+  id          String    @id @default(auto()) @map("_id") @db.ObjectId
+  studentId   String    @db.ObjectId
   student     User      @relation(fields: [studentId], references: [id])
-  courseId    Int
+  courseId    String    @db.ObjectId
   course      Course    @relation(fields: [courseId], references: [id])
   title       String
   description String?
-  template    String? // Certificate template
+  template    String?
   issuedAt    DateTime  @default(now())
   expiresAt   DateTime?
   isActive    Boolean   @default(true)
-  metadata    Json? // Certificate metadata
+  metadata    Json?
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
   @@unique([studentId, courseId])
 }
 
-// Recommendation Engine Models
 model CourseRecommendation {
-  id        Int      @id @default(autoincrement())
-  userId    Int
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId    String   @db.ObjectId
   user      User     @relation(fields: [userId], references: [id])
-  courseId  Int
+  courseId  String   @db.ObjectId
   course    Course   @relation(fields: [courseId], references: [id])
-  score     Float // Recommendation score (0-1)
-  reason    String // Reason for recommendation
-  algorithm String // Algorithm used (e.g., "collaborative", "content_based", "popularity")
-  metadata  Json? // Additional recommendation data
+  score     Float
+  reason    String
+  algorithm String
+  metadata  Json?
   isViewed  Boolean  @default(false)
   isClicked Boolean  @default(false)
   createdAt DateTime @default(now())
@@ -481,49 +480,45 @@ model CourseRecommendation {
 }
 
 model UserInteraction {
-  id        Int      @id @default(autoincrement())
-  userId    Int
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId    String   @db.ObjectId
   user      User     @relation(fields: [userId], references: [id])
-  courseId  Int?
+  courseId  String?  @db.ObjectId
   course    Course?  @relation(fields: [courseId], references: [id])
-  type      String // "view", "enroll", "complete", "rate", "search"
-  value     Float? // Rating value, time spent, etc.
-  metadata  Json? // Additional interaction data
+  type      String
+  value     Float?
+  metadata  Json?
   createdAt DateTime @default(now())
 
   @@index([userId, type])
   @@index([courseId, type])
 }
 
-// Calendar & Scheduling Models
 model CalendarEvent {
-  id          Int       @id @default(autoincrement())
+  id          String    @id @default(auto()) @map("_id") @db.ObjectId
   title       String
   description String?
-  type        String // "live_class", "deadline", "assignment_due", "quiz_due", "custom"
+  type        String
   startTime   DateTime
   endTime     DateTime?
   isAllDay    Boolean   @default(false)
-  location    String? // Physical location or meeting URL
-  courseId    Int?
+  location    String?
+  courseId    String?   @db.ObjectId
   course      Course?   @relation(fields: [courseId], references: [id])
-  createdBy   Int
+  createdBy   String    @db.ObjectId
   creator     User      @relation(fields: [createdBy], references: [id])
 
-  // Related entities
-  assignmentId Int?
+  assignmentId String?     @db.ObjectId
   assignment   Assignment? @relation(fields: [assignmentId], references: [id])
-  quizId       Int?
+  quizId       String?     @db.ObjectId
   quiz         Quiz?       @relation(fields: [quizId], references: [id])
 
-  // Recurrence settings
   isRecurring    Boolean @default(false)
-  recurrenceRule String? // RRULE format for recurring events
+  recurrenceRule String?
 
-  // Notification settings
-  reminderMinutes Int[] @default([15]) // Minutes before event to send reminders
+  reminderMinutes Int[] @default([15])
 
-  metadata  Json? // Additional event data
+  metadata  Json?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -535,12 +530,12 @@ model CalendarEvent {
 }
 
 model EventAttendee {
-  id        Int           @id @default(autoincrement())
-  eventId   Int
+  id        String        @id @default(auto()) @map("_id") @db.ObjectId
+  eventId   String        @db.ObjectId
   event     CalendarEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
-  userId    Int
+  userId    String        @db.ObjectId
   user      User          @relation(fields: [userId], references: [id])
-  status    String        @default("invited") // "invited", "accepted", "declined", "maybe"
+  status    String        @default("invited")
   createdAt DateTime      @default(now())
   updatedAt DateTime      @updatedAt
 
@@ -548,13 +543,13 @@ model EventAttendee {
 }
 
 model EventReminder {
-  id         Int           @id @default(autoincrement())
-  eventId    Int
+  id         String        @id @default(auto()) @map("_id") @db.ObjectId
+  eventId    String        @db.ObjectId
   event      CalendarEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
-  userId     Int
+  userId     String        @db.ObjectId
   user       User          @relation(fields: [userId], references: [id])
   reminderAt DateTime
-  type       String        @default("email") // "email", "push", "sms"
+  type       String        @default("email")
   isSent     Boolean       @default(false)
   createdAt  DateTime      @default(now())
 
@@ -562,24 +557,24 @@ model EventReminder {
 }
 
 model AuditLog {
-  id        Int      @id @default(autoincrement())
-  userId    Int?
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId    String?  @db.ObjectId
   user      User?    @relation(fields: [userId], references: [id])
   action    String
   entity    String
-  entityId  Int?
+  entityId  String?  @db.ObjectId
   metadata  Json?
   createdAt DateTime @default(now())
 }
 
 model Interaction {
-  id        Int      @id @default(autoincrement())
-  userId    Int
-  courseId  Int?
-  moduleId  Int?
-  quizId    Int?
-  eventType String // 'view', 'attempt', 'search', 'rating', etc.
-  metadata  Json? // extra info like search terms or rating score
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId    String   @db.ObjectId
+  courseId  String?  @db.ObjectId
+  moduleId  String?  @db.ObjectId
+  quizId    String?  @db.ObjectId
+  eventType String
+  metadata  Json?
   createdAt DateTime @default(now())
 
   user   User          @relation(fields: [userId], references: [id])

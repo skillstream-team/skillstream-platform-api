@@ -1,6 +1,6 @@
 export interface CreateRecommendationDto {
-  userId: number;
-  courseId: number;
+  userId: string;
+  courseId: string;
   score: number;
   reason: string;
   algorithm: string;
@@ -8,9 +8,9 @@ export interface CreateRecommendationDto {
 }
 
 export interface RecommendationResponseDto {
-  id: number;
-  userId: number;
-  courseId: number;
+  id: string;
+  userId: string;
+  courseId: string;
   score: number;
   reason: string;
   algorithm: string;
@@ -20,27 +20,27 @@ export interface RecommendationResponseDto {
   createdAt: Date;
   updatedAt: Date;
   course: {
-    id: number;
+    id: string;
     title: string;
     description?: string;
     price: number;
     instructor: {
-      id: number;
+      id: string;
       username: string;
     };
   };
 }
 
 export interface UserInteractionDto {
-  userId: number;
-  courseId?: number;
+  userId: string;
+  courseId?: string;
   type: 'view' | 'enroll' | 'complete' | 'rate' | 'search';
   value?: number;
   metadata?: any;
 }
 
 export interface RecommendationFiltersDto {
-  userId: number;
+  userId: string;
   limit?: number;
   algorithm?: string;
   minScore?: number;

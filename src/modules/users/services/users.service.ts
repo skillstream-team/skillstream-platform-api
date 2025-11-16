@@ -3,8 +3,7 @@ import { prisma } from '../models/user.model';
 import { CreateUserDTO } from '../dtos/user.dto';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
-import { generateToken } from '../../../utils/jwt';
-import { supabase } from '../../../utils/supabase';
+import { generateToken, JWTPayload } from '../../../utils/jwt';
 import { emailService } from './email.service';
 
 const JWT_SECRET = process.env.JWT_SECRET as string;
@@ -12,21 +11,12 @@ if (!JWT_SECRET) {
   throw new Error('JWT_SECRET is not defined in your environment variables');
 }
 
-// Define a type for the JWT payload
-interface JWTPayload {
-  userId: string;
-  role: string;
-}
-
-export const signToken = (payload: JWTPayload): string => {
-  return jwt.sign(payload, JWT_SECRET, { expiresIn: '1h' });
-};
 
 const RESET_TOKEN_SECRET = process.env.RESET_TOKEN_SECRET as string;
 if (!RESET_TOKEN_SECRET) {
     throw new Error('RESET_TOKEN_SECRET is not defined in your environment variables');
 }
-const RESET_TOKEN_EXPIRY = '15m'; // 1 hour
+const RESET_TOKEN_EXPIRY = '15m'; // 15 Minutes
 
 export class UsersService {
     /**
@@ -34,7 +24,7 @@ export class UsersService {
      * /users:
      *   post:
      *     summary: Create a new user
-     *     description: Creates a new user in Supabase auth, inserts the user record in the database, and returns a JWT token along with user info.
+     *     description: Creates a new user in the database with hashed password and returns a JWT token along with user info.
      *     tags:
      *       - Users
      *     requestBody:
@@ -87,30 +77,47 @@ export class UsersService {
      *                     role:
      *                       type: string
      *       400:
-     *         description: Bad request, invalid input or Supabase error
+     *         description: Bad request, invalid input or database error
      */
   async createUser(data: CreateUserDTO) {
-    const { email, password, username, role } = data;
+    try {
+      const { email, password, username, role } = data;
 
-    const { data: authUser, error: authError } = await supabase.auth.admin.createUser({
-      email,
-      password,
-      user_metadata: { username, role },
-      email_confirm: true,
-    });
-    if (authError) throw authError;
+      // Check if user already exists
+      const existingUser = await prisma.user.findFirst({
+        where: {
+          OR: [
+            { email },
+            { username }
+          ]
+        }
+      });
 
-    const { data: user, error: dbError } = await supabase
-      .from('users')
-      .insert([{ id: authUser.user.id, username, role, email }])
-      .select()
-      .single();
-    if (dbError) throw dbError;
+      if (existingUser) {
+        throw new Error('User with this email or username already exists');
+      }
 
-    // 3️⃣ Generate app-specific JWT
-    const token = signToken({ userId: authUser.user.id, role });
+      // Hash password
+      const hashedPassword = await bcrypt.hash(password, 10);
 
-    return { token, user };
+      // Create user in database
+      const user = await prisma.user.create({
+        data: {
+          email,
+          password: hashedPassword,
+          username,
+          role,
+        },
+      });
+
+      // Generate JWT token
+      const { password: _, ...userWithoutPassword } = user;
+      const token = generateToken({ id: user.id, role: user.role });
+
+      return { token, user: userWithoutPassword };
+    } catch (error) {
+      throw new Error('Error creating user: ' + (error as Error).message);
+    }
   }
     /**
      * @swagger
@@ -237,8 +244,11 @@ export class UsersService {
     try {
       const decoded = jwt.verify(token, JWT_SECRET as string) as unknown as JWTPayload;
 
-      // Fetch the user from the DB
-      const user = await prisma.user.findUnique({ where: { id: Number(decoded.userId) } });
+      // Fetch the user from the DB - support both id and userId for backward compatibility
+      const userId = decoded.id || decoded.userId;
+      if (!userId) throw new Error('Invalid token payload');
+      
+      const user = await prisma.user.findUnique({ where: { id: userId } });
       if (!user) throw new Error('User not found');
 
       const { password, ...userWithoutPassword } = user;
@@ -316,7 +326,7 @@ export class UsersService {
      */
     async resetPassword(data: { token: string; newPassword: string }) {
         try {
-            const decoded = jwt.verify(data.token, RESET_TOKEN_SECRET) as { userId: number };
+            const decoded = jwt.verify(data.token, RESET_TOKEN_SECRET) as { userId: string };
 
             if (!data.newPassword || data.newPassword.length < 6)
                 throw new Error('Password must be at least 6 characters long');
@@ -367,7 +377,7 @@ export class UsersService {
      *       404:
      *         description: User not found
      */
-    async getUserById(id: number) {
+    async getUserById(id: string) {
         return prisma.user.findUnique({ where: { id } });
     }
 
@@ -379,7 +389,7 @@ export class UsersService {
      *     tags:
      *       - Users
      */
-    async getUserProfile(userId: number) {
+    async getUserProfile(userId: string) {
         return prisma.user.findUnique({ where: { id: userId } });
     }
 
@@ -413,7 +423,7 @@ export class UsersService {
      *                 type: string
      *                 example: "NewPass123"
      */
-    async changePassword(id: number, newPassword: string) {
+    async changePassword(id: string, newPassword: string) {
         try {
             if (!newPassword || newPassword.length < 6)
                 throw new Error('Password must be at least 6 characters long');
@@ -437,7 +447,7 @@ export class UsersService {
      *     tags:
      *       - Users
      */
-    async updateUser(id: number, data: Partial<CreateUserDTO>) {
+    async updateUser(id: string, data: Partial<CreateUserDTO>) {
         try {
             if (data.password) {
                 data.password = await bcrypt.hash(data.password, 10);
@@ -456,7 +466,7 @@ export class UsersService {
      *     tags:
      *       - Users
      */
-    async deleteUser(id: number) {
+    async deleteUser(id: string) {
         try {
             return prisma.user.delete({ where: { id } });
         } catch (error) {
@@ -472,7 +482,7 @@ export class UsersService {
      *     tags:
      *       - Users
      */
-    async updateUserRole(id: number, roles: string[]) {
+    async updateUserRole(id: string, roles: string[]) {
         try {
             return prisma.user.update({
                 where: { id },

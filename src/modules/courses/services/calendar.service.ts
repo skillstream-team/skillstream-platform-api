@@ -14,7 +14,7 @@ export class CalendarService {
   /**
    * Create a new calendar event
    */
-  async createEvent(createdBy: number, eventData: CreateCalendarEventDto): Promise<CalendarEventResponseDto> {
+  async createEvent(createdBy: string, eventData: CreateCalendarEventDto): Promise<CalendarEventResponseDto> {
     const event = await prisma.calendarEvent.create({
       data: {
         title: eventData.title,
@@ -60,7 +60,7 @@ export class CalendarService {
   /**
    * Update an existing calendar event
    */
-  async updateEvent(eventId: number, userId: number, eventData: UpdateCalendarEventDto): Promise<CalendarEventResponseDto> {
+  async updateEvent(eventId: string, userId: string, eventData: UpdateCalendarEventDto): Promise<CalendarEventResponseDto> {
     // Check if user has permission to update this event
     const existingEvent = await prisma.calendarEvent.findFirst({
       where: { id: eventId, createdBy: userId }
@@ -103,7 +103,7 @@ export class CalendarService {
   /**
    * Delete a calendar event
    */
-  async deleteEvent(eventId: number, userId: number): Promise<void> {
+  async deleteEvent(eventId: string, userId: string): Promise<void> {
     const event = await prisma.calendarEvent.findFirst({
       where: { id: eventId, createdBy: userId }
     });
@@ -169,7 +169,7 @@ export class CalendarService {
   /**
    * Get personal calendar for a student (all events for enrolled courses)
    */
-  async getPersonalCalendar(userId: number, startDate?: Date, endDate?: Date): Promise<PersonalCalendarDto> {
+  async getPersonalCalendar(userId: string, startDate?: Date, endDate?: Date): Promise<PersonalCalendarDto> {
     // Get user's enrolled courses
     const enrollments = await prisma.enrollment.findMany({
       where: { studentId: userId },
@@ -235,7 +235,7 @@ export class CalendarService {
   /**
    * Add attendees to an event
    */
-  async addAttendees(eventId: number, userIds: number[]): Promise<void> {
+  async addAttendees(eventId: string, userIds: string[]): Promise<void> {
     const attendeeData = userIds.map(userId => ({
       eventId,
       userId,
@@ -243,15 +243,14 @@ export class CalendarService {
     }));
 
     await prisma.eventAttendee.createMany({
-      data: attendeeData,
-      skipDuplicates: true
+      data: attendeeData
     });
   }
 
   /**
    * Remove attendees from an event
    */
-  async removeAttendees(eventId: number, userIds: number[]): Promise<void> {
+  async removeAttendees(eventId: string, userIds: string[]): Promise<void> {
     await prisma.eventAttendee.deleteMany({
       where: {
         eventId,
@@ -278,7 +277,7 @@ export class CalendarService {
   /**
    * Schedule reminders for an event
    */
-  private async scheduleReminders(eventId: number, attendeeIds: number[], reminderMinutes: number[]): Promise<void> {
+  private async scheduleReminders(eventId: string, attendeeIds: string[], reminderMinutes: number[]): Promise<void> {
     const event = await prisma.calendarEvent.findUnique({
       where: { id: eventId },
       select: { startTime: true }
@@ -303,8 +302,7 @@ export class CalendarService {
 
     if (reminderData.length > 0) {
       await prisma.eventReminder.createMany({
-        data: reminderData,
-        skipDuplicates: true
+        data: reminderData
       });
     }
   }
@@ -338,7 +336,7 @@ export class CalendarService {
   /**
    * Mark reminder as sent
    */
-  async markReminderAsSent(reminderId: number): Promise<void> {
+  async markReminderAsSent(reminderId: string): Promise<void> {
     await prisma.eventReminder.update({
       where: { id: reminderId },
       data: { isSent: true }

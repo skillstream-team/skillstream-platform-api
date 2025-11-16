@@ -14,24 +14,24 @@ import { Prisma } from '@prisma/client';
 export interface CreatePollDto {
   title: string;
   description?: string;
-  courseId: number;
-  moduleId?: number;
-  liveStreamId: number;
+  courseId: string;
+  moduleId?: string;
+  liveStreamId: string;
   options: string[];
 }
 
 export interface RespondToPollDto {
-  pollId: number;
+  pollId: string;
   selectedOption: string;
 }
 
 export interface PollResponseDto {
-  id: number;
+  id: string;
   title: string;
   description?: string;
-  courseId?: number;
-  moduleId?: number;
-  liveSessionId?: number;
+  courseId?: string;
+  moduleId?: string;
+  liveSessionId?: string;
   options: string[];
   responses: PollResponseDetailDto[];
   createdAt: Date;
@@ -39,7 +39,7 @@ export interface PollResponseDto {
 }
 
 export interface PollResponseDetailDto {
-  userId: number;
+  userId: string;
   selectedOption: string;
   respondedAt: Date;
 }

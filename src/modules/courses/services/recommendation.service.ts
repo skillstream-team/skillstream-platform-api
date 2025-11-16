@@ -12,7 +12,7 @@ export class RecommendationService {
   /**
    * Generate recommendations for a user based on different algorithms
    */
-  async generateRecommendations(userId: number, limit: number = 10): Promise<RecommendationResponseDto[]> {
+  async generateRecommendations(userId: string, limit: number = 10): Promise<RecommendationResponseDto[]> {
     // Clear old recommendations for this user
     await prisma.courseRecommendation.deleteMany({
       where: { userId }
@@ -74,7 +74,7 @@ export class RecommendationService {
    * Collaborative filtering: recommend courses based on similar users
    */
   private async getCollaborativeRecommendations(
-    userId: number, 
+    userId: string, 
     userEnrollments: any[]
   ): Promise<CreateRecommendationDto[]> {
     const enrolledCourseIds = userEnrollments.map(e => e.courseId);
@@ -118,7 +118,7 @@ export class RecommendationService {
    * Content-based filtering: recommend courses based on user's course history
    */
   private async getContentBasedRecommendations(
-    userId: number,
+    userId: string,
     userEnrollments: any[]
   ): Promise<CreateRecommendationDto[]> {
     if (userEnrollments.length === 0) return [];
@@ -150,7 +150,7 @@ export class RecommendationService {
    * Popularity-based recommendations: recommend trending courses
    */
   private async getPopularityBasedRecommendations(
-    userId: number,
+    userId: string,
     userEnrollments: any[]
   ): Promise<CreateRecommendationDto[]> {
     const enrolledCourseIds = userEnrollments.map(e => e.courseId);
@@ -242,7 +242,7 @@ export class RecommendationService {
   /**
    * Get recommendation statistics for a user
    */
-  async getRecommendationStats(userId: number): Promise<RecommendationStatsDto> {
+  async getRecommendationStats(userId: string): Promise<RecommendationStatsDto> {
     const stats = await prisma.courseRecommendation.aggregate({
       where: { userId },
       _count: { id: true },
@@ -277,7 +277,7 @@ export class RecommendationService {
   /**
    * Refresh recommendations for a user
    */
-  async refreshRecommendations(userId: number): Promise<RecommendationResponseDto[]> {
+  async refreshRecommendations(userId: string): Promise<RecommendationResponseDto[]> {
     return this.generateRecommendations(userId);
   }
 

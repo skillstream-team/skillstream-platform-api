@@ -9,15 +9,15 @@
  */
 import { Prisma } from '@prisma/client';
 export interface CreateCourseModuleDto {
-  courseId: number;
+  courseId: string;
   title: string;
   description?: string;
   content?: Prisma.InputJsonValue;
   order: number;
   isPublished?: boolean;
   publishedAt?: Date;
-  createdBy: number;
-  creator?: { id: number; username: string; email: string };
+  createdBy: string;
+  creator?: { id: string; username: string; email: string };
   lessons?: any[];
   quizzes?: any[];
   assignments?: any[];
@@ -32,16 +32,16 @@ export interface UpdateCourseModuleDto {
 }
 
 export interface CourseModuleResponseDto {
-  id: number;
-  courseId: number;
+  id: string;
+  courseId: string;
   title: string;
   description?: string;
   order: number;
   isPublished: boolean;
   publishedAt?: Date;
-  createdBy: number;
+  createdBy: string;
   creator: {
-    id: number;
+    id: string;
     username: string;
     email: string;
   };
@@ -58,8 +58,8 @@ export interface CourseModuleResponseDto {
  * Advanced assessment and testing capabilities
  */
 export interface CreateQuizDto {
-  courseId: number;
-  moduleId?: number;
+  courseId: string;
+  moduleId?: string;
   title: string;
   description?: string;
   instructions?: string;
@@ -67,7 +67,7 @@ export interface CreateQuizDto {
   maxAttempts?: number;
   passingScore?: number; // percentage
   dueDate?: Date;
-  createdBy: number;
+  createdBy: string;
 }
 
 export interface UpdateQuizDto {
@@ -82,9 +82,9 @@ export interface UpdateQuizDto {
 }
 
 export interface QuizResponseDto {
-  id: number;
-  courseId: number;
-  moduleId?: number;
+  id: string;
+  courseId: string;
+  moduleId?: string;
   title: string;
   description?: string;
   instructions?: string;
@@ -94,9 +94,9 @@ export interface QuizResponseDto {
   isPublished: boolean;
   publishedAt?: Date;
   dueDate?: Date;
-  createdBy: number;
+  createdBy: string;
   creator: {
-    id: number;
+    id: string;
     username: string;
     email: string;
   };
@@ -107,7 +107,7 @@ export interface QuizResponseDto {
 }
 
 export interface CreateQuizQuestionDto {
-  quizId: number;
+  quizId: string;
   question: string;
   type: 'multiple_choice' | 'true_false' | 'fill_blank' | 'essay';
   options?: any; // For multiple choice
@@ -118,8 +118,8 @@ export interface CreateQuizQuestionDto {
 }
 
 export interface QuizQuestionResponseDto {
-  id: number;
-  quizId: number;
+  id: string;
+  quizId: string;
   question: string;
   type: string;
   options?: any;
@@ -132,22 +132,22 @@ export interface QuizQuestionResponseDto {
 }
 
 export interface StartQuizAttemptDto {
-  quizId: number;
-  studentId: number;
+  quizId: string;
+  studentId: string;
 }
 
 export interface SubmitQuizAttemptDto {
-  attemptId: number;
+  attemptId: string;
   answers: any; // Student answers
   timeSpent?: number; // in seconds
 }
 
 export interface QuizAttemptResponseDto {
-  id: number;
-  quizId: number;
-  studentId: number;
+  id: string;
+  quizId: string;
+  studentId: string;
   student: {
-    id: number;
+    id: string;
     username: string;
     email: string;
   };
@@ -159,9 +159,9 @@ export interface QuizAttemptResponseDto {
   startedAt: Date;
   submittedAt?: Date;
   gradedAt?: Date;
-  gradedBy?: number;
+  gradedBy?: string | null;
   grader?: {
-    id: number;
+    id: string;
     username: string;
     email: string;
   };
@@ -176,15 +176,15 @@ export interface QuizAttemptResponseDto {
  * Various assignment types with detailed tracking
  */
 export interface CreateAssignmentDto {
-  courseId: number;
-  moduleId?: number;
+  courseId: string;
+  moduleId?: string;
   title: string;
   description?: string;
   instructions?: string;
   type: 'essay' | 'file_upload' | 'peer_review' | 'group_project';
   maxScore?: number;
   dueDate?: Date;
-  createdBy: number;
+  createdBy: string;
 }
 
 export interface UpdateAssignmentDto {
@@ -198,9 +198,9 @@ export interface UpdateAssignmentDto {
 }
 
 export interface AssignmentResponseDto {
-  id: number;
-  courseId: number;
-  moduleId?: number;
+  id: string;
+  courseId: string;
+  moduleId?: string;
   title: string;
   description?: string;
   instructions?: string;
@@ -209,9 +209,9 @@ export interface AssignmentResponseDto {
   dueDate?: Date;
   isPublished: boolean;
   publishedAt?: Date;
-  createdBy: number;
+  createdBy: string;
   creator: {
-    id: number;
+    id: string;
     username: string;
     email: string;
   };
@@ -225,11 +225,11 @@ export interface AssignmentResponseDto {
  * Comprehensive student progress monitoring
  */
 export interface CreateProgressDto {
-  studentId: number;
-  courseId: number;
-  moduleId?: number;
+  studentId: string;
+  courseId: string;
+  moduleId?: string;
   type: 'module' | 'quiz' | 'assignment' | 'video' | 'material';
-  itemId: number;
+  itemId: string;
   status: 'not_started' | 'in_progress' | 'completed' | 'passed' | 'failed';
   progress?: number; // 0-100
   score?: number;
@@ -245,25 +245,25 @@ export interface UpdateProgressDto {
 }
 
 export interface ProgressResponseDto {
-  id: number;
-  studentId: number;
+  id: string;
+  studentId: string;
   student: {
-    id: number;
+    id: string;
     username: string;
     email: string;
   };
-  courseId: number;
+  courseId: string;
   course: {
-    id: number;
+    id: string;
     title: string;
   };
-  moduleId?: number;
+  moduleId?: string;
   module?: {
-    id: number;
+    id: string;
     title: string;
   };
   type: string;
-  itemId: number;
+  itemId: string;
   status: string;
   progress: number;
   score?: number;
@@ -288,7 +288,7 @@ export interface CreateBadgeDto {
 }
 
 export interface BadgeResponseDto {
-  id: number;
+  id: string;
   name: string;
   description: string;
   icon?: string;
@@ -301,18 +301,18 @@ export interface BadgeResponseDto {
 }
 
 export interface AchievementResponseDto {
-  id: number;
-  studentId: number;
+  id: string;
+  studentId: string;
   student: {
-    id: number;
+    id: string;
     username: string;
     email: string;
   };
-  badgeId: number;
+  badgeId: string;
   badge: BadgeResponseDto;
-  courseId?: number;
+  courseId?: string;
   course?: {
-    id: number;
+    id: string;
     title: string;
   };
   earnedAt: Date;
@@ -320,8 +320,8 @@ export interface AchievementResponseDto {
 }
 
 export interface CreateCertificateDto {
-  studentId: number;
-  courseId: number;
+  studentId: string;
+  courseId: string;
   title: string;
   description?: string;
   template?: string;
@@ -329,16 +329,16 @@ export interface CreateCertificateDto {
 }
 
 export interface CertificateResponseDto {
-  id: number;
-  studentId: number;
+  id: string;
+  studentId: string;
   student: {
-    id: number;
+    id: string;
     username: string;
     email: string;
   };
-  courseId: number;
+  courseId: string;
   course: {
-    id: number;
+    id: string;
     title: string;
   };
   title: string;
@@ -357,7 +357,7 @@ export interface CertificateResponseDto {
  * Learning analytics and insights
  */
 export interface LearningAnalyticsDto {
-  courseId: number;
+  courseId: string;
   totalStudents: number;
   completionRate: number;
   averageScore: number;
@@ -369,7 +369,7 @@ export interface LearningAnalyticsDto {
 }
 
 export interface ModuleProgressDto {
-  moduleId: number;
+  moduleId: string;
   title: string;
   completionRate: number;
   averageTimeSpent: number;
@@ -377,7 +377,7 @@ export interface ModuleProgressDto {
 }
 
 export interface QuizPerformanceDto {
-  quizId: number;
+  quizId: string;
   title: string;
   averageScore: number;
   passRate: number;
@@ -386,7 +386,7 @@ export interface QuizPerformanceDto {
 }
 
 export interface AssignmentPerformanceDto {
-  assignmentId: number;
+  assignmentId: string;
   title: string;
   submissionRate: number;
   averageScore: number;
@@ -406,9 +406,9 @@ export interface EngagementMetricsDto {
  * Lesson DTOs (if not already defined)
  */
 export interface LessonResponseDto {
-  id: number;
-  courseId: number;
-  moduleId?: number;
+  id: string;
+  courseId: string;
+  moduleId?: string;
   title: string;
   content?: any;
   order: number;
@@ -420,11 +420,11 @@ export interface LessonResponseDto {
  * Submission DTOs (if not already defined)
  */
 export interface SubmissionResponseDto {
-  id: number;
-  assignmentId: number;
-  studentId: number;
+  id: string;
+  assignmentId: string;
+  studentId: string;
   student: {
-    id: number;
+    id: string;
     username: string;
     email: string;
   };

@@ -197,7 +197,7 @@ export class LearningService {
    *       500:
    *         description: Internal server error
    */
-  async getCourseModule(moduleId: number): Promise<CourseModuleResponseDto | null> {
+  async getCourseModule(moduleId: string): Promise<CourseModuleResponseDto | null> {
     try {
       const module = await prisma.courseModule.findUnique({
         where: { id: moduleId },
@@ -255,7 +255,7 @@ export class LearningService {
    *       500:
    *         description: Internal server error
    */
-  async getCourseModules(courseId: number): Promise<CourseModuleResponseDto[]> {
+  async getCourseModules(courseId: string): Promise<CourseModuleResponseDto[]> {
     try {
       const modules = await prisma.courseModule.findMany({
         where: { courseId },
@@ -818,7 +818,7 @@ export class LearningService {
    *       500:
    *         description: Internal server error
    */
-  async getLearningAnalytics(courseId: number): Promise<LearningAnalyticsDto> {
+  async getLearningAnalytics(courseId: string): Promise<LearningAnalyticsDto> {
     try {
       // Validate course exists
       const course = await prisma.course.findUnique({
@@ -894,7 +894,7 @@ export class LearningService {
   // PRIVATE HELPER METHODS
   // ===========================================
 
-  private async getModuleProgressAnalytics(courseId: number): Promise<ModuleProgressDto[]> {
+  private async getModuleProgressAnalytics(courseId: string): Promise<ModuleProgressDto[]> {
     const modules = await prisma.courseModule.findMany({
       where: { courseId },
       include: {
@@ -918,7 +918,7 @@ export class LearningService {
     });
   }
 
-  private async getQuizPerformanceAnalytics(courseId: number): Promise<QuizPerformanceDto[]> {
+  private async getQuizPerformanceAnalytics(courseId: string): Promise<QuizPerformanceDto[]> {
     const quizzes = await prisma.quiz.findMany({
       where: { courseId },
       include: {
@@ -944,7 +944,7 @@ export class LearningService {
     });
   }
 
-  private async getAssignmentPerformanceAnalytics(courseId: number): Promise<AssignmentPerformanceDto[]> {
+  private async getAssignmentPerformanceAnalytics(courseId: string): Promise<AssignmentPerformanceDto[]> {
     const assignments = await prisma.assignment.findMany({
       where: { courseId },
       include: {
@@ -971,7 +971,7 @@ export class LearningService {
     });
   }
 
-  private async getEngagementMetrics(courseId: number): Promise<EngagementMetricsDto> {
+  private async getEngagementMetrics(courseId: string): Promise<EngagementMetricsDto> {
     // This would typically involve more complex queries
     // For now, returning basic metrics
     return {
@@ -985,7 +985,7 @@ export class LearningService {
   }
 }
 
-async function updateProgress(studentId: number, courseId: number, type: string, itemId: number, status: string, score?: number, timeSpent?: number) {
+async function updateProgress(studentId: string, courseId: string, type: string, itemId: string, status: string, score?: number, timeSpent?: number) {
     const existing = await prisma.progress.findUnique({
         where: { studentId_courseId_type_itemId: { studentId, courseId, type, itemId } }
     });
@@ -1021,14 +1021,14 @@ async function updateProgress(studentId: number, courseId: number, type: string,
 }
 
 
-async function getCourseProgress(studentId: number, courseId: number) {
+async function getCourseProgress(studentId: string, courseId: string) {
     // get all items for course
     const progress = await prisma.progress.findMany({
         where: { studentId, courseId }
     });
 
     // group by type or module
-    const moduleIds = [...new Set(progress.map(p => p.moduleId).filter(Boolean))] as number[];
+    const moduleIds = [...new Set(progress.map(p => p.moduleId).filter(Boolean))] as string[];
 
     let totalProgress = 0;
     let modulesCounted = 0;

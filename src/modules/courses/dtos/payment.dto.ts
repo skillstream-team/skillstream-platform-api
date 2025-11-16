@@ -1,6 +1,6 @@
 export interface CreatePaymentDto {
-  studentId: number;
-  courseId: number;
+  studentId: string;
+  courseId: string;
   amount: number;
   currency?: string;
   status: 'PENDING' | 'COMPLETED' | 'FAILED';
@@ -9,9 +9,9 @@ export interface CreatePaymentDto {
 }
 
 export interface PaymentResponseDto {
-  id: number;
-  studentId: number;
-  courseId: number;
+  id: string;
+  studentId: string;
+  courseId: string;
   amount: number;
   currency: string;
   status: string;
@@ -19,12 +19,12 @@ export interface PaymentResponseDto {
   transactionId?: string;
   createdAt: Date;
   student: {
-    id: number;
+    id: string;
     username: string;
     email: string;
   };
   course: {
-    id: number;
+    id: string;
     title: string;
     price: number;
   };

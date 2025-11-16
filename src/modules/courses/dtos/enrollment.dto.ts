@@ -1,6 +1,6 @@
 export interface CreateEnrollmentDto {
-  courseId: number;
-  studentId: number;
+  courseId: string;
+  studentId: string;
   amount: number;
   currency?: string;
   provider: string;
@@ -8,23 +8,23 @@ export interface CreateEnrollmentDto {
 }
 
 export interface EnrollmentResponseDto {
-  id: number;
-  courseId: number;
-  studentId: number;
-  paymentId: number;
+  id: string;
+  courseId: string;
+  studentId: string;
+  paymentId: string | null;
   createdAt: Date;
   course: {
-    id: number;
+    id: string;
     title: string;
     price: number;
   };
   student: {
-    id: number;
+    id: string;
     username: string;
     email: string;
   };
   payment: {
-    id: number;
+    id: string;
     amount: number;
     currency: string;
     status: string;
@@ -34,7 +34,7 @@ export interface EnrollmentResponseDto {
 }
 
 export interface CourseEnrollmentDto {
-  id: number;
+  id: string;
   username: string;
   email: string;
   enrollmentDate: Date;

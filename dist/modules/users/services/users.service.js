@@ -3,34 +3,29 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.UsersService = exports.signToken = void 0;
+exports.UsersService = void 0;
 // modules/users/services/users.service.ts
 const user_model_1 = require("../models/user.model");
 const bcrypt_1 = __importDefault(require("bcrypt"));
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const jwt_1 = require("../../../utils/jwt");
-const supabase_1 = require("../../../utils/supabase");
 const email_service_1 = require("./email.service");
 const JWT_SECRET = process.env.JWT_SECRET;
 if (!JWT_SECRET) {
     throw new Error('JWT_SECRET is not defined in your environment variables');
 }
-const signToken = (payload) => {
-    return jsonwebtoken_1.default.sign(payload, JWT_SECRET, { expiresIn: '1h' });
-};
-exports.signToken = signToken;
 const RESET_TOKEN_SECRET = process.env.RESET_TOKEN_SECRET;
 if (!RESET_TOKEN_SECRET) {
     throw new Error('RESET_TOKEN_SECRET is not defined in your environment variables');
 }
-const RESET_TOKEN_EXPIRY = '15m'; // 1 hour
+const RESET_TOKEN_EXPIRY = '15m'; // 15 Minutes
 class UsersService {
     /**
      * @swagger
      * /users:
      *   post:
      *     summary: Create a new user
-     *     description: Creates a new user in Supabase auth, inserts the user record in the database, and returns a JWT token along with user info.
+     *     description: Creates a new user in the database with hashed password and returns a JWT token along with user info.
      *     tags:
      *       - Users
      *     requestBody:
@@ -83,28 +78,42 @@ class UsersService {
      *                     role:
      *                       type: string
      *       400:
-     *         description: Bad request, invalid input or Supabase error
+     *         description: Bad request, invalid input or database error
      */
     async createUser(data) {
-        const { email, password, username, role } = data;
-        const { data: authUser, error: authError } = await supabase_1.supabase.auth.admin.createUser({
-            email,
-            password,
-            user_metadata: { username, role },
-            email_confirm: true,
-        });
-        if (authError)
-            throw authError;
-        const { data: user, error: dbError } = await supabase_1.supabase
-            .from('users')
-            .insert([{ id: authUser.user.id, username, role, email }])
-            .select()
-            .single();
-        if (dbError)
-            throw dbError;
-        // 3️⃣ Generate app-specific JWT
-        const token = (0, exports.signToken)({ userId: authUser.user.id, role });
-        return { token, user };
+        try {
+            const { email, password, username, role } = data;
+            // Check if user already exists
+            const existingUser = await user_model_1.prisma.user.findFirst({
+                where: {
+                    OR: [
+                        { email },
+                        { username }
+                    ]
+                }
+            });
+            if (existingUser) {
+                throw new Error('User with this email or username already exists');
+            }
+            // Hash password
+            const hashedPassword = await bcrypt_1.default.hash(password, 10);
+            // Create user in database
+            const user = await user_model_1.prisma.user.create({
+                data: {
+                    email,
+                    password: hashedPassword,
+                    username,
+                    role,
+                },
+            });
+            // Generate JWT token
+            const { password: _, ...userWithoutPassword } = user;
+            const token = (0, jwt_1.generateToken)({ id: user.id, role: user.role });
+            return { token, user: userWithoutPassword };
+        }
+        catch (error) {
+            throw new Error('Error creating user: ' + error.message);
+        }
     }
     /**
      * @swagger
@@ -228,8 +237,11 @@ class UsersService {
     async refreshToken(token) {
         try {
             const decoded = jsonwebtoken_1.default.verify(token, JWT_SECRET);
-            // Fetch the user from the DB
-            const user = await user_model_1.prisma.user.findUnique({ where: { id: Number(decoded.userId) } });
+            // Fetch the user from the DB - support both id and userId for backward compatibility
+            const userId = decoded.id || decoded.userId;
+            if (!userId)
+                throw new Error('Invalid token payload');
+            const user = await user_model_1.prisma.user.findUnique({ where: { id: userId } });
             if (!user)
                 throw new Error('User not found');
             const { password, ...userWithoutPassword } = user;

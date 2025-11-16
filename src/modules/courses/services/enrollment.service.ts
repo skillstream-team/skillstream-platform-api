@@ -90,7 +90,7 @@ export class EnrollmentService {
      *               items:
      *                 $ref: '#/components/schemas/CourseEnrollmentDto'
      */
-    async getCourseEnrollments(courseId: number): Promise<CourseEnrollmentDto[]> {
+    async getCourseEnrollments(courseId: string): Promise<CourseEnrollmentDto[]> {
         const enrollments = await prisma.enrollment.findMany({
             where: { courseId },
             include: { student: { select: { id: true, username: true, email: true } } },
@@ -126,7 +126,7 @@ export class EnrollmentService {
      *             schema:
      *               $ref: '#/components/schemas/CourseStatsDto'
      */
-    async getCourseStats(courseId: number): Promise<CourseStatsDto> {
+    async getCourseStats(courseId: string): Promise<CourseStatsDto> {
         const [enrolledCount, totalRevenue] = await Promise.all([
             prisma.enrollment.count({ where: { courseId } }),
             prisma.payment.aggregate({
@@ -164,7 +164,7 @@ export class EnrollmentService {
      *               items:
      *                 $ref: '#/components/schemas/EnrollmentResponseDto'
      */
-    async getStudentEnrollments(studentId: number): Promise<EnrollmentResponseDto[]> {
+    async getStudentEnrollments(studentId: string): Promise<EnrollmentResponseDto[]> {
         const enrollments = await prisma.enrollment.findMany({
             where: { studentId },
             include: {
@@ -208,7 +208,7 @@ export class EnrollmentService {
      *                   type: boolean
      *                   example: true
      */
-    async isStudentEnrolled(courseId: number, studentId: number): Promise<boolean> {
+    async isStudentEnrolled(courseId: string, studentId: string): Promise<boolean> {
         const enrollment = await prisma.enrollment.findFirst({
             where: { courseId, studentId },
         });

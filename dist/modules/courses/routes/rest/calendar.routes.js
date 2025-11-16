@@ -149,11 +149,11 @@ router.post('/events', auth_1.requireAuth, async (req, res) => {
 router.put('/events/:eventId', auth_1.requireAuth, async (req, res) => {
     try {
         const userId = req.user?.id;
-        const eventId = parseInt(req.params.eventId);
+        const eventId = req.params.eventId;
         if (!userId) {
             return res.status(401).json({ error: 'User not authenticated' });
         }
-        if (isNaN(eventId)) {
+        if (!eventId) {
             return res.status(400).json({ error: 'Invalid event ID' });
         }
         const eventData = {
@@ -205,11 +205,11 @@ router.put('/events/:eventId', auth_1.requireAuth, async (req, res) => {
 router.delete('/events/:eventId', auth_1.requireAuth, async (req, res) => {
     try {
         const userId = req.user?.id;
-        const eventId = parseInt(req.params.eventId);
+        const eventId = req.params.eventId;
         if (!userId) {
             return res.status(401).json({ error: 'User not authenticated' });
         }
-        if (isNaN(eventId)) {
+        if (!eventId) {
             return res.status(400).json({ error: 'Invalid event ID' });
         }
         await calendarService.deleteEvent(eventId, userId);
@@ -273,7 +273,7 @@ router.get('/events', auth_1.requireAuth, async (req, res) => {
         const userId = req.user?.id;
         const filters = {
             userId,
-            courseId: req.query.courseId ? parseInt(req.query.courseId) : undefined,
+            courseId: req.query.courseId ? req.query.courseId : undefined,
             type: req.query.type,
             startDate: req.query.startDate ? new Date(req.query.startDate) : undefined,
             endDate: req.query.endDate ? new Date(req.query.endDate) : undefined,
@@ -371,9 +371,9 @@ router.get('/personal', auth_1.requireAuth, async (req, res) => {
  */
 router.post('/events/:eventId/attendees', auth_1.requireAuth, async (req, res) => {
     try {
-        const eventId = parseInt(req.params.eventId);
+        const eventId = req.params.eventId;
         const { userIds } = req.body;
-        if (isNaN(eventId)) {
+        if (!eventId) {
             return res.status(400).json({ error: 'Invalid event ID' });
         }
         if (!Array.isArray(userIds) || userIds.length === 0) {
@@ -426,9 +426,9 @@ router.post('/events/:eventId/attendees', auth_1.requireAuth, async (req, res) =
  */
 router.delete('/events/:eventId/attendees', auth_1.requireAuth, async (req, res) => {
     try {
-        const eventId = parseInt(req.params.eventId);
+        const eventId = req.params.eventId;
         const { userIds } = req.body;
-        if (isNaN(eventId)) {
+        if (!eventId) {
             return res.status(400).json({ error: 'Invalid event ID' });
         }
         if (!Array.isArray(userIds) || userIds.length === 0) {
@@ -486,10 +486,10 @@ router.delete('/events/:eventId/attendees', auth_1.requireAuth, async (req, res)
  */
 router.put('/events/:eventId/attendees/:userId/status', auth_1.requireAuth, async (req, res) => {
     try {
-        const eventId = parseInt(req.params.eventId);
-        const userId = parseInt(req.params.userId);
+        const eventId = req.params.eventId;
+        const userId = req.params.userId;
         const { status } = req.body;
-        if (isNaN(eventId) || isNaN(userId)) {
+        if (!eventId || !userId) {
             return res.status(400).json({ error: 'Invalid event ID or user ID' });
         }
         if (!['accepted', 'declined', 'maybe'].includes(status)) {
@@ -559,8 +559,8 @@ router.get('/reminders/pending', auth_1.requireAuth, (0, roles_1.requireRole)('A
  */
 router.put('/reminders/:reminderId/sent', auth_1.requireAuth, (0, roles_1.requireRole)('ADMIN'), async (req, res) => {
     try {
-        const reminderId = parseInt(req.params.reminderId);
-        if (isNaN(reminderId)) {
+        const reminderId = req.params.reminderId;
+        if (!reminderId) {
             return res.status(400).json({ error: 'Invalid reminder ID' });
         }
         await calendarService.markReminderAsSent(reminderId);

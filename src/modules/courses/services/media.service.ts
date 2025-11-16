@@ -76,7 +76,7 @@ export class MediaService {
      *     summary: Get all materials for a specific course
      *     tags: [Materials]
      */
-    async getMaterialsByCourse(courseId: number): Promise<MaterialResponseDto[]> {
+    async getMaterialsByCourse(courseId: string): Promise<MaterialResponseDto[]> {
         const materials = await prisma.material.findMany({
             where: { courseId },
             include: { uploader: { select: { id: true, username: true, email: true } } },
@@ -93,7 +93,7 @@ export class MediaService {
      *     summary: Delete a material
      *     tags: [Materials]
      */
-    async deleteMaterial(materialId: number): Promise<void> {
+    async deleteMaterial(materialId: string): Promise<void> {
         const material = await prisma.material.findUnique({ where: { id: materialId } });
         if (!material) throw new Error('Material not found');
         await r2Service.deleteFile(material.key);
@@ -107,7 +107,7 @@ export class MediaService {
      *     summary: Get signed download URL for a material
      *     tags: [Materials]
      */
-    async getSignedUrl(materialId: number, expiresIn = 3600): Promise<string> {
+    async getSignedUrl(materialId: string, expiresIn = 3600): Promise<string> {
         const material = await prisma.material.findUnique({ where: { id: materialId } });
         if (!material) throw new Error('Material not found');
         return await r2Service.getSignedUrl(material.key, expiresIn);
@@ -144,7 +144,7 @@ export class MediaService {
      *     summary: Get all videos by course
      *     tags: [Videos]
      */
-    async getVideosByCourse(courseId: number): Promise<VideoResponseDto[]> {
+    async getVideosByCourse(courseId: string): Promise<VideoResponseDto[]> {
         const videos = await prisma.video.findMany({
             where: { courseId },
             include: { uploader: { select: { id: true, username: true, email: true } } },
@@ -161,7 +161,7 @@ export class MediaService {
      *     summary: Get details of a single video
      *     tags: [Videos]
      */
-    async getVideo(videoId: number): Promise<VideoResponseDto | null> {
+    async getVideo(videoId: string): Promise<VideoResponseDto | null> {
         const video = await prisma.video.findUnique({
             where: { id: videoId },
             include: { uploader: { select: { id: true, username: true, email: true } } },
@@ -177,7 +177,7 @@ export class MediaService {
      *     summary: Refresh video status from Cloudflare Stream
      *     tags: [Videos]
      */
-    async updateVideoStatus(videoId: number): Promise<VideoResponseDto> {
+    async updateVideoStatus(videoId: string): Promise<VideoResponseDto> {
         const video = await prisma.video.findUnique({ where: { id: videoId } });
         if (!video) throw new Error('Video not found');
 
@@ -203,7 +203,7 @@ export class MediaService {
      *     summary: Delete a video from Cloudflare Stream and database
      *     tags: [Videos]
      */
-    async deleteVideo(videoId: number): Promise<void> {
+    async deleteVideo(videoId: string): Promise<void> {
         const video = await prisma.video.findUnique({ where: { id: videoId } });
         if (!video) throw new Error('Video not found');
 
@@ -218,7 +218,7 @@ export class MediaService {
      *     summary: Get Cloudflare Stream upload URL for a video
      *     tags: [Videos]
      */
-    async getVideoUploadUrl(videoId: number): Promise<VideoUploadUrlDto> {
+    async getVideoUploadUrl(videoId: string): Promise<VideoUploadUrlDto> {
         const video = await prisma.video.findUnique({ where: { id: videoId } });
         if (!video) throw new Error('Video not found');
 
@@ -260,7 +260,7 @@ export class MediaService {
      *     summary: Get all live streams for a course
      *     tags: [Live Streams]
      */
-    async getLiveStreamsByCourse(courseId: number): Promise<LiveStreamResponseDto[]> {
+    async getLiveStreamsByCourse(courseId: string): Promise<LiveStreamResponseDto[]> {
         const liveStreams = await prisma.liveStream.findMany({
             where: { courseId },
             include: { creator: { select: { id: true, username: true, email: true } } },
@@ -351,7 +351,7 @@ export class MediaService {
      *     summary: Answer a question during a live stream
      *     tags: [Live Streams]
      */
-    async answerQuestion(questionId: number, answeredBy: number, answer: string): Promise<StreamQuestionDto> {
+    async answerQuestion(questionId: string, answeredBy: string, answer: string): Promise<StreamQuestionDto> {
         const question = await prisma.streamQuestion.update({
             where: { id: questionId },
             data: {
@@ -443,7 +443,7 @@ export class MediaService {
      *     summary: End a poll
      *     tags: [Live Streams]
      */
-    async endPoll(pollId: number): Promise<StreamPollDto> {
+    async endPoll(pollId: string): Promise<StreamPollDto> {
         const poll = await prisma.streamPoll.update({
             where: { id: pollId },
             data: { isActive: false },

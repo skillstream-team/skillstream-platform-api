@@ -17,7 +17,7 @@ router.post('/course', requireRole('TUTOR'), async (req, res) => {
 
 router.post('/:id/modules', requireRole('TUTOR'), async (req, res) => {
     try{
-        const courseModule = await service.addModuleToCourse(Number(req.params.id), req.body)
+        const courseModule = await service.addModuleToCourse(req.params.id, req.body)
         res.json(courseModule);
     }catch(err){
         res.status(400).json({ error: (err as Error).message });
@@ -27,7 +27,7 @@ router.post('/:id/modules', requireRole('TUTOR'), async (req, res) => {
 //POST /api/v1/courses/{courseId}/modules/{moduleId}/lessons
 router.post('/:id/modules/:moduleId/lessons', requireRole('TUTOR'), async (req,res) => {
     try{
-        const lesson = await service.addLessonToModule(Number(req.params.moduleId), req.body);
+        const lesson = await service.addLessonToModule(req.params.moduleId, req.body);
         res.json(lesson);
     }catch(err){
         res.status(400).json({ error: (err as Error).message });
@@ -38,7 +38,7 @@ router.post('/:id/modules/:moduleId/lessons', requireRole('TUTOR'), async (req,r
 
 router.post('/:id/lessons/:lessonId/quiz', requireRole('TUTOR'), async (req,res) => {
     try{
-        const quiz = await service.addQuizToLesson(Number(req.params.lessonId), req.body);
+        const quiz = await service.addQuizToLesson(req.params.lessonId, req.body);
         res.json(quiz);
     }catch(err){
         res.status(400).json({ error: (err as Error).message });
@@ -58,7 +58,7 @@ router.get('/', async (req, res) => {
 // Get single course
 router.get('/:id', async (req, res) => {
     try{
-        const course = await service.getCourseById(Number(req.params.id));
+        const course = await service.getCourseById(req.params.id);
         if (!course) return res.status(404).json({ error: 'Not found' });
         res.json(course);
     }catch(err){
@@ -69,7 +69,7 @@ router.get('/:id', async (req, res) => {
 // Update course
 router.put('/:id', requireRole('TUTOR'), async (req, res) => {
   try {
-    const course = await service.updateCourse(Number(req.params.id), req.body);
+    const course = await service.updateCourse(req.params.id, req.body);
     res.json(course);
   } catch (err) {
     res.status(400).json({ error: (err as Error).message });
@@ -79,7 +79,7 @@ router.put('/:id', requireRole('TUTOR'), async (req, res) => {
 // Delete course
 router.delete('/:id', requireRole('TUTOR'), async (req, res) => {
   try {
-    await service.deleteCourse(Number(req.params.id));
+    await service.deleteCourse(req.params.id);
     res.json({ success: true });
   } catch (err) {
     res.status(400).json({ error: (err as Error).message });

@@ -46,6 +46,12 @@ model User {
   Notification       Notification[]
   AuditLog           AuditLog[]
   Interaction        Interaction[]
+  sentMessages       Message[]                    @relation("MessageSender")
+  receivedMessages   Message[]                    @relation("MessageReceiver")
+  conversations      ConversationParticipant[]
+  createdConversations Conversation[]
+  messageReactions   MessageReaction[]
+  messageReads       MessageRead[]
 }
 
 model SecurityLog {
@@ -581,4 +587,99 @@ model Interaction {
   course Course?       @relation(fields: [courseId], references: [id])
   module CourseModule? @relation(fields: [moduleId], references: [id])
   quiz   Quiz?         @relation(fields: [quizId], references: [id])
+}
+
+model Conversation {
+  id          String                  @id @default(auto()) @map("_id") @db.ObjectId
+  type        String                  @default("direct") // "direct" or "group"
+  name        String?                 // For group conversations
+  description String?
+  createdBy   String                  @db.ObjectId
+  creator     User                    @relation(fields: [createdBy], references: [id])
+  createdAt   DateTime                @default(now())
+  updatedAt   DateTime                @updatedAt
+
+  participants ConversationParticipant[]
+  messages     Message[]
+
+  @@index([createdBy])
+  @@index([type])
+}
+
+model ConversationParticipant {
+  id             String       @id @default(auto()) @map("_id") @db.ObjectId
+  conversationId String       @db.ObjectId
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  userId         String       @db.ObjectId
+  user           User         @relation(fields: [userId], references: [id])
+  role           String       @default("member") // "admin", "member"
+  joinedAt       DateTime   @default(now())
+  lastReadAt     DateTime?
+  isMuted        Boolean    @default(false)
+  leftAt         DateTime?
+
+  @@unique([conversationId, userId])
+  @@index([userId])
+  @@index([conversationId])
+}
+
+model Message {
+  id             String       @id @default(auto()) @map("_id") @db.ObjectId
+  conversationId String       @db.ObjectId
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  senderId       String       @db.ObjectId
+  sender         User         @relation("MessageSender", fields: [senderId], references: [id])
+  receiverId     String?      @db.ObjectId
+  receiver       User?        @relation("MessageReceiver", fields: [receiverId], references: [id])
+  content        String
+  type           String       @default("text") // "text", "image", "file", "system"
+  attachments    Json?        // Array of file attachments
+  isRead         Boolean      @default(false)
+  readAt         DateTime?
+  isEdited       Boolean      @default(false)
+  editedAt       DateTime?
+  isDeleted      Boolean      @default(false)
+  deletedAt      DateTime?
+  replyToId      String?      @db.ObjectId
+  replyTo        Message?     @relation("MessageReplies", fields: [replyToId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  replies        Message[]    @relation("MessageReplies")
+  metadata       Json?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  reactions MessageReaction[]
+  reads     MessageRead[]
+
+  @@index([conversationId, createdAt])
+  @@index([senderId])
+  @@index([receiverId])
+  @@index([isRead])
+  @@index([content]) // For search
+}
+
+model MessageReaction {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  messageId String   @db.ObjectId
+  message   Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  userId    String   @db.ObjectId
+  user      User     @relation(fields: [userId], references: [id])
+  emoji     String   // e.g., "👍", "❤️", "😂"
+  createdAt DateTime @default(now())
+
+  @@unique([messageId, userId, emoji])
+  @@index([messageId])
+  @@index([userId])
+}
+
+model MessageRead {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  messageId String   @db.ObjectId
+  message   Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  userId    String   @db.ObjectId
+  user      User     @relation(fields: [userId], references: [id])
+  readAt    DateTime @default(now())
+
+  @@unique([messageId, userId])
+  @@index([messageId])
+  @@index([userId])
 }

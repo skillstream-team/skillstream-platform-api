@@ -12,6 +12,7 @@ const swagger_1 = require("./swagger");
 const kafka_1 = require("./utils/kafka");
 const users_1 = require("./modules/users");
 const courses_1 = require("./modules/courses");
+const messaging_1 = require("./modules/messaging");
 const env_1 = require("./utils/env");
 const error_handler_1 = require("./middleware/error-handler");
 const security_1 = require("./middleware/security");
@@ -28,6 +29,8 @@ catch (error) {
     process.exit(1);
 }
 const app = (0, express_1.default)();
+// Trust first proxy (Render/Cloudflare) so rate limiting and IP-based features work correctly
+app.set('trust proxy', 1);
 const server = http_1.default.createServer(app);
 const io = new socket_io_1.Server(server, {
     cors: security_1.corsOptions,
@@ -47,6 +50,7 @@ app.use(express_1.default.urlencoded({ extended: true, limit: '10mb' }));
 // Register modules
 (0, users_1.registerUserModule)(app);
 (0, courses_1.registerCoursesModule)(app);
+(0, messaging_1.registerMessagingModule)(app, io);
 // Setup Swagger docs
 (0, swagger_1.setupSwagger)(app);
 // Health check endpoint

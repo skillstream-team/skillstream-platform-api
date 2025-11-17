@@ -22,7 +22,6 @@ if (process.env.NODE_ENV !== 'production')
 async function testDatabaseConnection() {
     try {
         await exports.prisma.$connect();
-        await exports.prisma.$queryRaw `SELECT 1`;
         return true;
     }
     catch (error) {

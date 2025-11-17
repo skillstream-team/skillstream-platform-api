@@ -1,0 +1,1175 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.MessagingService = void 0;
+// src/modules/messaging/services/messaging.service.ts
+const prisma_1 = require("../../../utils/prisma");
+class MessagingService {
+    // ===========================================
+    // CONVERSATION MANAGEMENT
+    // ===========================================
+    /**
+     * Create a new conversation (direct or group)
+     */
+    async createConversation(createdBy, data) {
+        try {
+            // Validate participant count
+            if (data.participantIds.length < 2) {
+                throw new Error('A conversation must have at least 2 participants');
+            }
+            // For direct messages, check if conversation already exists
+            if (data.type === 'direct') {
+                if (data.participantIds.length !== 2) {
+                    throw new Error('Direct conversations must have exactly 2 participants');
+                }
+                // Check if conversation already exists between these two users
+                // Find conversations where both users are participants
+                const allConversations = await prisma_1.prisma.conversation.findMany({
+                    where: {
+                        type: 'direct',
+                        participants: {
+                            some: {
+                                userId: { in: data.participantIds },
+                                leftAt: null,
+                            },
+                        },
+                    },
+                    include: {
+                        participants: {
+                            where: {
+                                leftAt: null,
+                            },
+                            include: {
+                                user: {
+                                    select: {
+                                        id: true,
+                                        username: true,
+                                        email: true,
+                                    },
+                                },
+                            },
+                        },
+                        creator: {
+                            select: {
+                                id: true,
+                                username: true,
+                                email: true,
+                            },
+                        },
+                    },
+                });
+                // Find conversation with exactly these two participants
+                const existingConversation = allConversations.find((conv) => {
+                    const participantUserIds = conv.participants.map((p) => p.userId).sort();
+                    const requestedUserIds = [...data.participantIds].sort();
+                    return (participantUserIds.length === 2 &&
+                        participantUserIds[0] === requestedUserIds[0] &&
+                        participantUserIds[1] === requestedUserIds[1]);
+                });
+                if (existingConversation) {
+                    return this.mapConversationToDto(existingConversation);
+                }
+            }
+            else {
+                // Group conversation requires a name
+                if (!data.name) {
+                    throw new Error('Group conversations must have a name');
+                }
+            }
+            // Ensure creator is in participants
+            if (!data.participantIds.includes(createdBy)) {
+                data.participantIds.push(createdBy);
+            }
+            // Create conversation with participants
+            const conversation = await prisma_1.prisma.conversation.create({
+                data: {
+                    type: data.type,
+                    name: data.name,
+                    description: data.description,
+                    createdBy,
+                    participants: {
+                        create: data.participantIds.map((userId) => ({
+                            userId,
+                            role: userId === createdBy ? 'admin' : 'member',
+                        })),
+                    },
+                },
+                include: {
+                    participants: {
+                        include: {
+                            user: {
+                                select: {
+                                    id: true,
+                                    username: true,
+                                    email: true,
+                                },
+                            },
+                        },
+                    },
+                    creator: {
+                        select: {
+                            id: true,
+                            username: true,
+                            email: true,
+                        },
+                    },
+                    messages: {
+                        take: 1,
+                        orderBy: {
+                            createdAt: 'desc',
+                        },
+                        include: {
+                            sender: {
+                                select: {
+                                    id: true,
+                                    username: true,
+                                    email: true,
+                                },
+                            },
+                            receiver: {
+                                select: {
+                                    id: true,
+                                    username: true,
+                                    email: true,
+                                },
+                            },
+                        },
+                    },
+                },
+            });
+            return this.mapConversationToDto(conversation);
+        }
+        catch (error) {
+            throw new Error(`Failed to create conversation: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
+    }
+    /**
+     * Get conversations for a user
+     */
+    async getConversations(userId, filters) {
+        try {
+            const where = {
+                participants: {
+                    some: {
+                        userId,
+                        leftAt: null, // Only active participants
+                    },
+                },
+            };
+            if (filters.type) {
+                where.type = filters.type;
+            }
+            if (filters.search) {
+                where.OR = [
+                    { name: { contains: filters.search, mode: 'insensitive' } },
+                    { description: { contains: filters.search, mode: 'insensitive' } },
+                ];
+            }
+            const conversations = await prisma_1.prisma.conversation.findMany({
+                where,
+                include: {
+                    participants: {
+                        include: {
+                            user: {
+                                select: {
+                                    id: true,
+                                    username: true,
+                                    email: true,
+                                },
+                            },
+                        },
+                    },
+                    creator: {
+                        select: {
+                            id: true,
+                            username: true,
+                            email: true,
+                        },
+                    },
+                    messages: {
+                        take: 1,
+                        orderBy: {
+                            createdAt: 'desc',
+                        },
+                        include: {
+                            sender: {
+                                select: {
+                                    id: true,
+                                    username: true,
+                                    email: true,
+                                },
+                            },
+                            receiver: {
+                                select: {
+                                    id: true,
+                                    username: true,
+                                    email: true,
+                                },
+                            },
+                        },
+                    },
+                },
+                orderBy: {
+                    updatedAt: 'desc',
+                },
+                take: filters.limit || 50,
+                skip: filters.offset || 0,
+            });
+            // Get unread counts for each conversation
+            const conversationsWithUnread = await Promise.all(conversations.map(async (conv) => {
+                const participant = conv.participants.find((p) => p.userId === userId);
+                const unreadCount = await prisma_1.prisma.message.count({
+                    where: {
+                        conversationId: conv.id,
+                        isRead: false,
+                        senderId: { not: userId },
+                        createdAt: {
+                            gt: participant?.lastReadAt || new Date(0),
+                        },
+                    },
+                });
+                return {
+                    ...conv,
+                    unreadCount,
+                };
+            }));
+            return conversationsWithUnread.map((conv) => this.mapConversationToDto(conv));
+        }
+        catch (error) {
+            throw new Error(`Failed to get conversations: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
+    }
+    /**
+     * Get a single conversation by ID
+     */
+    async getConversationById(conversationId, userId) {
+        try {
+            const conversation = await prisma_1.prisma.conversation.findFirst({
+                where: {
+                    id: conversationId,
+                    participants: {
+                        some: {
+                            userId,
+                            leftAt: null,
+                        },
+                    },
+                },
+                include: {
+                    participants: {
+                        include: {
+                            user: {
+                                select: {
+                                    id: true,
+                                    username: true,
+                                    email: true,
+                                },
+                            },
+                        },
+                    },
+                    creator: {
+                        select: {
+                            id: true,
+                            username: true,
+                            email: true,
+                        },
+                    },
+                    messages: {
+                        take: 1,
+                        orderBy: {
+                            createdAt: 'desc',
+                        },
+                        include: {
+                            sender: {
+                                select: {
+                                    id: true,
+                                    username: true,
+                                    email: true,
+                                },
+                            },
+                            receiver: {
+                                select: {
+                                    id: true,
+                                    username: true,
+                                    email: true,
+                                },
+                            },
+                        },
+                    },
+                },
+            });
+            if (!conversation) {
+                throw new Error('Conversation not found or access denied');
+            }
+            const participant = conversation.participants.find((p) => p.userId === userId);
+            const unreadCount = await prisma_1.prisma.message.count({
+                where: {
+                    conversationId: conversation.id,
+                    isRead: false,
+                    senderId: { not: userId },
+                    createdAt: {
+                        gt: participant?.lastReadAt || new Date(0),
+                    },
+                },
+            });
+            return this.mapConversationToDto({ ...conversation, unreadCount });
+        }
+        catch (error) {
+            throw new Error(`Failed to get conversation: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
+    }
+    /**
+     * Update a conversation
+     */
+    async updateConversation(conversationId, userId, data) {
+        try {
+            // Check if user is admin or creator
+            const conversation = await prisma_1.prisma.conversation.findFirst({
+                where: {
+                    id: conversationId,
+                    OR: [
+                        { createdBy: userId },
+                        {
+                            participants: {
+                                some: {
+                                    userId,
+                                    role: 'admin',
+                                    leftAt: null,
+                                },
+                            },
+                        },
+                    ],
+                },
+            });
+            if (!conversation) {
+                throw new Error('Conversation not found or you do not have permission to update it');
+            }
+            const updated = await prisma_1.prisma.conversation.update({
+                where: { id: conversationId },
+                data: {
+                    ...(data.name && { name: data.name }),
+                    ...(data.description !== undefined && { description: data.description }),
+                },
+                include: {
+                    participants: {
+                        include: {
+                            user: {
+                                select: {
+                                    id: true,
+                                    username: true,
+                                    email: true,
+                                },
+                            },
+                        },
+                    },
+                    creator: {
+                        select: {
+                            id: true,
+                            username: true,
+                            email: true,
+                        },
+                    },
+                    messages: {
+                        take: 1,
+                        orderBy: {
+                            createdAt: 'desc',
+                        },
+                        include: {
+                            sender: {
+                                select: {
+                                    id: true,
+                                    username: true,
+                                    email: true,
+                                },
+                            },
+                            receiver: {
+                                select: {
+                                    id: true,
+                                    username: true,
+                                    email: true,
+                                },
+                            },
+                        },
+                    },
+                },
+            });
+            return this.mapConversationToDto(updated);
+        }
+        catch (error) {
+            throw new Error(`Failed to update conversation: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
+    }
+    /**
+     * Add participants to a conversation
+     */
+    async addParticipants(conversationId, userId, participantIds) {
+        try {
+            // Check if user has permission (admin or creator)
+            const conversation = await prisma_1.prisma.conversation.findFirst({
+                where: {
+                    id: conversationId,
+                    OR: [
+                        { createdBy: userId },
+                        {
+                            participants: {
+                                some: {
+                                    userId,
+                                    role: 'admin',
+                                    leftAt: null,
+                                },
+                            },
+                        },
+                    ],
+                },
+            });
+            if (!conversation) {
+                throw new Error('Conversation not found or you do not have permission');
+            }
+            // Add participants
+            await prisma_1.prisma.conversationParticipant.createMany({
+                data: participantIds.map((pid) => ({
+                    conversationId,
+                    userId: pid,
+                    role: 'member',
+                })),
+            });
+        }
+        catch (error) {
+            throw new Error(`Failed to add participants: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
+    }
+    /**
+     * Remove participant from conversation (leave or remove)
+     */
+    async removeParticipant(conversationId, userId, participantIdToRemove) {
+        try {
+            // Check if user has permission or is removing themselves
+            const canRemove = userId === participantIdToRemove ||
+                (await prisma_1.prisma.conversation.findFirst({
+                    where: {
+                        id: conversationId,
+                        OR: [
+                            { createdBy: userId },
+                            {
+                                participants: {
+                                    some: {
+                                        userId,
+                                        role: 'admin',
+                                        leftAt: null,
+                                    },
+                                },
+                            },
+                        ],
+                    },
+                }));
+            if (!canRemove) {
+                throw new Error('You do not have permission to remove this participant');
+            }
+            await prisma_1.prisma.conversationParticipant.updateMany({
+                where: {
+                    conversationId,
+                    userId: participantIdToRemove,
+                },
+                data: {
+                    leftAt: new Date(),
+                },
+            });
+        }
+        catch (error) {
+            throw new Error(`Failed to remove participant: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
+    }
+    // ===========================================
+    // MESSAGE MANAGEMENT
+    // ===========================================
+    /**
+     * Send a message
+     */
+    async sendMessage(senderId, data) {
+        try {
+            let conversationId = data.conversationId;
+            // If no conversationId, create or find direct conversation
+            if (!conversationId) {
+                if (!data.receiverId) {
+                    throw new Error('Either conversationId or receiverId must be provided');
+                }
+                // Find or create direct conversation
+                const conversation = await this.createConversation(senderId, {
+                    type: 'direct',
+                    participantIds: [senderId, data.receiverId],
+                });
+                conversationId = conversation.id;
+            }
+            // Verify user is a participant
+            const participant = await prisma_1.prisma.conversationParticipant.findFirst({
+                where: {
+                    conversationId,
+                    userId: senderId,
+                    leftAt: null,
+                },
+            });
+            if (!participant) {
+                throw new Error('You are not a participant in this conversation');
+            }
+            // Determine receiver for direct messages
+            let receiverId = data.receiverId;
+            if (!receiverId && conversationId) {
+                const conversation = await prisma_1.prisma.conversation.findFirst({
+                    where: { id: conversationId },
+                    include: {
+                        participants: {
+                            where: {
+                                userId: { not: senderId },
+                                leftAt: null,
+                            },
+                        },
+                    },
+                });
+                if (conversation?.type === 'direct' && conversation.participants.length > 0) {
+                    receiverId = conversation.participants[0].userId;
+                }
+            }
+            // Create message
+            const message = await prisma_1.prisma.message.create({
+                data: {
+                    conversationId,
+                    senderId,
+                    receiverId,
+                    content: data.content,
+                    type: data.type || 'text',
+                    attachments: data.attachments || null,
+                    replyToId: data.replyToId,
+                    metadata: data.metadata || null,
+                },
+                include: {
+                    sender: {
+                        select: {
+                            id: true,
+                            username: true,
+                            email: true,
+                        },
+                    },
+                    receiver: {
+                        select: {
+                            id: true,
+                            username: true,
+                            email: true,
+                        },
+                    },
+                    replyTo: {
+                        include: {
+                            sender: {
+                                select: {
+                                    id: true,
+                                    username: true,
+                                    email: true,
+                                },
+                            },
+                        },
+                    },
+                },
+            });
+            // Update conversation's updatedAt
+            await prisma_1.prisma.conversation.update({
+                where: { id: conversationId },
+                data: { updatedAt: new Date() },
+            });
+            return this.mapMessageToDto(message);
+        }
+        catch (error) {
+            throw new Error(`Failed to send message: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
+    }
+    /**
+     * Get messages for a conversation
+     */
+    async getMessages(conversationId, userId, filters) {
+        try {
+            // Verify user is a participant
+            const participant = await prisma_1.prisma.conversationParticipant.findFirst({
+                where: {
+                    conversationId,
+                    userId,
+                    leftAt: null,
+                },
+            });
+            if (!participant) {
+                throw new Error('You are not a participant in this conversation');
+            }
+            const where = {
+                conversationId,
+                isDeleted: false,
+            };
+            if (filters.before) {
+                where.createdAt = { ...where.createdAt, lt: filters.before };
+            }
+            if (filters.after) {
+                where.createdAt = { ...where.createdAt, gt: filters.after };
+            }
+            const messages = await prisma_1.prisma.message.findMany({
+                where,
+                include: {
+                    sender: {
+                        select: {
+                            id: true,
+                            username: true,
+                            email: true,
+                        },
+                    },
+                    receiver: {
+                        select: {
+                            id: true,
+                            username: true,
+                            email: true,
+                        },
+                    },
+                    replyTo: {
+                        include: {
+                            sender: {
+                                select: {
+                                    id: true,
+                                    username: true,
+                                    email: true,
+                                },
+                            },
+                        },
+                    },
+                    reactions: {
+                        include: {
+                            user: {
+                                select: {
+                                    id: true,
+                                    username: true,
+                                },
+                            },
+                        },
+                    },
+                    reads: {
+                        include: {
+                            user: {
+                                select: {
+                                    id: true,
+                                    username: true,
+                                },
+                            },
+                        },
+                    },
+                },
+                orderBy: {
+                    createdAt: 'desc',
+                },
+                take: filters.limit || 50,
+                skip: filters.offset || 0,
+            });
+            return messages.reverse().map((msg) => this.mapMessageToDto(msg));
+        }
+        catch (error) {
+            throw new Error(`Failed to get messages: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
+    }
+    /**
+     * Update a message
+     */
+    async updateMessage(messageId, userId, data) {
+        try {
+            const message = await prisma_1.prisma.message.findFirst({
+                where: {
+                    id: messageId,
+                    senderId: userId,
+                    isDeleted: false,
+                },
+            });
+            if (!message) {
+                throw new Error('Message not found or you do not have permission to update it');
+            }
+            const updated = await prisma_1.prisma.message.update({
+                where: { id: messageId },
+                data: {
+                    ...(data.content && { content: data.content }),
+                    ...(data.metadata !== undefined && { metadata: data.metadata }),
+                    isEdited: true,
+                    editedAt: new Date(),
+                },
+                include: {
+                    sender: {
+                        select: {
+                            id: true,
+                            username: true,
+                            email: true,
+                        },
+                    },
+                    receiver: {
+                        select: {
+                            id: true,
+                            username: true,
+                            email: true,
+                        },
+                    },
+                    replyTo: {
+                        include: {
+                            sender: {
+                                select: {
+                                    id: true,
+                                    username: true,
+                                    email: true,
+                                },
+                            },
+                        },
+                    },
+                },
+            });
+            return this.mapMessageToDto(updated);
+        }
+        catch (error) {
+            throw new Error(`Failed to update message: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
+    }
+    /**
+     * Delete a message (soft delete)
+     */
+    async deleteMessage(messageId, userId) {
+        try {
+            const message = await prisma_1.prisma.message.findFirst({
+                where: {
+                    id: messageId,
+                    senderId: userId,
+                    isDeleted: false,
+                },
+            });
+            if (!message) {
+                throw new Error('Message not found or you do not have permission to delete it');
+            }
+            await prisma_1.prisma.message.update({
+                where: { id: messageId },
+                data: {
+                    isDeleted: true,
+                    deletedAt: new Date(),
+                    content: '[Message deleted]',
+                },
+            });
+        }
+        catch (error) {
+            throw new Error(`Failed to delete message: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
+    }
+    /**
+     * Mark messages as read
+     */
+    async markMessagesAsRead(conversationId, userId) {
+        try {
+            // Verify user is a participant
+            const participant = await prisma_1.prisma.conversationParticipant.findFirst({
+                where: {
+                    conversationId,
+                    userId,
+                    leftAt: null,
+                },
+            });
+            if (!participant) {
+                throw new Error('You are not a participant in this conversation');
+            }
+            // Mark all unread messages as read
+            await prisma_1.prisma.message.updateMany({
+                where: {
+                    conversationId,
+                    receiverId: userId,
+                    isRead: false,
+                },
+                data: {
+                    isRead: true,
+                    readAt: new Date(),
+                },
+            });
+            // Update participant's lastReadAt
+            await prisma_1.prisma.conversationParticipant.update({
+                where: {
+                    id: participant.id,
+                },
+                data: {
+                    lastReadAt: new Date(),
+                },
+            });
+        }
+        catch (error) {
+            throw new Error(`Failed to mark messages as read: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
+    }
+    // ===========================================
+    // MESSAGE SEARCH
+    // ===========================================
+    /**
+     * Search messages
+     */
+    async searchMessages(userId, filters) {
+        try {
+            const where = {
+                content: {
+                    contains: filters.query,
+                    mode: 'insensitive',
+                },
+                isDeleted: false,
+            };
+            if (filters.conversationId) {
+                // Verify user is a participant
+                const participant = await prisma_1.prisma.conversationParticipant.findFirst({
+                    where: {
+                        conversationId: filters.conversationId,
+                        userId,
+                        leftAt: null,
+                    },
+                });
+                if (!participant) {
+                    throw new Error('You are not a participant in this conversation');
+                }
+                where.conversationId = filters.conversationId;
+            }
+            else {
+                // Search across all user's conversations
+                const userConversations = await prisma_1.prisma.conversationParticipant.findMany({
+                    where: {
+                        userId,
+                        leftAt: null,
+                    },
+                    select: {
+                        conversationId: true,
+                    },
+                });
+                where.conversationId = {
+                    in: userConversations.map((c) => c.conversationId),
+                };
+            }
+            const messages = await prisma_1.prisma.message.findMany({
+                where,
+                include: {
+                    sender: {
+                        select: {
+                            id: true,
+                            username: true,
+                            email: true,
+                        },
+                    },
+                    receiver: {
+                        select: {
+                            id: true,
+                            username: true,
+                            email: true,
+                        },
+                    },
+                    replyTo: {
+                        include: {
+                            sender: {
+                                select: {
+                                    id: true,
+                                    username: true,
+                                    email: true,
+                                },
+                            },
+                        },
+                    },
+                    reactions: {
+                        include: {
+                            user: {
+                                select: {
+                                    id: true,
+                                    username: true,
+                                },
+                            },
+                        },
+                    },
+                    reads: {
+                        include: {
+                            user: {
+                                select: {
+                                    id: true,
+                                    username: true,
+                                },
+                            },
+                        },
+                    },
+                },
+                orderBy: {
+                    createdAt: 'desc',
+                },
+                take: filters.limit || 50,
+                skip: filters.offset || 0,
+            });
+            return messages.map((msg) => this.mapMessageToDto(msg));
+        }
+        catch (error) {
+            throw new Error(`Failed to search messages: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
+    }
+    // ===========================================
+    // MESSAGE REACTIONS
+    // ===========================================
+    /**
+     * Add a reaction to a message
+     */
+    async addReaction(messageId, userId, emoji) {
+        try {
+            // Verify user can access this message
+            const message = await prisma_1.prisma.message.findFirst({
+                where: {
+                    id: messageId,
+                    isDeleted: false,
+                },
+                include: {
+                    conversation: {
+                        include: {
+                            participants: {
+                                where: {
+                                    userId,
+                                    leftAt: null,
+                                },
+                            },
+                        },
+                    },
+                },
+            });
+            if (!message) {
+                throw new Error('Message not found');
+            }
+            if (message.conversation.participants.length === 0) {
+                throw new Error('You are not a participant in this conversation');
+            }
+            // Add or update reaction
+            await prisma_1.prisma.messageReaction.upsert({
+                where: {
+                    messageId_userId_emoji: {
+                        messageId,
+                        userId,
+                        emoji,
+                    },
+                },
+                create: {
+                    messageId,
+                    userId,
+                    emoji,
+                },
+                update: {},
+            });
+            // Return updated message with reactions
+            return await this.getMessageById(messageId, userId);
+        }
+        catch (error) {
+            throw new Error(`Failed to add reaction: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
+    }
+    /**
+     * Remove a reaction from a message
+     */
+    async removeReaction(messageId, userId, emoji) {
+        try {
+            await prisma_1.prisma.messageReaction.deleteMany({
+                where: {
+                    messageId,
+                    userId,
+                    emoji,
+                },
+            });
+            // Return updated message
+            return await this.getMessageById(messageId, userId);
+        }
+        catch (error) {
+            throw new Error(`Failed to remove reaction: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
+    }
+    // ===========================================
+    // PER-MESSAGE READ RECEIPTS
+    // ===========================================
+    /**
+     * Mark a specific message as read
+     */
+    async markMessageAsRead(messageId, userId) {
+        try {
+            // Verify user can access this message
+            const message = await prisma_1.prisma.message.findFirst({
+                where: {
+                    id: messageId,
+                    isDeleted: false,
+                },
+                include: {
+                    conversation: {
+                        include: {
+                            participants: {
+                                where: {
+                                    userId,
+                                    leftAt: null,
+                                },
+                            },
+                        },
+                    },
+                },
+            });
+            if (!message) {
+                throw new Error('Message not found');
+            }
+            if (message.conversation.participants.length === 0) {
+                throw new Error('You are not a participant in this conversation');
+            }
+            // Create or update read receipt
+            await prisma_1.prisma.messageRead.upsert({
+                where: {
+                    messageId_userId: {
+                        messageId,
+                        userId,
+                    },
+                },
+                create: {
+                    messageId,
+                    userId,
+                },
+                update: {
+                    readAt: new Date(),
+                },
+            });
+            // Update message isRead flag if user is the receiver
+            if (message.receiverId === userId) {
+                await prisma_1.prisma.message.update({
+                    where: { id: messageId },
+                    data: {
+                        isRead: true,
+                        readAt: new Date(),
+                    },
+                });
+            }
+            // Return updated message
+            return await this.getMessageById(messageId, userId);
+        }
+        catch (error) {
+            throw new Error(`Failed to mark message as read: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
+    }
+    /**
+     * Get a single message by ID with all details
+     */
+    async getMessageById(messageId, userId) {
+        const message = await prisma_1.prisma.message.findFirst({
+            where: {
+                id: messageId,
+                isDeleted: false,
+            },
+            include: {
+                sender: {
+                    select: {
+                        id: true,
+                        username: true,
+                        email: true,
+                    },
+                },
+                receiver: {
+                    select: {
+                        id: true,
+                        username: true,
+                        email: true,
+                    },
+                },
+                replyTo: {
+                    include: {
+                        sender: {
+                            select: {
+                                id: true,
+                                username: true,
+                                email: true,
+                            },
+                        },
+                    },
+                },
+                reactions: {
+                    include: {
+                        user: {
+                            select: {
+                                id: true,
+                                username: true,
+                            },
+                        },
+                    },
+                },
+                reads: {
+                    include: {
+                        user: {
+                            select: {
+                                id: true,
+                                username: true,
+                            },
+                        },
+                    },
+                },
+            },
+        });
+        if (!message) {
+            throw new Error('Message not found');
+        }
+        return this.mapMessageToDto(message);
+    }
+    // ===========================================
+    // HELPER METHODS
+    // ===========================================
+    mapMessageToDto(message) {
+        return {
+            id: message.id,
+            conversationId: message.conversationId,
+            senderId: message.senderId,
+            sender: message.sender,
+            receiverId: message.receiverId || undefined,
+            receiver: message.receiver || undefined,
+            content: message.content,
+            type: message.type,
+            attachments: message.attachments || undefined,
+            isRead: message.isRead,
+            readAt: message.readAt || undefined,
+            isEdited: message.isEdited,
+            editedAt: message.editedAt || undefined,
+            isDeleted: message.isDeleted,
+            deletedAt: message.deletedAt || undefined,
+            replyToId: message.replyToId || undefined,
+            replyTo: message.replyTo ? this.mapMessageToDto(message.replyTo) : undefined,
+            reactions: message.reactions
+                ? message.reactions.map((r) => ({
+                    id: r.id,
+                    emoji: r.emoji,
+                    userId: r.userId,
+                    user: r.user,
+                    createdAt: r.createdAt,
+                }))
+                : undefined,
+            readBy: message.reads
+                ? message.reads.map((r) => ({
+                    id: r.id,
+                    userId: r.userId,
+                    user: r.user,
+                    readAt: r.readAt,
+                }))
+                : undefined,
+            metadata: message.metadata || undefined,
+            createdAt: message.createdAt,
+            updatedAt: message.updatedAt,
+        };
+    }
+    mapConversationToDto(conversation) {
+        return {
+            id: conversation.id,
+            type: conversation.type,
+            name: conversation.name || undefined,
+            description: conversation.description || undefined,
+            createdBy: conversation.createdBy,
+            creator: conversation.creator,
+            participants: (conversation.participants || [])
+                .filter((p) => !p.leftAt)
+                .map((p) => ({
+                id: p.id,
+                userId: p.userId,
+                user: p.user,
+                role: p.role,
+                joinedAt: p.joinedAt,
+                lastReadAt: p.lastReadAt || undefined,
+                isMuted: p.isMuted,
+            })),
+            lastMessage: conversation.messages && conversation.messages.length > 0
+                ? this.mapMessageToDto(conversation.messages[0])
+                : undefined,
+            unreadCount: conversation.unreadCount || 0,
+            createdAt: conversation.createdAt,
+            updatedAt: conversation.updatedAt,
+        };
+    }
+}
+exports.MessagingService = MessagingService;

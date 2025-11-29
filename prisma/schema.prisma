@@ -11,12 +11,25 @@ model User {
   id                  String    @id @default(auto()) @map("_id") @db.ObjectId
   username            String    @unique
   email               String    @unique
-  password            String
+  password            String?
   role                String
   failedLoginAttempts Int       @default(0)
   lockoutUntil        DateTime?
+  
+  // OAuth fields
+  provider            String?   // "google", "linkedin", or null for email/password
+  providerId          String?   // OAuth provider user ID
+  providerEmail       String?   // Email from OAuth provider
+  
+  // Profile fields
+  firstName           String?
+  lastName            String?
+  avatar              String?
+  
   createdAt           DateTime  @default(now())
   updatedAt           DateTime  @updatedAt
+  
+  @@index([provider, providerId])
 
   courses            Course[]               @relation("InstructorCourses")
   enrollments        Enrollment[]
@@ -52,6 +65,15 @@ model User {
   createdConversations Conversation[]
   messageReactions   MessageReaction[]
   messageReads       MessageRead[]
+  announcements      Announcement[]
+  availabilities     TeacherAvailability[]
+  bookingsAsStudent  Booking[]             @relation("BookingStudent")
+  bookingsAsTeacher  Booking[]             @relation("BookingTeacher")
+  attendances        Attendance[]
+  lessonSlots        LessonSlot[]          @relation("LessonSlotTeacher")
+  quickLessons       QuickLesson[]         @relation("QuickLessonTeacher")
+  lessonResourcesCreated LessonResource[]  @relation("LessonResourceSharer")
+  videoConferencesHosted VideoConference[] @relation("VideoConferenceHost")
 }
 
 model SecurityLog {
@@ -93,6 +115,7 @@ model Course {
   interactions    UserInteraction[]
   events          CalendarEvent[]
   Interaction     Interaction[]
+  announcements   Announcement[]
 }
 
 model Enrollment {
@@ -143,15 +166,21 @@ model Material {
 }
 
 model Lesson {
-  id        String   @id @default(auto()) @map("_id") @db.ObjectId
-  courseId  String   @db.ObjectId
-  course    Course   @relation(fields: [courseId], references: [id])
-  title     String
-  content   Json?
-  order     Int
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  quizzes   Quiz[]
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  courseId    String   @db.ObjectId
+  course      Course   @relation(fields: [courseId], references: [id])
+  title       String
+  content     Json?
+  order       Int
+  scheduledAt DateTime?
+  teacherId   String?  @db.ObjectId
+  duration    Int?     // Duration in minutes
+  joinLink    String?
+  meetingId   String?
+  status      String   @default("scheduled") // "scheduled", "in_progress", "completed", "cancelled"
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  quizzes     Quiz[]
 }
 
 model Quiz {
@@ -682,4 +711,180 @@ model MessageRead {
   @@unique([messageId, userId])
   @@index([messageId])
   @@index([userId])
+}
+
+model Announcement {
+  id          String    @id @default(auto()) @map("_id") @db.ObjectId
+  title       String
+  message     String
+  type        String    @default("global") // "global", "course", "user"
+  scope       String    @default("global") // "global", "course", "user"
+  courseId    String?   @db.ObjectId
+  course      Course?   @relation(fields: [courseId], references: [id])
+  createdBy   String    @db.ObjectId
+  creator     User      @relation(fields: [createdBy], references: [id])
+  targetUserId String?  @db.ObjectId
+  isActive    Boolean   @default(true)
+  expiresAt   DateTime?
+  metadata    Json?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([scope, courseId])
+  @@index([createdBy])
+  @@index([isActive, expiresAt])
+}
+
+model TeacherAvailability {
+  id          String    @id @default(auto()) @map("_id") @db.ObjectId
+  teacherId   String    @db.ObjectId
+  teacher     User      @relation(fields: [teacherId], references: [id])
+  startTime   DateTime
+  endTime     DateTime
+  isRecurring Boolean   @default(false)
+  recurrenceRule String?
+  subject     String?
+  duration    Int?      // Duration in minutes
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  slots       LessonSlot[]
+  @@index([teacherId, startTime])
+}
+
+model LessonSlot {
+  id           String    @id @default(auto()) @map("_id") @db.ObjectId
+  availabilityId String? @db.ObjectId
+  availability TeacherAvailability? @relation(fields: [availabilityId], references: [id])
+  teacherId    String    @db.ObjectId
+  teacher      User      @relation("LessonSlotTeacher", fields: [teacherId], references: [id])
+  startTime    DateTime
+  endTime      DateTime
+  subject      String?
+  duration     Int       // Duration in minutes
+  isBooked     Boolean   @default(false)
+  isAvailable  Boolean   @default(true)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  booking     Booking?
+  @@unique([availabilityId, startTime])
+  @@index([teacherId, startTime])
+  @@index([isBooked, isAvailable])
+}
+
+model Booking {
+  id          String    @id @default(auto()) @map("_id") @db.ObjectId
+  slotId      String    @unique @db.ObjectId
+  slot        LessonSlot @relation(fields: [slotId], references: [id])
+  studentId   String    @db.ObjectId
+  student     User      @relation("BookingStudent", fields: [studentId], references: [id])
+  teacherId   String    @db.ObjectId
+  teacher     User      @relation("BookingTeacher", fields: [teacherId], references: [id])
+  status      String    @default("confirmed") // "confirmed", "cancelled", "completed"
+  subject     String?
+  notes       String?
+  joinLink    String?
+  meetingId   String?
+  cancelledAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  attendance  Attendance?
+  @@index([studentId, createdAt])
+  @@index([teacherId, createdAt])
+  @@index([status])
+}
+
+model QuickLesson {
+  id          String    @id @default(auto()) @map("_id") @db.ObjectId
+  title       String
+  description String?
+  teacherId   String    @db.ObjectId
+  teacher     User      @relation("QuickLessonTeacher", fields: [teacherId], references: [id])
+  scheduledAt DateTime
+  subject     String?
+  duration    Int?      // Duration in minutes
+  joinLink    String?
+  meetingId   String?
+  status      String    @default("scheduled") // "scheduled", "in_progress", "completed", "cancelled"
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  attendance  Attendance[]
+  resources   LessonResource[]
+  @@index([teacherId, scheduledAt])
+  @@index([status])
+}
+
+model Attendance {
+  id          String    @id @default(auto()) @map("_id") @db.ObjectId
+  lessonId    String?   @db.ObjectId
+  lesson      QuickLesson? @relation(fields: [lessonId], references: [id])
+  bookingId   String?   @unique @db.ObjectId
+  booking     Booking?  @relation(fields: [bookingId], references: [id])
+  studentId   String    @db.ObjectId
+  student     User      @relation(fields: [studentId], references: [id])
+  status      String    // "present", "absent", "late"
+  joinedAt    DateTime?
+  leftAt      DateTime?
+  duration    Int?      // Duration in seconds
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@unique([lessonId, studentId])
+  @@index([studentId])
+  @@index([status])
+}
+
+model LessonResource {
+  id          String    @id @default(auto()) @map("_id") @db.ObjectId
+  lessonId    String    @db.ObjectId
+  lesson      QuickLesson @relation(fields: [lessonId], references: [id])
+  title       String
+  type        String    // "file", "link", "document"
+  url         String?
+  fileUrl     String?
+  filename    String?
+  size        Int?
+  mimeType    String?
+  sharedBy    String    @db.ObjectId
+  sharer      User      @relation("LessonResourceSharer", fields: [sharedBy], references: [id])
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([lessonId, createdAt])
+}
+
+model VideoConference {
+  id          String    @id @default(auto()) @map("_id") @db.ObjectId
+  conferenceId String   @unique
+  title       String
+  hostId      String    @db.ObjectId
+  host        User      @relation("VideoConferenceHost", fields: [hostId], references: [id])
+  joinLink    String
+  status      String    @default("scheduled") // "scheduled", "active", "ended"
+  startedAt   DateTime?
+  endedAt     DateTime?
+  metadata    Json?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  rooms       BreakoutRoom[]
+  @@index([hostId, createdAt])
+}
+
+model BreakoutRoom {
+  id            String          @id @default(auto()) @map("_id") @db.ObjectId
+  conferenceDbId String          @db.ObjectId
+  conference    VideoConference @relation(fields: [conferenceDbId], references: [id])
+  name          String
+  joinLink      String?
+  status        String          @default("open") // "open", "closed"
+  participants  String[]        // Array of user IDs
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  @@index([conferenceDbId, status])
 }

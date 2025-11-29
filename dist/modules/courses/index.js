@@ -21,6 +21,19 @@ exports.calendarSchema = exports.recommendationSchema = exports.mediaSchema = ex
 exports.registerCoursesModule = registerCoursesModule;
 const express_graphql_1 = require("express-graphql");
 const courses_routes_1 = __importDefault(require("./routes/rest/courses.routes"));
+const progress_routes_1 = __importDefault(require("./routes/rest/progress.routes"));
+const announcements_routes_1 = __importDefault(require("./routes/rest/announcements.routes"));
+const recommendations_user_routes_1 = __importDefault(require("./routes/rest/recommendations-user.routes"));
+const bookings_routes_1 = __importDefault(require("./routes/rest/bookings.routes"));
+const lessons_routes_1 = __importDefault(require("./routes/rest/lessons.routes"));
+const earnings_routes_1 = __importDefault(require("./routes/rest/earnings.routes"));
+const certificates_routes_1 = __importDefault(require("./routes/rest/certificates.routes"));
+const attendance_routes_1 = __importDefault(require("./routes/rest/attendance.routes"));
+const resources_routes_1 = __importDefault(require("./routes/rest/resources.routes"));
+const video_routes_1 = __importDefault(require("./routes/rest/video.routes"));
+const marketing_routes_1 = __importDefault(require("./routes/rest/marketing.routes"));
+const calendar_routes_1 = __importDefault(require("./routes/rest/calendar.routes"));
+const recommendations_routes_1 = __importDefault(require("./routes/rest/recommendations.routes"));
 const course_resolver_1 = require("./routes/graphql/course.resolver");
 Object.defineProperty(exports, "coursesSchema", { enumerable: true, get: function () { return course_resolver_1.coursesSchema; } });
 const enrollment_resolver_1 = require("./routes/graphql/enrollment.resolver");
@@ -34,6 +47,19 @@ Object.defineProperty(exports, "calendarSchema", { enumerable: true, get: functi
 function registerCoursesModule(app) {
     // REST routes
     app.use('/api/courses', courses_routes_1.default);
+    app.use('/api', progress_routes_1.default);
+    app.use('/api', announcements_routes_1.default);
+    app.use('/api', recommendations_user_routes_1.default);
+    app.use('/api', bookings_routes_1.default);
+    app.use('/api', lessons_routes_1.default);
+    app.use('/api', earnings_routes_1.default);
+    app.use('/api', certificates_routes_1.default);
+    app.use('/api', attendance_routes_1.default);
+    app.use('/api', resources_routes_1.default);
+    app.use('/api', video_routes_1.default);
+    app.use('/api', marketing_routes_1.default);
+    app.use('/api/calendar', calendar_routes_1.default);
+    app.use('/api/recommendations', recommendations_routes_1.default);
     // GraphQL endpoints
     app.use('/graphql/courses', (0, express_graphql_1.graphqlHTTP)({
         schema: course_resolver_1.coursesSchema,

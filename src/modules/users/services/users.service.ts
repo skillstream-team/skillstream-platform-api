@@ -97,8 +97,8 @@ export class UsersService {
         throw new Error('User with this email or username already exists');
       }
 
-      // Hash password
-      const hashedPassword = await bcrypt.hash(password, 10);
+      // Hash password if provided
+      const hashedPassword = password ? await bcrypt.hash(password, 10) : null;
 
       // Create user in database
       const user = await prisma.user.create({
@@ -109,6 +109,14 @@ export class UsersService {
           role,
         },
       });
+
+      // Send welcome email
+      try {
+        await emailService.sendWelcomeEmail(user.email, user.username);
+      } catch (error) {
+        console.error('Error sending welcome email:', error);
+        // Don't fail user creation if email fails
+      }
 
       // Generate JWT token
       const { password: _, ...userWithoutPassword } = user;
@@ -177,6 +185,11 @@ export class UsersService {
     try{
       const user = await prisma.user.findUnique({ where: { email } });
       if (!user) throw new Error('Invalid credentials');
+
+      // Check if user is OAuth-only user (no password)
+      if (!user.password) {
+        throw new Error('Please sign in with your OAuth provider (Google/LinkedIn)');
+      }
 
       const isValid = await bcrypt.compare(password, user.password);
       if (!isValid) throw new Error('Invalid credentials');

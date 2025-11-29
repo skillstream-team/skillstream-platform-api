@@ -1,0 +1,192 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const learning_service_1 = require("../../services/learning.service");
+const enrollment_service_1 = require("../../services/enrollment.service");
+const auth_1 = require("../../../../middleware/auth");
+const prisma_1 = require("../../../../utils/prisma");
+const router = (0, express_1.Router)();
+const learningService = new learning_service_1.LearningService();
+const enrollmentService = new enrollment_service_1.EnrollmentService();
+/**
+ * @swagger
+ * /api/users/{userId}/progress:
+ *   get:
+ *     summary: Get all course progress for a user
+ *     tags: [Progress]
+ *     parameters:
+ *       - in: path
+ *         name: userId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: User ID
+ *     responses:
+ *       200:
+ *         description: Progress retrieved successfully
+ *       404:
+ *         description: User not found
+ */
+router.get('/users/:userId/progress', auth_1.requireAuth, async (req, res) => {
+    try {
+        const { userId } = req.params;
+        const { status } = req.query;
+        // Get all enrollments for the user
+        const enrollments = await prisma_1.prisma.enrollment.findMany({
+            where: { studentId: userId },
+            include: { course: true }
+        });
+        // Get progress for each enrollment
+        const progressData = await Promise.all(enrollments.map(async (enrollment) => {
+            const progress = await prisma_1.prisma.progress.findMany({
+                where: {
+                    studentId: userId,
+                    courseId: enrollment.courseId
+                },
+                include: {
+                    course: true,
+                    module: true
+                }
+            });
+            return {
+                courseId: enrollment.courseId,
+                course: enrollment.course,
+                progress: progress || []
+            };
+        }));
+        // Filter by status if provided
+        let filteredProgress = progressData;
+        if (status === 'in_progress' || status === 'completed') {
+            filteredProgress = progressData.filter((item) => {
+                const completedItems = item.progress.filter((p) => p.status === 'completed').length;
+                const totalItems = item.progress.length;
+                const completionRate = totalItems > 0 ? (completedItems / totalItems) * 100 : 0;
+                if (status === 'completed') {
+                    return completionRate === 100;
+                }
+                else {
+                    return completionRate < 100 && completionRate > 0;
+                }
+            });
+        }
+        res.json({
+            success: true,
+            data: filteredProgress
+        });
+    }
+    catch (error) {
+        console.error('Error fetching user progress:', error);
+        res.status(500).json({ error: 'Failed to fetch user progress' });
+    }
+});
+/**
+ * @swagger
+ * /api/users/{userId}/progress/courses:
+ *   get:
+ *     summary: Get course progress filtered by status
+ *     tags: [Progress]
+ *     parameters:
+ *       - in: path
+ *         name: userId
+ *         required: true
+ *         schema:
+ *           type: string
+ *       - in: query
+ *         name: status
+ *         schema:
+ *           type: string
+ *           enum: [in_progress, completed]
+ */
+router.get('/users/:userId/progress/courses', auth_1.requireAuth, async (req, res) => {
+    try {
+        const { userId } = req.params;
+        const { status } = req.query;
+        const enrollments = await prisma_1.prisma.enrollment.findMany({
+            where: { studentId: userId },
+            include: { course: true }
+        });
+        const coursesWithProgress = await Promise.all(enrollments.map(async (enrollment) => {
+            const progress = await prisma_1.prisma.progress.findMany({
+                where: {
+                    studentId: userId,
+                    courseId: enrollment.courseId
+                }
+            });
+            const completedItems = progress?.filter((p) => p.status === 'completed').length || 0;
+            const totalItems = progress?.length || 0;
+            const completionRate = totalItems > 0 ? (completedItems / totalItems) * 100 : 0;
+            let courseStatus = 'not_started';
+            if (completionRate === 100) {
+                courseStatus = 'completed';
+            }
+            else if (completionRate > 0) {
+                courseStatus = 'in_progress';
+            }
+            return {
+                courseId: enrollment.courseId,
+                course: enrollment.course,
+                status: courseStatus,
+                completionRate,
+                completedItems,
+                totalItems
+            };
+        }));
+        // Filter by status if provided
+        let filtered = coursesWithProgress;
+        if (status === 'in_progress' || status === 'completed') {
+            filtered = coursesWithProgress.filter((item) => item.status === status);
+        }
+        res.json({
+            success: true,
+            data: filtered
+        });
+    }
+    catch (error) {
+        console.error('Error fetching course progress:', error);
+        res.status(500).json({ error: 'Failed to fetch course progress' });
+    }
+});
+/**
+ * @swagger
+ * /api/courses/{courseId}/progress:
+ *   get:
+ *     summary: Get progress for current user in a specific course
+ *     tags: [Progress]
+ *     parameters:
+ *       - in: path
+ *         name: courseId
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Progress retrieved successfully
+ */
+router.get('/courses/:courseId/progress', auth_1.requireAuth, async (req, res) => {
+    try {
+        const { courseId } = req.params;
+        const userId = req.user?.id;
+        if (!userId) {
+            return res.status(401).json({ error: 'User not authenticated' });
+        }
+        const progress = await prisma_1.prisma.progress.findMany({
+            where: {
+                studentId: userId,
+                courseId: courseId
+            },
+            include: {
+                course: true,
+                module: true
+            }
+        });
+        res.json({
+            success: true,
+            data: progress || []
+        });
+    }
+    catch (error) {
+        console.error('Error fetching course progress:', error);
+        res.status(500).json({ error: 'Failed to fetch course progress' });
+    }
+});
+exports.default = router;

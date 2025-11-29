@@ -7,6 +7,7 @@ import { producer, consumer, isKafkaAvailable } from "./utils/kafka";
 import { registerUserModule } from "./modules/users";
 import { registerCoursesModule } from "./modules/courses";
 import { registerMessagingModule } from "./modules/messaging";
+import { setSocketIO } from "./modules/users/services/admin-messaging.service";
 import { validateEnv, env } from "./utils/env";
 import { errorHandler } from "./middleware/error-handler";
 import { securityHeaders, corsOptions } from "./middleware/security";
@@ -31,6 +32,9 @@ const io = new Server(server, {
     cors: corsOptions,
     transports: ['websocket', 'polling'],
 });
+
+// Initialize admin messaging service with io instance
+setSocketIO(io);
 
 const PORT = parseInt(env.PORT, 10);
 

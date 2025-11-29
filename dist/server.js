@@ -13,6 +13,7 @@ const kafka_1 = require("./utils/kafka");
 const users_1 = require("./modules/users");
 const courses_1 = require("./modules/courses");
 const messaging_1 = require("./modules/messaging");
+const admin_messaging_service_1 = require("./modules/users/services/admin-messaging.service");
 const env_1 = require("./utils/env");
 const error_handler_1 = require("./middleware/error-handler");
 const security_1 = require("./middleware/security");
@@ -37,6 +38,8 @@ const io = new socket_io_1.Server(server, {
     transports: ['websocket', 'polling'],
 });
 exports.io = io;
+// Initialize admin messaging service with io instance
+(0, admin_messaging_service_1.setSocketIO)(io);
 const PORT = parseInt(env_1.env.PORT, 10);
 // Security middleware (must be first)
 app.use(security_1.securityHeaders);

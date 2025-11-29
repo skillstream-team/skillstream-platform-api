@@ -6,11 +6,15 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.registerUserModule = registerUserModule;
 // modules/users/index.ts
 const users_routes_1 = __importDefault(require("./routes/rest/users.routes"));
+const oauth_routes_1 = __importDefault(require("./routes/rest/oauth.routes"));
+const admin_routes_1 = __importDefault(require("./routes/rest/admin.routes"));
 const users_resolver_1 = require("./routes/graphql/users.resolver");
 const express_graphql_1 = require("express-graphql");
 function registerUserModule(app) {
     // REST
     app.use('/api/users', users_routes_1.default);
+    app.use('/api', oauth_routes_1.default);
+    app.use('/api', admin_routes_1.default);
     // GraphQL
     app.use('/graphql/users', (0, express_graphql_1.graphqlHTTP)({
         schema: users_resolver_1.usersSchema,

@@ -1,0 +1,144 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const auth_1 = require("../../../../middleware/auth");
+const roles_1 = require("../../../../middleware/roles");
+const prisma_1 = require("../../../../utils/prisma");
+const router = (0, express_1.Router)();
+/**
+ * @swagger
+ * /api/users/{userId}/earnings-report:
+ *   get:
+ *     summary: Get earnings report for a tutor
+ *     tags: [Earnings]
+ */
+router.get('/users/:userId/earnings-report', auth_1.requireAuth, (0, roles_1.requireRole)('TUTOR'), async (req, res) => {
+    try {
+        const { userId } = req.params;
+        const currentUserId = req.user?.id;
+        if (userId !== currentUserId) {
+            return res.status(403).json({ error: 'Unauthorized' });
+        }
+        const now = new Date();
+        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+        const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+        const endOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0);
+        const startOfYear = new Date(now.getFullYear(), 0, 1);
+        // Get all payments for courses taught by this tutor
+        const tutorCourses = await prisma_1.prisma.course.findMany({
+            where: { instructorId: userId },
+            select: { id: true }
+        });
+        const courseIds = tutorCourses.map(c => c.id);
+        // Current month earnings
+        const currentMonthPayments = await prisma_1.prisma.payment.findMany({
+            where: {
+                courseId: { in: courseIds },
+                status: 'COMPLETED',
+                createdAt: { gte: startOfMonth }
+            }
+        });
+        // Previous month earnings
+        const previousMonthPayments = await prisma_1.prisma.payment.findMany({
+            where: {
+                courseId: { in: courseIds },
+                status: 'COMPLETED',
+                createdAt: { gte: startOfLastMonth, lte: endOfLastMonth }
+            }
+        });
+        // Year to date earnings
+        const yearToDatePayments = await prisma_1.prisma.payment.findMany({
+            where: {
+                courseId: { in: courseIds },
+                status: 'COMPLETED',
+                createdAt: { gte: startOfYear }
+            }
+        });
+        // Lifetime earnings
+        const lifetimePayments = await prisma_1.prisma.payment.findMany({
+            where: {
+                courseId: { in: courseIds },
+                status: 'COMPLETED'
+            }
+        });
+        // Calculate totals (assuming 80% tutor share, adjust as needed)
+        const tutorShare = 0.8;
+        const calculateTotal = (payments) => payments.reduce((sum, p) => sum + (p.amount * tutorShare), 0);
+        const currentMonth = calculateTotal(currentMonthPayments);
+        const previousMonth = calculateTotal(previousMonthPayments);
+        const yearToDate = calculateTotal(yearToDatePayments);
+        const lifetime = calculateTotal(lifetimePayments);
+        // Get courses with earnings
+        const courses = await prisma_1.prisma.course.findMany({
+            where: { instructorId: userId },
+            include: {
+                payments: {
+                    where: { status: 'COMPLETED' }
+                },
+                enrollments: true
+            }
+        });
+        // Monthly trends (last 12 months)
+        const monthlyTrends = [];
+        for (let i = 11; i >= 0; i--) {
+            const monthStart = new Date(now.getFullYear(), now.getMonth() - i, 1);
+            const monthEnd = new Date(now.getFullYear(), now.getMonth() - i + 1, 0);
+            const monthPayments = await prisma_1.prisma.payment.findMany({
+                where: {
+                    courseId: { in: courseIds },
+                    status: 'COMPLETED',
+                    createdAt: { gte: monthStart, lte: monthEnd }
+                }
+            });
+            monthlyTrends.push({
+                month: monthStart.toISOString().substring(0, 7),
+                earnings: calculateTotal(monthPayments),
+                enrollments: monthPayments.length
+            });
+        }
+        // Get transactions
+        const transactions = await prisma_1.prisma.payment.findMany({
+            where: {
+                courseId: { in: courseIds },
+                status: 'COMPLETED'
+            },
+            include: {
+                course: {
+                    select: { id: true, title: true }
+                },
+                student: {
+                    select: { id: true, username: true, email: true }
+                }
+            },
+            orderBy: { createdAt: 'desc' },
+            take: 50
+        });
+        res.json({
+            success: true,
+            data: {
+                currentMonth,
+                previousMonth,
+                yearToDate,
+                lifetime,
+                tutorShare,
+                courses: courses.map(c => ({
+                    id: c.id,
+                    title: c.title,
+                    totalEarnings: calculateTotal(c.payments),
+                    totalEnrollments: c.enrollments.length
+                })),
+                transactions: transactions.map(t => ({
+                    ...t,
+                    tutorEarnings: t.amount * tutorShare
+                })),
+                monthlyTrends,
+                pendingPayoutRequests: [] // Implement payout requests if needed
+            }
+        });
+    }
+    catch (error) {
+        console.error('Error fetching earnings report:', error);
+        res.status(500).json({ error: 'Failed to fetch earnings report' });
+    }
+});
+exports.default = router;

@@ -20,6 +20,14 @@ interface EnvConfig {
   KAFKA_BROKERS?: string;
   FRONTEND_URL?: string;
   SERVER_URL?: string;
+  
+  // Email
+  SMTP_HOST?: string;
+  SMTP_PORT?: string;
+  SMTP_USER?: string;
+  SMTP_PASS?: string;
+  SMTP_FROM?: string;
+  SMTP_SECURE?: string;
 }
 
 const requiredEnvVars = [

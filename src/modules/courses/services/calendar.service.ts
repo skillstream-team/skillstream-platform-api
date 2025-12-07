@@ -118,52 +118,83 @@ export class CalendarService {
   }
 
   /**
-   * Get events based on filters
+   * Get events based on filters (with pagination)
    */
-  async getEvents(filters: CalendarFiltersDto): Promise<CalendarEventResponseDto[]> {
-    const events = await prisma.calendarEvent.findMany({
-      where: {
-        ...(filters.courseId && { courseId: filters.courseId }),
-        ...(filters.type && { type: filters.type }),
-        ...(filters.startDate && filters.endDate && {
-          OR: [
-            {
-              startTime: {
-                gte: filters.startDate,
-                lte: filters.endDate
-              }
-            },
-            {
-              endTime: {
-                gte: filters.startDate,
-                lte: filters.endDate
-              }
-            }
-          ]
-        }),
-        ...(filters.includeAllDay !== undefined && { isAllDay: filters.includeAllDay }),
-        ...(filters.userId && {
-          OR: [
-            { createdBy: filters.userId },
-            { attendees: { some: { userId: filters.userId } } }
-          ]
-        })
-      },
-      include: {
-        creator: { select: { id: true, username: true } },
-        course: { select: { id: true, title: true } },
-        assignment: { select: { id: true, title: true } },
-        quiz: { select: { id: true, title: true } },
-        attendees: {
-          include: {
-            user: { select: { id: true, username: true, email: true } }
-          }
-        }
-      },
-      orderBy: { startTime: 'asc' }
-    });
+  async getEvents(filters: CalendarFiltersDto & { page?: number; limit?: number }): Promise<{
+    data: CalendarEventResponseDto[];
+    pagination: {
+      page: number;
+      limit: number;
+      total: number;
+      totalPages: number;
+      hasNext: boolean;
+      hasPrev: boolean;
+    };
+  }> {
+    const page = filters.page || 1;
+    const limit = Math.min(filters.limit || 50, 100);
+    const skip = (page - 1) * limit;
 
-    return events.map(this.mapToResponseDto);
+    const where: any = {
+      ...(filters.courseId && { courseId: filters.courseId }),
+      ...(filters.type && { type: filters.type }),
+      ...(filters.startDate && filters.endDate && {
+        OR: [
+          {
+            startTime: {
+              gte: filters.startDate,
+              lte: filters.endDate
+            }
+          },
+          {
+            endTime: {
+              gte: filters.startDate,
+              lte: filters.endDate
+            }
+          }
+        ]
+      }),
+      ...(filters.includeAllDay !== undefined && { isAllDay: filters.includeAllDay }),
+      ...(filters.userId && {
+        OR: [
+          { createdBy: filters.userId },
+          { attendees: { some: { userId: filters.userId } } }
+        ]
+      })
+    };
+
+    const [events, total] = await Promise.all([
+      prisma.calendarEvent.findMany({
+        where,
+        skip,
+        take: limit,
+        include: {
+          creator: { select: { id: true, username: true } },
+          course: { select: { id: true, title: true } },
+          assignment: { select: { id: true, title: true } },
+          quiz: { select: { id: true, title: true } },
+          attendees: {
+            include: {
+              user: { select: { id: true, username: true, email: true } }
+            }
+          }
+        },
+        orderBy: { startTime: 'asc' }
+      }),
+      prisma.calendarEvent.count({ where }),
+    ]);
+
+    return {
+      data: events.map(this.mapToResponseDto),
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+        hasNext: page * limit < total,
+        hasPrev: page > 1,
+      },
+    };
   }
 
   /**
@@ -179,11 +210,12 @@ export class CalendarService {
     const courseIds = enrollments.map(e => e.courseId);
 
     // Get events for enrolled courses and events where user is an attendee
-    const events = await this.getEvents({
+    const eventsResult = await this.getEvents({
       userId,
       startDate,
       endDate
     });
+    const events = eventsResult.data;
 
     // Get upcoming assignment deadlines
     const upcomingAssignments = await prisma.assignment.findMany({

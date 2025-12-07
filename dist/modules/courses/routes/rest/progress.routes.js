@@ -31,27 +31,56 @@ router.get('/users/:userId/progress', auth_1.requireAuth, async (req, res) => {
     try {
         const { userId } = req.params;
         const { status } = req.query;
+        const page = parseInt(req.query.page) || 1;
+        const limit = Math.min(parseInt(req.query.limit) || 20, 100);
+        const skip = (page - 1) * limit;
         // Get all enrollments for the user
         const enrollments = await prisma_1.prisma.enrollment.findMany({
             where: { studentId: userId },
-            include: { course: true }
+            select: { courseId: true, course: { select: { id: true, title: true } } }
         });
-        // Get progress for each enrollment
+        // Get progress for each enrollment (with pagination per course)
         const progressData = await Promise.all(enrollments.map(async (enrollment) => {
-            const progress = await prisma_1.prisma.progress.findMany({
-                where: {
-                    studentId: userId,
-                    courseId: enrollment.courseId
-                },
-                include: {
-                    course: true,
-                    module: true
-                }
-            });
+            const [progress, total] = await Promise.all([
+                prisma_1.prisma.progress.findMany({
+                    where: {
+                        studentId: userId,
+                        courseId: enrollment.courseId
+                    },
+                    skip,
+                    take: limit,
+                    select: {
+                        id: true,
+                        status: true,
+                        progress: true,
+                        score: true,
+                        timeSpent: true,
+                        lastAccessed: true,
+                        completedAt: true,
+                        course: { select: { id: true, title: true } },
+                        module: { select: { id: true, title: true } }
+                    },
+                    orderBy: { lastAccessed: 'desc' }
+                }),
+                prisma_1.prisma.progress.count({
+                    where: {
+                        studentId: userId,
+                        courseId: enrollment.courseId
+                    }
+                })
+            ]);
             return {
                 courseId: enrollment.courseId,
                 course: enrollment.course,
-                progress: progress || []
+                progress: progress || [],
+                pagination: {
+                    page,
+                    limit,
+                    total,
+                    totalPages: Math.ceil(total / limit),
+                    hasNext: page * limit < total,
+                    hasPrev: page > 1,
+                }
             };
         }));
         // Filter by status if provided
@@ -71,7 +100,15 @@ router.get('/users/:userId/progress', auth_1.requireAuth, async (req, res) => {
         }
         res.json({
             success: true,
-            data: filteredProgress
+            data: filteredProgress,
+            pagination: {
+                page,
+                limit,
+                total: filteredProgress.reduce((sum, item) => sum + item.pagination.total, 0),
+                totalPages: Math.ceil(filteredProgress.reduce((sum, item) => sum + item.pagination.total, 0) / limit),
+                hasNext: page * limit < filteredProgress.reduce((sum, item) => sum + item.pagination.total, 0),
+                hasPrev: page > 1,
+            }
         });
     }
     catch (error) {
@@ -101,16 +138,19 @@ router.get('/users/:userId/progress/courses', auth_1.requireAuth, async (req, re
     try {
         const { userId } = req.params;
         const { status } = req.query;
+        const page = parseInt(req.query.page) || 1;
+        const limit = Math.min(parseInt(req.query.limit) || 20, 100);
         const enrollments = await prisma_1.prisma.enrollment.findMany({
             where: { studentId: userId },
-            include: { course: true }
+            select: { courseId: true, course: { select: { id: true, title: true } } }
         });
         const coursesWithProgress = await Promise.all(enrollments.map(async (enrollment) => {
             const progress = await prisma_1.prisma.progress.findMany({
                 where: {
                     studentId: userId,
                     courseId: enrollment.courseId
-                }
+                },
+                select: { status: true }
             });
             const completedItems = progress?.filter((p) => p.status === 'completed').length || 0;
             const totalItems = progress?.length || 0;
@@ -138,7 +178,15 @@ router.get('/users/:userId/progress/courses', auth_1.requireAuth, async (req, re
         }
         res.json({
             success: true,
-            data: filtered
+            data: filtered,
+            pagination: {
+                page,
+                limit,
+                total: filtered.length,
+                totalPages: Math.ceil(filtered.length / limit),
+                hasNext: page * limit < filtered.length,
+                hasPrev: page > 1,
+            }
         });
     }
     catch (error) {
@@ -169,19 +217,48 @@ router.get('/courses/:courseId/progress', auth_1.requireAuth, async (req, res) =
         if (!userId) {
             return res.status(401).json({ error: 'User not authenticated' });
         }
-        const progress = await prisma_1.prisma.progress.findMany({
-            where: {
-                studentId: userId,
-                courseId: courseId
-            },
-            include: {
-                course: true,
-                module: true
-            }
-        });
+        const page = parseInt(req.query.page) || 1;
+        const limit = Math.min(parseInt(req.query.limit) || 20, 100);
+        const skip = (page - 1) * limit;
+        const [progress, total] = await Promise.all([
+            prisma_1.prisma.progress.findMany({
+                where: {
+                    studentId: userId,
+                    courseId: courseId
+                },
+                skip,
+                take: limit,
+                select: {
+                    id: true,
+                    status: true,
+                    progress: true,
+                    score: true,
+                    timeSpent: true,
+                    lastAccessed: true,
+                    completedAt: true,
+                    course: { select: { id: true, title: true } },
+                    module: { select: { id: true, title: true } }
+                },
+                orderBy: { lastAccessed: 'desc' }
+            }),
+            prisma_1.prisma.progress.count({
+                where: {
+                    studentId: userId,
+                    courseId: courseId
+                }
+            })
+        ]);
         res.json({
             success: true,
-            data: progress || []
+            data: progress || [],
+            pagination: {
+                page,
+                limit,
+                total,
+                totalPages: Math.ceil(total / limit),
+                hasNext: page * limit < total,
+                hasPrev: page > 1,
+            }
         });
     }
     catch (error) {

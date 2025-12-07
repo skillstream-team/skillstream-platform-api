@@ -787,6 +787,150 @@ export class LearningService {
     }
   }
 
+  /**
+   * Get quiz attempts with pagination
+   */
+  async getQuizAttempts(quizId: string, page: number = 1, limit: number = 20): Promise<{
+    data: QuizAttemptResponseDto[];
+    pagination: {
+      page: number;
+      limit: number;
+      total: number;
+      totalPages: number;
+      hasNext: boolean;
+      hasPrev: boolean;
+    };
+  }> {
+    const skip = (page - 1) * limit;
+    const take = Math.min(limit, 100);
+
+    const [attempts, total] = await Promise.all([
+      prisma.quizAttempt.findMany({
+        where: { quizId },
+        skip,
+        take,
+        include: {
+          student: {
+            select: { id: true, username: true, email: true }
+          },
+          grader: {
+            select: { id: true, username: true, email: true }
+          }
+        },
+        orderBy: { startedAt: 'desc' },
+      }),
+      prisma.quizAttempt.count({ where: { quizId } }),
+    ]);
+
+    return {
+      data: attempts as QuizAttemptResponseDto[],
+      pagination: {
+        page,
+        limit: take,
+        total,
+        totalPages: Math.ceil(total / take),
+        hasNext: page * take < total,
+        hasPrev: page > 1,
+      },
+    };
+  }
+
+  /**
+   * Get student quiz attempts with pagination
+   */
+  async getStudentQuizAttempts(studentId: string, page: number = 1, limit: number = 20): Promise<{
+    data: QuizAttemptResponseDto[];
+    pagination: {
+      page: number;
+      limit: number;
+      total: number;
+      totalPages: number;
+      hasNext: boolean;
+      hasPrev: boolean;
+    };
+  }> {
+    const skip = (page - 1) * limit;
+    const take = Math.min(limit, 100);
+
+    const [attempts, total] = await Promise.all([
+      prisma.quizAttempt.findMany({
+        where: { studentId },
+        skip,
+        take,
+        include: {
+          student: {
+            select: { id: true, username: true, email: true }
+          },
+          quiz: {
+            select: { id: true, title: true, courseId: true }
+          },
+          grader: {
+            select: { id: true, username: true, email: true }
+          }
+        },
+        orderBy: { startedAt: 'desc' },
+      }),
+      prisma.quizAttempt.count({ where: { studentId } }),
+    ]);
+
+    return {
+      data: attempts as QuizAttemptResponseDto[],
+      pagination: {
+        page,
+        limit: take,
+        total,
+        totalPages: Math.ceil(total / take),
+        hasNext: page * take < total,
+        hasPrev: page > 1,
+      },
+    };
+  }
+
+  /**
+   * Get assignment submissions with pagination
+   */
+  async getAssignmentSubmissions(assignmentId: string, page: number = 1, limit: number = 20): Promise<{
+    data: any[];
+    pagination: {
+      page: number;
+      limit: number;
+      total: number;
+      totalPages: number;
+      hasNext: boolean;
+      hasPrev: boolean;
+    };
+  }> {
+    const skip = (page - 1) * limit;
+    const take = Math.min(limit, 100);
+
+    const [submissions, total] = await Promise.all([
+      prisma.submission.findMany({
+        where: { assignmentId },
+        skip,
+        take,
+        include: {
+          student: {
+            select: { id: true, username: true, email: true }
+          }
+        },
+        orderBy: { submittedAt: 'desc' },
+      }),
+      prisma.submission.count({ where: { assignmentId } }),
+    ]);
+
+    return {
+      data: submissions,
+      pagination: {
+        page,
+        limit: take,
+        total,
+        totalPages: Math.ceil(total / take),
+        hasNext: page * take < total,
+        hasPrev: page > 1,
+      },
+    };
+  }
+
   // ===========================================
   // ANALYTICS & INSIGHTS
   // ===========================================

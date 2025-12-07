@@ -12,8 +12,17 @@ import { validateEnv, env } from "./utils/env";
 import { errorHandler } from "./middleware/error-handler";
 import { securityHeaders, corsOptions } from "./middleware/security";
 import { requestLogger } from "./middleware/logger";
+import { requestId } from "./middleware/request-id";
 import { testDatabaseConnection, prisma } from "./utils/prisma";
 import redisClient from "./utils/redis";
+import { initSentry } from "./utils/sentry";
+import * as Sentry from "@sentry/node";
+import compression from "compression";
+import { generalRateLimiter } from "./middleware/rate-limit";
+import { requestTimeout } from "./middleware/timeout";
+
+// Initialize Sentry FIRST (before anything else that might throw)
+initSentry();
 
 // Validate environment variables on startup
 try {
@@ -33,16 +42,49 @@ const io = new Server(server, {
     transports: ['websocket', 'polling'],
 });
 
+// Add Redis adapter for Socket.IO if Redis is available (enables horizontal scaling)
+if (redisClient) {
+    try {
+        // For Socket.IO v4, we use the Redis adapter
+        // Note: socket.io-redis package is for v3, for v4 we need @socket.io/redis-adapter
+        // For now, we'll use the built-in Redis adapter pattern
+        const { createAdapter } = require("@socket.io/redis-adapter");
+        const pubClient = redisClient;
+        const subClient = redisClient.duplicate();
+        io.adapter(createAdapter(pubClient, subClient));
+        console.log("✅ Socket.IO Redis adapter enabled for horizontal scaling");
+    } catch (error) {
+        console.warn("⚠️  Redis adapter not available. Socket.IO will use in-memory adapter.");
+        console.warn("   Install @socket.io/redis-adapter for horizontal scaling support.");
+    }
+}
+
 // Initialize admin messaging service with io instance
 setSocketIO(io);
 
 const PORT = parseInt(env.PORT, 10);
 
-// Security middleware (must be first)
+// Sentry request handlers (must be before other middleware)
+// Note: In Sentry v8+, request handling is done via integrations
+// The expressIntegration handles this automatically
+
+// Request ID tracking (must be early)
+app.use(requestId);
+
+// Compression middleware
+app.use(compression());
+
+// Security middleware
 app.use(securityHeaders);
 
 // CORS
 app.use(cors(corsOptions));
+
+// General rate limiting (applied to all routes)
+app.use(generalRateLimiter);
+
+// Request timeout (30 seconds default)
+app.use(requestTimeout(30000));
 
 // Request logging
 app.use(requestLogger);
@@ -208,12 +250,36 @@ process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 // Handle unhandled errors
 process.on('unhandledRejection', (reason, promise) => {
     console.error('❌ Unhandled Rejection at:', promise, 'reason:', reason);
+    // Send to Sentry in production
+    if (process.env.NODE_ENV === 'production' && process.env.SENTRY_DSN) {
+        Sentry.captureException(reason as Error, {
+            tags: {
+                type: 'unhandledRejection',
+            },
+        });
+    }
 });
 
 process.on('uncaughtException', (error) => {
     console.error('❌ Uncaught Exception:', error);
-    gracefulShutdown('uncaughtException');
+    // Send to Sentry in production before shutdown
+    if (process.env.NODE_ENV === 'production' && process.env.SENTRY_DSN) {
+        Sentry.captureException(error, {
+            tags: {
+                type: 'uncaughtException',
+            },
+        });
+        // Flush Sentry before shutdown
+        Sentry.flush(2000).then(() => {
+            gracefulShutdown('uncaughtException');
+        });
+    } else {
+        gracefulShutdown('uncaughtException');
+    }
 });
+
+// Sentry error handler (before global error handler)
+// Note: Error handling is done via our custom errorHandler middleware
 
 // Global error handler (must be last)
 app.use(errorHandler);

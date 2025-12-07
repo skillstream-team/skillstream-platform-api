@@ -129,6 +129,10 @@ model Enrollment {
   payment   Payment? @relation(fields: [paymentId], references: [id])
 
   createdAt DateTime @default(now())
+
+  @@unique([courseId, studentId])
+  @@index([courseId])
+  @@index([studentId])
 }
 
 model Payment {

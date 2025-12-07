@@ -10,6 +10,7 @@ const bcrypt_1 = __importDefault(require("bcrypt"));
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const jwt_1 = require("../../../utils/jwt");
 const email_service_1 = require("./email.service");
+const cache_1 = require("../../../utils/cache");
 const JWT_SECRET = process.env.JWT_SECRET;
 if (!JWT_SECRET) {
     throw new Error('JWT_SECRET is not defined in your environment variables');
@@ -117,6 +118,8 @@ class UsersService {
             // Generate JWT token
             const { password: _, ...userWithoutPassword } = user;
             const token = (0, jwt_1.generateToken)({ id: user.id, role: user.role });
+            // Invalidate user list cache
+            await (0, cache_1.deleteCachePattern)('users:list:*');
             return { token, user: userWithoutPassword };
         }
         catch (error) {
@@ -354,8 +357,66 @@ class UsersService {
      *       200:
      *         description: List of users
      */
-    async getAllUsers() {
-        return user_model_1.prisma.user.findMany();
+    /**
+     * @swagger
+     * /users:
+     *   get:
+     *     summary: Get all users (paginated)
+     *     tags: [Users]
+     *     parameters:
+     *       - in: query
+     *         name: page
+     *         schema:
+     *           type: integer
+     *           default: 1
+     *       - in: query
+     *         name: limit
+     *         schema:
+     *           type: integer
+     *           default: 20
+     *           maximum: 100
+     */
+    async getAllUsers(page = 1, limit = 20) {
+        const cacheKey = `users:list:${page}:${limit}`;
+        // Try cache first
+        const cached = await (0, cache_1.getCache)(cacheKey);
+        if (cached) {
+            return cached;
+        }
+        const skip = (page - 1) * limit;
+        const take = Math.min(limit, 100); // Max 100 per page
+        const [users, total] = await Promise.all([
+            user_model_1.prisma.user.findMany({
+                skip,
+                take,
+                select: {
+                    id: true,
+                    username: true,
+                    email: true,
+                    role: true,
+                    firstName: true,
+                    lastName: true,
+                    avatar: true,
+                    createdAt: true,
+                },
+                orderBy: { createdAt: 'desc' },
+            }),
+            user_model_1.prisma.user.count(),
+        ]);
+        const result = {
+            data: users,
+            pagination: {
+                page,
+                limit: take,
+                total,
+                totalPages: Math.ceil(total / take),
+                hasNext: page * take < total,
+                hasPrev: page > 1,
+            },
+        };
+        // Cache result
+        await (0, cache_1.setCache)(cacheKey, result, cache_1.CACHE_TTL.SHORT);
+        return result;
     }
     /**
      * @swagger
@@ -377,7 +438,30 @@ class UsersService {
      *         description: User not found
      */
     async getUserById(id) {
-        return user_model_1.prisma.user.findUnique({ where: { id } });
+        const cacheKey = cache_1.cacheKeys.user(id);
+        // Try cache first
+        const cached = await (0, cache_1.getCache)(cacheKey);
+        if (cached) {
+            return cached;
+        }
+        const user = await user_model_1.prisma.user.findUnique({
+            where: { id },
+            select: {
+                id: true,
+                username: true,
+                email: true,
+                role: true,
+                firstName: true,
+                lastName: true,
+                avatar: true,
+                createdAt: true,
+                updatedAt: true,
+            }
+        });
+        if (user) {
+            await (0, cache_1.setCache)(cacheKey, user, cache_1.CACHE_TTL.MEDIUM);
+        }
+        return user;
     }
     /**
      * @swagger
@@ -388,7 +472,30 @@ class UsersService {
      *       - Users
      */
     async getUserProfile(userId) {
-        return user_model_1.prisma.user.findUnique({ where: { id: userId } });
+        const cacheKey = cache_1.cacheKeys.userProfile(userId);
+        // Try cache first
+        const cached = await (0, cache_1.getCache)(cacheKey);
+        if (cached) {
+            return cached;
+        }
+        const user = await user_model_1.prisma.user.findUnique({
+            where: { id: userId },
+            select: {
+                id: true,
+                username: true,
+                email: true,
+                role: true,
+                firstName: true,
+                lastName: true,
+                avatar: true,
+                createdAt: true,
+                updatedAt: true,
+            }
+        });
+        if (user) {
+            await (0, cache_1.setCache)(cacheKey, user, cache_1.CACHE_TTL.MEDIUM);
+        }
+        return user;
     }
     /**
      * @swagger
@@ -399,7 +506,7 @@ class UsersService {
      *       - Users
      */
     async getRoles() {
-        return ['ADMIN', 'TUTOR', 'STUDENT'];
+        return ['ADMIN', 'Teacher', 'STUDENT'];
     }
     /**
      * @swagger

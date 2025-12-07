@@ -3,7 +3,9 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
 const auth_1 = require("../../../../middleware/auth");
 const prisma_1 = require("../../../../utils/prisma");
+const cloudflare_r2_service_1 = require("../../services/cloudflare-r2.service");
 const router = (0, express_1.Router)();
+const r2Service = new cloudflare_r2_service_1.CloudflareR2Service();
 /**
  * @swagger
  * /api/users/{userId}/resources/recent:
@@ -106,21 +108,70 @@ router.post('/lessons/:lessonId/resources/upload', auth_1.requireAuth, async (re
     try {
         const { lessonId } = req.params;
         const userId = req.user?.id;
-        // This endpoint would typically handle file upload
-        // For now, return a placeholder response
-        // You would integrate with your file upload service here (e.g., Cloudflare R2)
-        res.status(201).json({
-            success: true,
-            message: 'File upload endpoint - integrate with file upload service',
+        const { file, title, filename, contentType } = req.body;
+        if (!file || !filename || !contentType) {
+            return res.status(400).json({
+                error: 'file (base64), filename, and contentType are required'
+            });
+        }
+        // Verify lesson exists
+        const lesson = await prisma_1.prisma.quickLesson.findUnique({
+            where: { id: lessonId }
+        });
+        if (!lesson) {
+            return res.status(404).json({ error: 'Lesson not found' });
+        }
+        // Decode base64 file
+        const fileBuffer = Buffer.from(file, 'base64');
+        // Determine file type from content type
+        let fileType = 'other';
+        if (contentType.includes('pdf'))
+            fileType = 'pdf';
+        else if (contentType.startsWith('image/'))
+            fileType = 'image';
+        else if (contentType.includes('zip') || contentType.includes('archive'))
+            fileType = 'zip';
+        else if (contentType.includes('document') || contentType.includes('word') || contentType.includes('text'))
+            fileType = 'document';
+        // Use lesson ID for R2 organization (QuickLesson doesn't have courseId)
+        const courseId = lessonId;
+        // Upload to Cloudflare R2
+        const uploadResult = await r2Service.uploadFile({
+            file: fileBuffer,
+            filename,
+            contentType,
+            courseId: courseId.toString(),
+            type: fileType,
+        });
+        // Create resource record
+        const resource = await prisma_1.prisma.lessonResource.create({
             data: {
                 lessonId,
-                uploadedBy: userId
+                title: title || filename,
+                type: 'file',
+                fileUrl: uploadResult.url,
+                filename: uploadResult.filename,
+                size: uploadResult.size,
+                mimeType: uploadResult.contentType,
+                sharedBy: userId
+            },
+            include: {
+                sharer: {
+                    select: { id: true, username: true, email: true }
+                },
+                lesson: {
+                    select: { id: true, title: true, scheduledAt: true }
+                }
             }
+        });
+        res.status(201).json({
+            success: true,
+            data: resource
         });
     }
     catch (error) {
         console.error('Error uploading resource:', error);
-        res.status(500).json({ error: 'Failed to upload resource' });
+        res.status(500).json({ error: 'Failed to upload resource: ' + error.message });
     }
 });
 exports.default = router;

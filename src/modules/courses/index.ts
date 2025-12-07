@@ -14,6 +14,7 @@ import videoRoutes from './routes/rest/video.routes';
 import marketingRoutes from './routes/rest/marketing.routes';
 import calendarRoutes from './routes/rest/calendar.routes';
 import recommendationsRoutes from './routes/rest/recommendations.routes';
+import pollsRoutes from './routes/rest/polls.routes';
 import { coursesSchema } from './routes/graphql/course.resolver';
 import { enrollmentSchema } from './routes/graphql/enrollment.resolver';
 import { mediaSchema } from './routes/graphql/media.resolver';
@@ -36,6 +37,7 @@ export function registerCoursesModule(app: express.Application) {
   app.use('/api', marketingRoutes);
   app.use('/api/calendar', calendarRoutes);
   app.use('/api/recommendations', recommendationsRoutes);
+  app.use('/api/polls', pollsRoutes);
 
   // GraphQL endpoints
   app.use('/graphql/courses', graphqlHTTP({
@@ -73,6 +75,7 @@ export { CloudflareStreamService } from './services/cloudflare-stream.service';
 export { RealtimeService } from './services/realtime.service';
 export { RecommendationService } from './services/recommendation.service';
 export { CalendarService } from './services/calendar.service';
+export { PollService } from './services/poll.service';
 export { coursesSchema };
 export { enrollmentSchema };
 export { mediaSchema };

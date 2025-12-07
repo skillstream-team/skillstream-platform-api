@@ -3,6 +3,8 @@ import { Router } from 'express';
 import { MessagingService } from '../../services/messaging.service';
 import { MessagingFileUploadService } from '../../services/file-upload.service';
 import { requireAuth } from '../../../../middleware/auth';
+import { validate } from '../../../../middleware/validation';
+import { createMessageSchema, createConversationSchema } from '../../../../utils/validation-schemas';
 
 const router = Router();
 const messagingService = new MessagingService();
@@ -47,7 +49,10 @@ const fileUploadService = new MessagingFileUploadService();
  *       500:
  *         description: Server error
  */
-router.post('/conversations', requireAuth, async (req, res) => {
+router.post('/conversations', 
+  requireAuth,
+  validate({ body: createConversationSchema }),
+  async (req, res) => {
   try {
     const userId = (req as any).user?.id;
     if (!userId) {
@@ -112,18 +117,18 @@ router.get('/conversations', requireAuth, async (req, res) => {
       return res.status(401).json({ error: 'User not authenticated' });
     }
 
-    const conversations = await messagingService.getConversations(userId, {
+    const result = await messagingService.getConversations(userId, {
       userId,
       type: req.query.type as 'direct' | 'group' | undefined,
       search: req.query.search as string | undefined,
+      page: req.query.page ? parseInt(req.query.page as string) : undefined,
       limit: req.query.limit ? parseInt(req.query.limit as string) : undefined,
       offset: req.query.offset ? parseInt(req.query.offset as string) : undefined,
     });
 
     res.json({
       success: true,
-      data: conversations,
-      count: conversations.length,
+      ...result
     });
   } catch (error) {
     console.error('Error fetching conversations:', error);
@@ -452,12 +457,15 @@ router.delete(
  *       500:
  *         description: Server error
  */
-router.post('/messages', requireAuth, async (req, res) => {
-  try {
-    const userId = (req as any).user?.id;
-    if (!userId) {
-      return res.status(401).json({ error: 'User not authenticated' });
-    }
+router.post('/messages', 
+  requireAuth,
+  validate({ body: createMessageSchema }),
+  async (req, res) => {
+    try {
+      const userId = (req as any).user?.id;
+      if (!userId) {
+        return res.status(401).json({ error: 'User not authenticated' });
+      }
 
     const message = await messagingService.sendMessage(userId, req.body);
     res.status(201).json({
@@ -530,9 +538,10 @@ router.get('/conversations/:conversationId/messages', requireAuth, async (req, r
       return res.status(400).json({ error: 'Invalid conversation ID' });
     }
 
-    const messages = await messagingService.getMessages(conversationId, userId, {
+    const result = await messagingService.getMessages(conversationId, userId, {
       conversationId,
       userId,
+      page: req.query.page ? parseInt(req.query.page as string) : undefined,
       limit: req.query.limit ? parseInt(req.query.limit as string) : undefined,
       offset: req.query.offset ? parseInt(req.query.offset as string) : undefined,
       before: req.query.before ? new Date(req.query.before as string) : undefined,
@@ -541,8 +550,7 @@ router.get('/conversations/:conversationId/messages', requireAuth, async (req, r
 
     res.json({
       success: true,
-      data: messages,
-      count: messages.length,
+      ...result,
     });
   } catch (error) {
     console.error('Error fetching messages:', error);

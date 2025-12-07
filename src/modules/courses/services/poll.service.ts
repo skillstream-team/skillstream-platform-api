@@ -3,7 +3,7 @@ import { prisma } from '../../../utils/prisma';
 
 export { prisma };
 
-class PollService {
+export class PollService {
     async createPoll(data: CreatePollDto, creatorId: string) {
         // Use title as question if question is not provided separately
         // The Poll model requires both title and question fields

@@ -729,6 +729,111 @@ class LearningService {
             throw new Error(`Failed to update progress: ${error instanceof Error ? error.message : 'Unknown error'}`);
         }
     }
+    /**
+     * Get quiz attempts with pagination
+     */
+    async getQuizAttempts(quizId, page = 1, limit = 20) {
+        const skip = (page - 1) * limit;
+        const take = Math.min(limit, 100);
+        const [attempts, total] = await Promise.all([
+            prisma_1.prisma.quizAttempt.findMany({
+                where: { quizId },
+                skip,
+                take,
+                include: {
+                    student: {
+                        select: { id: true, username: true, email: true }
+                    },
+                    grader: {
+                        select: { id: true, username: true, email: true }
+                    }
+                },
+                orderBy: { startedAt: 'desc' },
+            }),
+            prisma_1.prisma.quizAttempt.count({ where: { quizId } }),
+        ]);
+        return {
+            data: attempts,
+            pagination: {
+                page,
+                limit: take,
+                total,
+                totalPages: Math.ceil(total / take),
+                hasNext: page * take < total,
+                hasPrev: page > 1,
+            },
+        };
+    }
+    /**
+     * Get student quiz attempts with pagination
+     */
+    async getStudentQuizAttempts(studentId, page = 1, limit = 20) {
+        const skip = (page - 1) * limit;
+        const take = Math.min(limit, 100);
+        const [attempts, total] = await Promise.all([
+            prisma_1.prisma.quizAttempt.findMany({
+                where: { studentId },
+                skip,
+                take,
+                include: {
+                    student: {
+                        select: { id: true, username: true, email: true }
+                    },
+                    quiz: {
+                        select: { id: true, title: true, courseId: true }
+                    },
+                    grader: {
+                        select: { id: true, username: true, email: true }
+                    }
+                },
+                orderBy: { startedAt: 'desc' },
+            }),
+            prisma_1.prisma.quizAttempt.count({ where: { studentId } }),
+        ]);
+        return {
+            data: attempts,
+            pagination: {
+                page,
+                limit: take,
+                total,
+                totalPages: Math.ceil(total / take),
+                hasNext: page * take < total,
+                hasPrev: page > 1,
+            },
+        };
+    }
+    /**
+     * Get assignment submissions with pagination
+     */
+    async getAssignmentSubmissions(assignmentId, page = 1, limit = 20) {
+        const skip = (page - 1) * limit;
+        const take = Math.min(limit, 100);
+        const [submissions, total] = await Promise.all([
+            prisma_1.prisma.submission.findMany({
+                where: { assignmentId },
+                skip,
+                take,
+                include: {
+                    student: {
+                        select: { id: true, username: true, email: true }
+                    }
+                },
+                orderBy: { submittedAt: 'desc' },
+            }),
+            prisma_1.prisma.submission.count({ where: { assignmentId } }),
+        ]);
+        return {
+            data: submissions,
+            pagination: {
+                page,
+                limit: take,
+                total,
+                totalPages: Math.ceil(total / take),
+                hasNext: page * take < total,
+                hasPrev: page > 1,
+            },
+        };
+    }
     // ===========================================
     // ANALYTICS & INSIGHTS
     // ===========================================

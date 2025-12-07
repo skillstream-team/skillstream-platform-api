@@ -45,7 +45,7 @@ router.get('/teachers/:teacherId/availability', auth_1.requireAuth, async (req, 
  *     summary: Create or update teacher availability
  *     tags: [Bookings]
  */
-router.post('/teachers/:teacherId/availability', auth_1.requireAuth, (0, roles_1.requireRole)('TUTOR'), async (req, res) => {
+router.post('/teachers/:teacherId/availability', auth_1.requireAuth, (0, roles_1.requireRole)('Teacher'), async (req, res) => {
     try {
         const { teacherId } = req.params;
         const userId = req.user?.id;
@@ -77,7 +77,7 @@ router.post('/teachers/:teacherId/availability', auth_1.requireAuth, (0, roles_1
  *     summary: Delete availability block
  *     tags: [Bookings]
  */
-router.delete('/teachers/:teacherId/availability/:availabilityId', auth_1.requireAuth, (0, roles_1.requireRole)('TUTOR'), async (req, res) => {
+router.delete('/teachers/:teacherId/availability/:availabilityId', auth_1.requireAuth, (0, roles_1.requireRole)('Teacher'), async (req, res) => {
     try {
         const { teacherId, availabilityId } = req.params;
         const userId = req.user?.id;

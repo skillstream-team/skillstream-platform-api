@@ -170,7 +170,17 @@ export class MessagingService {
   async getConversations(
     userId: string,
     filters: ConversationFiltersDto
-  ): Promise<ConversationResponseDto[]> {
+  ): Promise<{
+    data: ConversationResponseDto[];
+    pagination: {
+      page: number;
+      limit: number;
+      total: number;
+      totalPages: number;
+      hasNext: boolean;
+      hasPrev: boolean;
+    };
+  }> {
     try {
       const where: any = {
         participants: {
@@ -192,56 +202,64 @@ export class MessagingService {
         ];
       }
 
-      const conversations = await prisma.conversation.findMany({
-        where,
-        include: {
-          participants: {
-            include: {
-              user: {
-                select: {
-                  id: true,
-                  username: true,
-                  email: true,
+      // Convert offset/limit to page-based if needed
+      const page = filters.page || (filters.offset ? Math.floor((filters.offset || 0) / (filters.limit || 50)) + 1 : 1);
+      const limit = Math.min(filters.limit || 50, 100);
+      const skip = (page - 1) * limit;
+
+      const [conversations, total] = await Promise.all([
+        prisma.conversation.findMany({
+          where,
+          include: {
+            participants: {
+              include: {
+                user: {
+                  select: {
+                    id: true,
+                    username: true,
+                    email: true,
+                  },
+                },
+              },
+            },
+            creator: {
+              select: {
+                id: true,
+                username: true,
+                email: true,
+              },
+            },
+            messages: {
+              take: 1,
+              orderBy: {
+                createdAt: 'desc',
+              },
+              include: {
+                sender: {
+                  select: {
+                    id: true,
+                    username: true,
+                    email: true,
+                  },
+                },
+                receiver: {
+                  select: {
+                    id: true,
+                    username: true,
+                    email: true,
+                  },
                 },
               },
             },
           },
-          creator: {
-            select: {
-              id: true,
-              username: true,
-              email: true,
-            },
+          orderBy: {
+            updatedAt: 'desc',
           },
-          messages: {
-            take: 1,
-            orderBy: {
-              createdAt: 'desc',
-            },
-            include: {
-              sender: {
-                select: {
-                  id: true,
-                  username: true,
-                  email: true,
-                },
-              },
-              receiver: {
-                select: {
-                  id: true,
-                  username: true,
-                  email: true,
-                },
-              },
-            },
-          },
-        },
-        orderBy: {
-          updatedAt: 'desc',
-        },
-        take: filters.limit || 50,
-        skip: filters.offset || 0,
-      });
+          take: limit,
+          skip: skip,
+        }),
+        prisma.conversation.count({ where }),
+      ]);
 
       // Get unread counts for each conversation
       const conversationsWithUnread = await Promise.all(
@@ -265,7 +283,17 @@ export class MessagingService {
         })
       );
 
-      return conversationsWithUnread.map((conv: any) => this.mapConversationToDto(conv));
+      return {
+        data: conversationsWithUnread.map((conv: any) => this.mapConversationToDto(conv)),
+        pagination: {
+          page,
+          limit,
+          total,
+          totalPages: Math.ceil(total / limit),
+          hasNext: page * limit < total,
+          hasPrev: page > 1,
+        },
+      };
     } catch (error) {
       throw new Error(
         `Failed to get conversations: ${error instanceof Error ? error.message : 'Unknown error'}`
@@ -667,7 +695,17 @@ export class MessagingService {
     conversationId: string,
     userId: string,
     filters: MessageFiltersDto
-  ): Promise<MessageResponseDto[]> {
+  ): Promise<{
+    data: MessageResponseDto[];
+    pagination: {
+      page: number;
+      limit: number;
+      total: number;
+      totalPages: number;
+      hasNext: boolean;
+      hasPrev: boolean;
+    };
+  }> {
     try {
       // Verify user is a participant
       const participant = await prisma.conversationParticipant.findFirst({
@@ -695,63 +733,81 @@ export class MessagingService {
         where.createdAt = { ...where.createdAt, gt: filters.after };
       }
 
-      const messages = await prisma.message.findMany({
-        where,
-        include: {
-          sender: {
-            select: {
-              id: true,
-              username: true,
-              email: true,
-            },
-          },
-          receiver: {
-            select: {
-              id: true,
-              username: true,
-              email: true,
-            },
-          },
-          replyTo: {
-            include: {
-              sender: {
-                select: {
-                  id: true,
-                  username: true,
-                  email: true,
-                },
-              },
-            },
-          },
-          reactions: {
-            include: {
-              user: {
-                select: {
-                  id: true,
-                  username: true,
-                },
-              },
-            },
-          },
-          reads: {
-            include: {
-              user: {
-                select: {
-                  id: true,
-                  username: true,
-                },
-              },
-            },
-          },
-        },
-        orderBy: {
-          createdAt: 'desc',
-        },
-        take: filters.limit || 50,
-        skip: filters.offset || 0,
-      });
+      // Convert offset/limit to page-based if needed
+      const page = filters.page || (filters.offset ? Math.floor((filters.offset || 0) / (filters.limit || 50)) + 1 : 1);
+      const limit = Math.min(filters.limit || 50, 100);
+      const skip = (page - 1) * limit;
 
-      return messages.reverse().map((msg: any) => this.mapMessageToDto(msg));
+      const [messages, total] = await Promise.all([
+        prisma.message.findMany({
+          where,
+          include: {
+            sender: {
+              select: {
+                id: true,
+                username: true,
+                email: true,
+              },
+            },
+            receiver: {
+              select: {
+                id: true,
+                username: true,
+                email: true,
+              },
+            },
+            replyTo: {
+              include: {
+                sender: {
+                  select: {
+                    id: true,
+                    username: true,
+                    email: true,
+                  },
+                },
+              },
+            },
+            reactions: {
+              include: {
+                user: {
+                  select: {
+                    id: true,
+                    username: true,
+                  },
+                },
+              },
+            },
+            reads: {
+              include: {
+                user: {
+                  select: {
+                    id: true,
+                    username: true,
+                  },
+                },
+              },
+            },
+          },
+          orderBy: {
+            createdAt: 'desc',
+          },
+          take: limit,
+          skip: skip,
+        }),
+        prisma.message.count({ where }),
+      ]);
+
+      return {
+        data: messages.reverse().map((msg: any) => this.mapMessageToDto(msg)),
+        pagination: {
+          page,
+          limit,
+          total,
+          totalPages: Math.ceil(total / limit),
+          hasNext: page * limit < total,
+          hasPrev: page > 1,
+        },
+      };
     } catch (error) {
       throw new Error(
         `Failed to get messages: ${error instanceof Error ? error.message : 'Unknown error'}`

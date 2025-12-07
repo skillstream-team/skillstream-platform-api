@@ -12,7 +12,7 @@ const router = Router();
  *     summary: Create a quick lesson
  *     tags: [Lessons]
  */
-router.post('/lessons/quick', requireAuth, requireRole('TUTOR'), async (req, res) => {
+router.post('/lessons/quick', requireAuth, requireRole('Teacher'), async (req, res) => {
   try {
     const userId = (req as any).user?.id;
     const { title, description, teacherId, scheduledAt, subject, duration } = req.body;

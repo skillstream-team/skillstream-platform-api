@@ -229,8 +229,8 @@ const calendarQueries = {
           filters.endDate = new Date(filters.endDate);
         }
 
-        const events = await calendarService.getEvents(filters);
-        return events.map(mapEventToGraphQL);
+        const eventsResult = await calendarService.getEvents(filters);
+        return eventsResult.data.map(mapEventToGraphQL);
       } catch (error) {
         throw new Error(`Failed to fetch calendar events: ${error instanceof Error ? error.message : 'Unknown error'}`);
       }

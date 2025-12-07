@@ -123,6 +123,7 @@ export interface ConversationFiltersDto {
   search?: string;
   limit?: number;
   offset?: number;
+  page?: number;
 }
 
 export interface MessageFiltersDto {
@@ -130,6 +131,7 @@ export interface MessageFiltersDto {
   userId: string;
   limit?: number;
   offset?: number;
+  page?: number;
   before?: Date; // Get messages before this date
   after?: Date; // Get messages after this date
 }
@@ -140,6 +142,7 @@ export interface MessageSearchDto {
   query: string;
   limit?: number;
   offset?: number;
+  page?: number;
 }
 
 export interface AddReactionDto {

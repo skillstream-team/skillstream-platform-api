@@ -9,10 +9,10 @@ const router = Router();
  * @swagger
  * /api/users/{userId}/earnings-report:
  *   get:
- *     summary: Get earnings report for a tutor
+ *     summary: Get earnings report for a teacher
  *     tags: [Earnings]
  */
-router.get('/users/:userId/earnings-report', requireAuth, requireRole('TUTOR'), async (req, res) => {
+router.get('/users/:userId/earnings-report', requireAuth, requireRole('Teacher'), async (req, res) => {
   try {
     const { userId } = req.params;
     const currentUserId = (req as any).user?.id;
@@ -27,7 +27,7 @@ router.get('/users/:userId/earnings-report', requireAuth, requireRole('TUTOR'), 
     const endOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0);
     const startOfYear = new Date(now.getFullYear(), 0, 1);
 
-    // Get all payments for courses taught by this tutor
+    // Get all payments for courses taught by this teacher
     const tutorCourses = await prisma.course.findMany({
       where: { instructorId: userId },
       select: { id: true }
@@ -69,7 +69,7 @@ router.get('/users/:userId/earnings-report', requireAuth, requireRole('TUTOR'), 
       }
     });
 
-    // Calculate totals (assuming 80% tutor share, adjust as needed)
+    // Calculate totals (assuming 80% teacher share, adjust as needed)
     const tutorShare = 0.8;
     const calculateTotal = (payments: any[]) => 
       payments.reduce((sum, p) => sum + (p.amount * tutorShare), 0);

@@ -1,6 +1,7 @@
 import { Prisma } from '@prisma/client';
 import { CreateQuizQuestionDto } from '../dtos/learning.dto';
 import { prisma } from '../../../utils/prisma';
+import { getCache, setCache, deleteCache, deleteCachePattern, cacheKeys, CACHE_TTL } from '../../../utils/cache';
 
 export class CoursesService {
     // ============================================================
@@ -44,30 +45,102 @@ export class CoursesService {
         createdBy: string;
         instructorId: string;
     }) {
-        return prisma.course.create({ data });
+        // Validate instructor exists
+        const instructor = await prisma.user.findUnique({
+            where: { id: data.instructorId },
+        });
+        if (!instructor) {
+            throw new Error('Instructor not found');
+        }
+        
+        const course = await prisma.course.create({ data });
+        
+        // Invalidate course list cache
+        await deleteCachePattern('courses:list:*');
+        
+        return course;
     }
 
     /**
      * @swagger
      * /courses:
      *   get:
-     *     summary: Get all courses
+     *     summary: Get all courses (paginated)
      *     tags: [Courses]
+     *     parameters:
+     *       - in: query
+     *         name: page
+     *         schema:
+     *           type: integer
+     *           default: 1
+     *       - in: query
+     *         name: limit
+     *         schema:
+     *           type: integer
+     *           default: 20
+     *           maximum: 100
      *     responses:
      *       200:
-     *         description: List of all courses
+     *         description: Paginated list of courses
      */
-    async getAllCourses() {
-        return prisma.course.findMany({
-            include: {
-                instructor: true,
-                modules: true,
-                lessons: true,
-                quizzes: true,
-                enrollments: { include: { student: true } },
-                payments: true,
+    async getAllCourses(page: number = 1, limit: number = 20) {
+        const cacheKey = cacheKeys.courseList(page, limit);
+        
+        // Try cache first
+        const cached = await getCache(cacheKey);
+        if (cached) {
+            return cached;
+        }
+
+        const skip = (page - 1) * limit;
+        const take = Math.min(limit, 100); // Max 100 per page
+
+        const [courses, total] = await Promise.all([
+            prisma.course.findMany({
+                skip,
+                take,
+                select: {
+                    id: true,
+                    title: true,
+                    description: true,
+                    price: true,
+                    order: true,
+                    createdAt: true,
+                    updatedAt: true,
+                    createdBy: true,
+                    instructorId: true,
+                    instructor: {
+                        select: { id: true, username: true, email: true }
+                    },
+                    _count: {
+                        select: {
+                            enrollments: true,
+                            lessons: true,
+                            quizzes: true,
+                        }
+                    }
+                },
+                orderBy: { createdAt: 'desc' },
+            }),
+            prisma.course.count(),
+        ]);
+
+        const result = {
+            data: courses,
+            pagination: {
+                page,
+                limit: take,
+                total,
+                totalPages: Math.ceil(total / take),
+                hasNext: page * take < total,
+                hasPrev: page > 1,
             },
-        });
+        };
+
+        // Cache result
+        await setCache(cacheKey, result, CACHE_TTL.SHORT);
+        
+        return result;
     }
 
     /**
@@ -88,17 +161,53 @@ export class CoursesService {
      *         description: Course not found
      */
     async getCourseById(id: string) {
-        return prisma.course.findUnique({
+        const cacheKey = cacheKeys.course(id);
+        
+        // Try cache first
+        const cached = await getCache(cacheKey);
+        if (cached) {
+            return cached;
+        }
+
+        const course = await prisma.course.findUnique({
             where: { id },
-            include: {
-                instructor: true,
-                modules: true,
-                lessons: true,
-                quizzes: true,
-                enrollments: { include: { student: true } },
-                payments: true,
+            select: {
+                id: true,
+                title: true,
+                description: true,
+                price: true,
+                order: true,
+                createdAt: true,
+                updatedAt: true,
+                createdBy: true,
+                instructorId: true,
+                instructor: {
+                    select: { id: true, username: true, email: true }
+                },
+                modules: {
+                    select: { id: true, title: true, order: true }
+                },
+                lessons: {
+                    select: { id: true, title: true, order: true }
+                },
+                quizzes: {
+                    select: { id: true, title: true }
+                },
+                _count: {
+                    select: {
+                        enrollments: true,
+                        payments: true,
+                    }
+                }
             },
         });
+
+        if (course) {
+            // Cache result
+            await setCache(cacheKey, course, CACHE_TTL.MEDIUM);
+        }
+
+        return course;
     }
 
     /**
@@ -109,11 +218,39 @@ export class CoursesService {
      *     tags: [Courses]
      */
     async updateCourse(id: string, data: Prisma.CourseUpdateInput) {
-        return prisma.course.update({
+        const course = await prisma.course.update({
             where: { id },
             data,
-            include: { modules: true, lessons: true, quizzes: true },
+            select: {
+                id: true,
+                title: true,
+                description: true,
+                price: true,
+                order: true,
+                createdAt: true,
+                updatedAt: true,
+                createdBy: true,
+                instructorId: true,
+                instructor: {
+                    select: { id: true, username: true, email: true }
+                },
+                modules: {
+                    select: { id: true, title: true, order: true }
+                },
+                lessons: {
+                    select: { id: true, title: true, order: true }
+                },
+                quizzes: {
+                    select: { id: true, title: true }
+                }
+            },
         });
+        
+        // Invalidate caches
+        await deleteCache(cacheKeys.course(id));
+        await deleteCachePattern('courses:list:*');
+        
+        return course;
     }
 
     /**
@@ -124,7 +261,11 @@ export class CoursesService {
      *     tags: [Courses]
      */
     async deleteCourse(id: string) {
-        return prisma.course.delete({ where: { id } });
+        await prisma.course.delete({ where: { id } });
+        
+        // Invalidate caches
+        await deleteCache(cacheKeys.course(id));
+        await deleteCachePattern('courses:list:*');
     }
 
     // ============================================================

@@ -37,7 +37,14 @@ const UserUpdateInputType = new GraphQLInputObjectType({
 const usersQuery = {
   users: {
     type: new GraphQLList(UserType),
-    resolve: async () => await service.getAllUsers(),
+    args: {
+      page: { type: GraphQLInt },
+      limit: { type: GraphQLInt },
+    },
+    resolve: async (_: any, args: any) => {
+      const result = await service.getAllUsers(args.page || 1, args.limit || 20);
+      return result.data;
+    },
   },
   user: {
     type: UserType,

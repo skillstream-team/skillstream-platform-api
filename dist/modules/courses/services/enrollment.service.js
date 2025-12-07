@@ -2,6 +2,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.EnrollmentService = void 0;
 const prisma_1 = require("../../../utils/prisma");
+const cache_1 = require("../../../utils/cache");
 class EnrollmentService {
     /**
      * @swagger
@@ -27,12 +28,20 @@ class EnrollmentService {
      *         description: Student already enrolled or invalid data
      */
     async enrollStudent(data) {
-        const existingEnrollment = await prisma_1.prisma.enrollment.findFirst({
-            where: { courseId: data.courseId, studentId: data.studentId },
-        });
-        if (existingEnrollment)
-            throw new Error('Student is already enrolled in this course');
+        // Use transaction with unique constraint to prevent race conditions
+        // The unique constraint will throw if duplicate enrollment attempted
         const result = await prisma_1.prisma.$transaction(async (tx) => {
+            // Check inside transaction to minimize race condition window
+            // Using findFirst since composite unique constraints in MongoDB need this approach
+            const existingEnrollment = await tx.enrollment.findFirst({
+                where: {
+                    courseId: data.courseId,
+                    studentId: data.studentId
+                },
+            });
+            if (existingEnrollment) {
+                throw new Error('Student is already enrolled in this course');
+            }
             const payment = await tx.payment.create({
                 data: {
                     studentId: data.studentId,
@@ -58,6 +67,8 @@ class EnrollmentService {
             });
             return enrollment;
         });
+        // Invalidate enrollment caches
+        await (0, cache_1.deleteCachePattern)(`enrollments:*`);
         return result;
     }
     /**
@@ -84,18 +95,35 @@ class EnrollmentService {
      *               items:
      *                 $ref: '#/components/schemas/CourseEnrollmentDto'
      */
-    async getCourseEnrollments(courseId) {
-        const enrollments = await prisma_1.prisma.enrollment.findMany({
-            where: { courseId },
-            include: { student: { select: { id: true, username: true, email: true } } },
-            orderBy: { createdAt: 'desc' },
-        });
-        return enrollments.map((enrollment) => ({
-            id: enrollment.student.id,
-            username: enrollment.student.username,
-            email: enrollment.student.email,
-            enrollmentDate: enrollment.createdAt,
-        }));
+    async getCourseEnrollments(courseId, page = 1, limit = 20) {
+        const skip = (page - 1) * limit;
+        const take = Math.min(limit, 100);
+        const [enrollments, total] = await Promise.all([
+            prisma_1.prisma.enrollment.findMany({
+                where: { courseId },
+                skip,
+                take,
+                include: { student: { select: { id: true, username: true, email: true } } },
+                orderBy: { createdAt: 'desc' },
+            }),
+            prisma_1.prisma.enrollment.count({ where: { courseId } }),
+        ]);
+        return {
+            data: enrollments.map((enrollment) => ({
+                id: enrollment.student.id,
+                username: enrollment.student.username,
+                email: enrollment.student.email,
+                enrollmentDate: enrollment.createdAt,
+            })),
+            pagination: {
+                page,
+                limit: take,
+                total,
+                totalPages: Math.ceil(total / take),
+                hasNext: page * take < total,
+                hasPrev: page > 1,
+            },
+        };
     }
     /**
      * @swagger
@@ -154,17 +182,34 @@ class EnrollmentService {
      *               items:
      *                 $ref: '#/components/schemas/EnrollmentResponseDto'
      */
-    async getStudentEnrollments(studentId) {
-        const enrollments = await prisma_1.prisma.enrollment.findMany({
-            where: { studentId },
-            include: {
-                course: { select: { id: true, title: true, price: true } },
-                student: { select: { id: true, username: true, email: true } },
-                payment: true,
+    async getStudentEnrollments(studentId, page = 1, limit = 20) {
+        const skip = (page - 1) * limit;
+        const take = Math.min(limit, 100);
+        const [enrollments, total] = await Promise.all([
+            prisma_1.prisma.enrollment.findMany({
+                where: { studentId },
+                skip,
+                take,
+                include: {
+                    course: { select: { id: true, title: true, price: true } },
+                    student: { select: { id: true, username: true, email: true } },
+                    payment: true,
+                },
+                orderBy: { createdAt: 'desc' },
+            }),
+            prisma_1.prisma.enrollment.count({ where: { studentId } }),
+        ]);
+        return {
+            data: enrollments,
+            pagination: {
+                page,
+                limit: take,
+                total,
+                totalPages: Math.ceil(total / take),
+                hasNext: page * take < total,
+                hasPrev: page > 1,
             },
-            orderBy: { createdAt: 'desc' },
-        });
-        return enrollments;
+        };
     }
     /**
      * @swagger

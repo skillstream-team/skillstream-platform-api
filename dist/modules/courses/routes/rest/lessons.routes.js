@@ -12,7 +12,7 @@ const router = (0, express_1.Router)();
  *     summary: Create a quick lesson
  *     tags: [Lessons]
  */
-router.post('/lessons/quick', auth_1.requireAuth, (0, roles_1.requireRole)('TUTOR'), async (req, res) => {
+router.post('/lessons/quick', auth_1.requireAuth, (0, roles_1.requireRole)('Teacher'), async (req, res) => {
     try {
         const userId = req.user?.id;
         const { title, description, teacherId, scheduledAt, subject, duration } = req.body;

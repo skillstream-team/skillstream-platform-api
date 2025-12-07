@@ -58,21 +58,37 @@ router.get('/', auth_1.requireAuth, async (req, res) => {
                 ]
             });
         }
-        const announcements = await prisma_1.prisma.announcement.findMany({
-            where,
-            include: {
-                creator: {
-                    select: { id: true, username: true, email: true }
+        const page = parseInt(req.query.page) || 1;
+        const limit = Math.min(parseInt(req.query.limit) || 20, 100);
+        const skip = (page - 1) * limit;
+        const [announcements, total] = await Promise.all([
+            prisma_1.prisma.announcement.findMany({
+                where,
+                skip,
+                take: limit,
+                include: {
+                    creator: {
+                        select: { id: true, username: true, email: true }
+                    },
+                    course: {
+                        select: { id: true, title: true }
+                    }
                 },
-                course: {
-                    select: { id: true, title: true }
-                }
-            },
-            orderBy: { createdAt: 'desc' }
-        });
+                orderBy: { createdAt: 'desc' }
+            }),
+            prisma_1.prisma.announcement.count({ where }),
+        ]);
         res.json({
             success: true,
-            data: announcements
+            data: announcements,
+            pagination: {
+                page,
+                limit,
+                total,
+                totalPages: Math.ceil(total / limit),
+                hasNext: page * limit < total,
+                hasPrev: page > 1,
+            }
         });
     }
     catch (error) {
@@ -92,38 +108,55 @@ router.get('/users/:userId/announcements', auth_1.requireAuth, async (req, res) 
         const { userId } = req.params;
         // Get user's enrolled course IDs
         const courseIds = await getUserCourseIds(userId);
-        const announcements = await prisma_1.prisma.announcement.findMany({
-            where: {
-                isActive: true,
-                AND: [
-                    {
-                        OR: [
-                            { scope: 'global' },
-                            { scope: 'user', targetUserId: userId },
-                            { scope: 'course', courseId: { in: courseIds } }
-                        ]
-                    },
-                    {
-                        OR: [
-                            { expiresAt: null },
-                            { expiresAt: { gt: new Date() } }
-                        ]
-                    }
-                ]
-            },
-            include: {
-                creator: {
-                    select: { id: true, username: true, email: true }
+        const page = parseInt(req.query.page) || 1;
+        const limit = Math.min(parseInt(req.query.limit) || 20, 100);
+        const skip = (page - 1) * limit;
+        const where = {
+            isActive: true,
+            AND: [
+                {
+                    OR: [
+                        { scope: 'global' },
+                        { scope: 'user', targetUserId: userId },
+                        { scope: 'course', courseId: { in: courseIds } }
+                    ]
                 },
-                course: {
-                    select: { id: true, title: true }
+                {
+                    OR: [
+                        { expiresAt: null },
+                        { expiresAt: { gt: new Date() } }
+                    ]
                 }
-            },
-            orderBy: { createdAt: 'desc' }
-        });
+            ]
+        };
+        const [announcements, total] = await Promise.all([
+            prisma_1.prisma.announcement.findMany({
+                where,
+                skip,
+                take: limit,
+                include: {
+                    creator: {
+                        select: { id: true, username: true, email: true }
+                    },
+                    course: {
+                        select: { id: true, title: true }
+                    }
+                },
+                orderBy: { createdAt: 'desc' }
+            }),
+            prisma_1.prisma.announcement.count({ where }),
+        ]);
         res.json({
             success: true,
-            data: announcements
+            data: announcements,
+            pagination: {
+                page,
+                limit,
+                total,
+                totalPages: Math.ceil(total / limit),
+                hasNext: page * limit < total,
+                hasPrev: page > 1,
+            }
         });
     }
     catch (error) {
@@ -141,28 +174,45 @@ router.get('/users/:userId/announcements', auth_1.requireAuth, async (req, res) 
 router.get('/courses/:courseId/announcements', auth_1.requireAuth, async (req, res) => {
     try {
         const { courseId } = req.params;
-        const announcements = await prisma_1.prisma.announcement.findMany({
-            where: {
-                courseId,
-                isActive: true,
-                OR: [
-                    { expiresAt: null },
-                    { expiresAt: { gt: new Date() } }
-                ]
-            },
-            include: {
-                creator: {
-                    select: { id: true, username: true, email: true }
+        const page = parseInt(req.query.page) || 1;
+        const limit = Math.min(parseInt(req.query.limit) || 20, 100);
+        const skip = (page - 1) * limit;
+        const where = {
+            courseId,
+            isActive: true,
+            OR: [
+                { expiresAt: null },
+                { expiresAt: { gt: new Date() } }
+            ]
+        };
+        const [announcements, total] = await Promise.all([
+            prisma_1.prisma.announcement.findMany({
+                where,
+                skip,
+                take: limit,
+                include: {
+                    creator: {
+                        select: { id: true, username: true, email: true }
+                    },
+                    course: {
+                        select: { id: true, title: true }
+                    }
                 },
-                course: {
-                    select: { id: true, title: true }
-                }
-            },
-            orderBy: { createdAt: 'desc' }
-        });
+                orderBy: { createdAt: 'desc' }
+            }),
+            prisma_1.prisma.announcement.count({ where }),
+        ]);
         res.json({
             success: true,
-            data: announcements
+            data: announcements,
+            pagination: {
+                page,
+                limit,
+                total,
+                totalPages: Math.ceil(total / limit),
+                hasNext: page * limit < total,
+                hasPrev: page > 1,
+            }
         });
     }
     catch (error) {

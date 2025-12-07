@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { requireAuth } from '../../../../middleware/auth';
 import { prisma } from '../../../../utils/prisma';
+import { certificateService } from '../../services/certificate.service';
 
 const router = Router();
 
@@ -78,25 +79,35 @@ router.get('/courses/:courseId/certificates/:userId/download', requireAuth, asyn
       return res.status(404).json({ error: 'Certificate not found' });
     }
 
-    // TODO: Generate PDF certificate
-    // For now, return certificate data
-    // You would use a PDF generation library like pdfkit or puppeteer here
-    res.json({
-      success: true,
-      message: 'Certificate download endpoint - PDF generation to be implemented',
-      data: certificate
-    });
+    // Generate PDF certificate
+    try {
+      const pdfStream = await certificateService.generatePDFStream({
+        id: certificate.id,
+        student: {
+          username: certificate.student.username || 'Student',
+          email: certificate.student.email || ''
+        },
+        course: {
+          title: certificate.course.title,
+          description: certificate.course.description || undefined
+        },
+        issuedAt: certificate.issuedAt || new Date(),
+        certificateNumber: certificate.id.substring(0, 8).toUpperCase()
+      });
 
-    // Example PDF generation (commented out):
-    // const PDFDocument = require('pdfkit');
-    // const doc = new PDFDocument();
-    // res.setHeader('Content-Type', 'application/pdf');
-    // res.setHeader('Content-Disposition', `attachment; filename="certificate-${certificate.id}.pdf"`);
-    // doc.pipe(res);
-    // doc.text(`Certificate of Completion`, { align: 'center' });
-    // doc.text(`This certifies that ${certificate.student.username}`, { align: 'center' });
-    // doc.text(`has completed the course: ${certificate.course.title}`, { align: 'center' });
-    // doc.end();
+      // Set headers for PDF download
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader(
+        'Content-Disposition',
+        `attachment; filename="certificate-${certificate.course.title.replace(/[^a-z0-9]/gi, '_')}-${certificate.id.substring(0, 8)}.pdf"`
+      );
+
+      // Pipe PDF to response
+      pdfStream.pipe(res);
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+      res.status(500).json({ error: 'Failed to generate PDF certificate' });
+    }
   } catch (error) {
     console.error('Error downloading certificate:', error);
     res.status(500).json({ error: 'Failed to download certificate' });

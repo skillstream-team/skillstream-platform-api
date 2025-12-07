@@ -5,6 +5,7 @@ import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import { generateToken, JWTPayload } from '../../../utils/jwt';
 import { emailService } from './email.service';
+import { getCache, setCache, deleteCachePattern, cacheKeys, CACHE_TTL } from '../../../utils/cache';
 
 const JWT_SECRET = process.env.JWT_SECRET as string;
 if (!JWT_SECRET) {
@@ -121,6 +122,9 @@ export class UsersService {
       // Generate JWT token
       const { password: _, ...userWithoutPassword } = user;
       const token = generateToken({ id: user.id, role: user.role });
+
+      // Invalidate user list cache
+      await deleteCachePattern('users:list:*');
 
       return { token, user: userWithoutPassword };
     } catch (error) {
@@ -367,8 +371,72 @@ export class UsersService {
      *       200:
      *         description: List of users
      */
-    async getAllUsers() {
-        return prisma.user.findMany();
+    /**
+     * @swagger
+     * /users:
+     *   get:
+     *     summary: Get all users (paginated)
+     *     tags: [Users]
+     *     parameters:
+     *       - in: query
+     *         name: page
+     *         schema:
+     *           type: integer
+     *           default: 1
+     *       - in: query
+     *         name: limit
+     *         schema:
+     *           type: integer
+     *           default: 20
+     *           maximum: 100
+     */
+    async getAllUsers(page: number = 1, limit: number = 20) {
+        const cacheKey = `users:list:${page}:${limit}`;
+        
+        // Try cache first
+        const cached = await getCache(cacheKey);
+        if (cached) {
+            return cached;
+        }
+
+        const skip = (page - 1) * limit;
+        const take = Math.min(limit, 100); // Max 100 per page
+
+        const [users, total] = await Promise.all([
+            prisma.user.findMany({
+                skip,
+                take,
+                select: {
+                    id: true,
+                    username: true,
+                    email: true,
+                    role: true,
+                    firstName: true,
+                    lastName: true,
+                    avatar: true,
+                    createdAt: true,
+                },
+                orderBy: { createdAt: 'desc' },
+            }),
+            prisma.user.count(),
+        ]);
+
+        const result = {
+            data: users,
+            pagination: {
+                page,
+                limit: take,
+                total,
+                totalPages: Math.ceil(total / take),
+                hasNext: page * take < total,
+                hasPrev: page > 1,
+            },
+        };
+
+        // Cache result
+        await setCache(cacheKey, result, CACHE_TTL.SHORT);
+        
+        return result;
     }
 
     /**
@@ -391,7 +459,34 @@ export class UsersService {
      *         description: User not found
      */
     async getUserById(id: string) {
-        return prisma.user.findUnique({ where: { id } });
+        const cacheKey = cacheKeys.user(id);
+        
+        // Try cache first
+        const cached = await getCache(cacheKey);
+        if (cached) {
+            return cached;
+        }
+
+        const user = await prisma.user.findUnique({ 
+            where: { id },
+            select: {
+                id: true,
+                username: true,
+                email: true,
+                role: true,
+                firstName: true,
+                lastName: true,
+                avatar: true,
+                createdAt: true,
+                updatedAt: true,
+            }
+        });
+
+        if (user) {
+            await setCache(cacheKey, user, CACHE_TTL.MEDIUM);
+        }
+
+        return user;
     }
 
     /**
@@ -403,7 +498,34 @@ export class UsersService {
      *       - Users
      */
     async getUserProfile(userId: string) {
-        return prisma.user.findUnique({ where: { id: userId } });
+        const cacheKey = cacheKeys.userProfile(userId);
+        
+        // Try cache first
+        const cached = await getCache(cacheKey);
+        if (cached) {
+            return cached;
+        }
+
+        const user = await prisma.user.findUnique({ 
+            where: { id: userId },
+            select: {
+                id: true,
+                username: true,
+                email: true,
+                role: true,
+                firstName: true,
+                lastName: true,
+                avatar: true,
+                createdAt: true,
+                updatedAt: true,
+            }
+        });
+
+        if (user) {
+            await setCache(cacheKey, user, CACHE_TTL.MEDIUM);
+        }
+
+        return user;
     }
 
     /**
@@ -415,7 +537,7 @@ export class UsersService {
      *       - Users
      */
     async getRoles() {
-        return ['ADMIN', 'TUTOR', 'STUDENT'];
+        return ['ADMIN', 'Teacher', 'STUDENT'];
     }
 
     /**

@@ -53,7 +53,7 @@ class RealtimeMessagingService {
                         userId,
                         limit: 100,
                     });
-                    conversations.forEach((conv) => {
+                    conversations.data.forEach((conv) => {
                         socket.join(`conversation-${conv.id}`);
                     });
                     console.log(`User ${userId} joined messaging rooms`);

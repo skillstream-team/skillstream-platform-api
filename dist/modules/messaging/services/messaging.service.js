@@ -164,56 +164,63 @@ class MessagingService {
                     { description: { contains: filters.search, mode: 'insensitive' } },
                 ];
             }
-            const conversations = await prisma_1.prisma.conversation.findMany({
-                where,
-                include: {
-                    participants: {
-                        include: {
-                            user: {
-                                select: {
-                                    id: true,
-                                    username: true,
-                                    email: true,
+            // Convert offset/limit to page-based if needed
+            const page = filters.page || (filters.offset ? Math.floor((filters.offset || 0) / (filters.limit || 50)) + 1 : 1);
+            const limit = Math.min(filters.limit || 50, 100);
+            const skip = (page - 1) * limit;
+            const [conversations, total] = await Promise.all([
+                prisma_1.prisma.conversation.findMany({
+                    where,
+                    include: {
+                        participants: {
+                            include: {
+                                user: {
+                                    select: {
+                                        id: true,
+                                        username: true,
+                                        email: true,
+                                    },
+                                },
+                            },
+                        },
+                        creator: {
+                            select: {
+                                id: true,
+                                username: true,
+                                email: true,
+                            },
+                        },
+                        messages: {
+                            take: 1,
+                            orderBy: {
+                                createdAt: 'desc',
+                            },
+                            include: {
+                                sender: {
+                                    select: {
+                                        id: true,
+                                        username: true,
+                                        email: true,
+                                    },
+                                },
+                                receiver: {
+                                    select: {
+                                        id: true,
+                                        username: true,
+                                        email: true,
+                                    },
                                 },
                             },
                         },
                     },
-                    creator: {
-                        select: {
-                            id: true,
-                            username: true,
-                            email: true,
-                        },
+                    orderBy: {
+                        updatedAt: 'desc',
                     },
-                    messages: {
-                        take: 1,
-                        orderBy: {
-                            createdAt: 'desc',
-                        },
-                        include: {
-                            sender: {
-                                select: {
-                                    id: true,
-                                    username: true,
-                                    email: true,
-                                },
-                            },
-                            receiver: {
-                                select: {
-                                    id: true,
-                                    username: true,
-                                    email: true,
-                                },
-                            },
-                        },
-                    },
-                },
-                orderBy: {
-                    updatedAt: 'desc',
-                },
-                take: filters.limit || 50,
-                skip: filters.offset || 0,
-            });
+                    take: limit,
+                    skip: skip,
+                }),
+                prisma_1.prisma.conversation.count({ where }),
+            ]);
             // Get unread counts for each conversation
             const conversationsWithUnread = await Promise.all(conversations.map(async (conv) => {
                 const participant = conv.participants.find((p) => p.userId === userId);
@@ -232,7 +239,17 @@ class MessagingService {
                     unreadCount,
                 };
             }));
-            return conversationsWithUnread.map((conv) => this.mapConversationToDto(conv));
+            return {
+                data: conversationsWithUnread.map((conv) => this.mapConversationToDto(conv)),
+                pagination: {
+                    page,
+                    limit,
+                    total,
+                    totalPages: Math.ceil(total / limit),
+                    hasNext: page * limit < total,
+                    hasPrev: page > 1,
+                },
+            };
         }
         catch (error) {
             throw new Error(`Failed to get conversations: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -604,62 +621,79 @@ class MessagingService {
             if (filters.after) {
                 where.createdAt = { ...where.createdAt, gt: filters.after };
             }
-            const messages = await prisma_1.prisma.message.findMany({
-                where,
-                include: {
-                    sender: {
-                        select: {
-                            id: true,
-                            username: true,
-                            email: true,
+            // Convert offset/limit to page-based if needed
+            const page = filters.page || (filters.offset ? Math.floor((filters.offset || 0) / (filters.limit || 50)) + 1 : 1);
+            const limit = Math.min(filters.limit || 50, 100);
+            const skip = (page - 1) * limit;
+            const [messages, total] = await Promise.all([
+                prisma_1.prisma.message.findMany({
+                    where,
+                    include: {
+                        sender: {
+                            select: {
+                                id: true,
+                                username: true,
+                                email: true,
+                            },
                         },
-                    },
-                    receiver: {
-                        select: {
-                            id: true,
-                            username: true,
-                            email: true,
+                        receiver: {
+                            select: {
+                                id: true,
+                                username: true,
+                                email: true,
+                            },
                         },
-                    },
-                    replyTo: {
-                        include: {
-                            sender: {
-                                select: {
-                                    id: true,
-                                    username: true,
-                                    email: true,
+                        replyTo: {
+                            include: {
+                                sender: {
+                                    select: {
+                                        id: true,
+                                        username: true,
+                                        email: true,
+                                    },
+                                },
+                            },
+                        },
+                        reactions: {
+                            include: {
+                                user: {
+                                    select: {
+                                        id: true,
+                                        username: true,
+                                    },
+                                },
+                            },
+                        },
+                        reads: {
+                            include: {
+                                user: {
+                                    select: {
+                                        id: true,
+                                        username: true,
+                                    },
                                 },
                             },
                         },
                     },
-                    reactions: {
-                        include: {
-                            user: {
-                                select: {
-                                    id: true,
-                                    username: true,
-                                },
-                            },
-                        },
+                    orderBy: {
+                        createdAt: 'desc',
                     },
-                    reads: {
-                        include: {
-                            user: {
-                                select: {
-                                    id: true,
-                                    username: true,
-                                },
-                            },
-                        },
-                    },
+                    take: limit,
+                    skip: skip,
+                }),
+                prisma_1.prisma.message.count({ where }),
+            ]);
+            return {
+                data: messages.reverse().map((msg) => this.mapMessageToDto(msg)),
+                pagination: {
+                    page,
+                    limit,
+                    total,
+                    totalPages: Math.ceil(total / limit),
+                    hasNext: page * limit < total,
+                    hasPrev: page > 1,
                 },
-                orderBy: {
-                    createdAt: 'desc',
-                },
-                take: filters.limit || 50,
-                skip: filters.offset || 0,
-            });
-            return messages.reverse().map((msg) => this.mapMessageToDto(msg));
+            };
         }
         catch (error) {
             throw new Error(`Failed to get messages: ${error instanceof Error ? error.message : 'Unknown error'}`);

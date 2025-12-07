@@ -1,6 +1,7 @@
 import { CreateEnrollmentDto, EnrollmentResponseDto, CourseEnrollmentDto, CourseStatsDto } from '../dtos/enrollment.dto';
 import { CreatePaymentDto } from '../dtos/payment.dto';
 import { prisma } from '../../../utils/prisma';
+import { deleteCachePattern } from '../../../utils/cache';
 
 export class EnrollmentService {
 
@@ -28,13 +29,21 @@ export class EnrollmentService {
      *         description: Student already enrolled or invalid data
      */
     async enrollStudent(data: CreateEnrollmentDto): Promise<EnrollmentResponseDto> {
-        const existingEnrollment = await prisma.enrollment.findFirst({
-            where: { courseId: data.courseId, studentId: data.studentId },
-        });
-
-        if (existingEnrollment) throw new Error('Student is already enrolled in this course');
-
+        // Use transaction with unique constraint to prevent race conditions
+        // The unique constraint will throw if duplicate enrollment attempted
         const result = await prisma.$transaction(async (tx) => {
+            // Check inside transaction to minimize race condition window
+            // Using findFirst since composite unique constraints in MongoDB need this approach
+            const existingEnrollment = await tx.enrollment.findFirst({
+                where: { 
+                    courseId: data.courseId,
+                    studentId: data.studentId
+                },
+            });
+
+            if (existingEnrollment) {
+                throw new Error('Student is already enrolled in this course');
+            }
             const payment = await tx.payment.create({
                 data: {
                     studentId: data.studentId,
@@ -63,6 +72,9 @@ export class EnrollmentService {
             return enrollment;
         });
 
+        // Invalidate enrollment caches
+        await deleteCachePattern(`enrollments:*`);
+
         return result as EnrollmentResponseDto;
     }
 
@@ -90,19 +102,47 @@ export class EnrollmentService {
      *               items:
      *                 $ref: '#/components/schemas/CourseEnrollmentDto'
      */
-    async getCourseEnrollments(courseId: string): Promise<CourseEnrollmentDto[]> {
-        const enrollments = await prisma.enrollment.findMany({
-            where: { courseId },
-            include: { student: { select: { id: true, username: true, email: true } } },
-            orderBy: { createdAt: 'desc' },
-        });
+    async getCourseEnrollments(courseId: string, page: number = 1, limit: number = 20): Promise<{
+        data: CourseEnrollmentDto[];
+        pagination: {
+            page: number;
+            limit: number;
+            total: number;
+            totalPages: number;
+            hasNext: boolean;
+            hasPrev: boolean;
+        };
+    }> {
+        const skip = (page - 1) * limit;
+        const take = Math.min(limit, 100);
 
-        return enrollments.map((enrollment) => ({
-            id: enrollment.student.id,
-            username: enrollment.student.username,
-            email: enrollment.student.email,
-            enrollmentDate: enrollment.createdAt,
-        }));
+        const [enrollments, total] = await Promise.all([
+            prisma.enrollment.findMany({
+                where: { courseId },
+                skip,
+                take,
+                include: { student: { select: { id: true, username: true, email: true } } },
+                orderBy: { createdAt: 'desc' },
+            }),
+            prisma.enrollment.count({ where: { courseId } }),
+        ]);
+
+        return {
+            data: enrollments.map((enrollment) => ({
+                id: enrollment.student.id,
+                username: enrollment.student.username,
+                email: enrollment.student.email,
+                enrollmentDate: enrollment.createdAt,
+            })),
+            pagination: {
+                page,
+                limit: take,
+                total,
+                totalPages: Math.ceil(total / take),
+                hasNext: page * take < total,
+                hasPrev: page > 1,
+            },
+        };
     }
 
     /**
@@ -164,18 +204,46 @@ export class EnrollmentService {
      *               items:
      *                 $ref: '#/components/schemas/EnrollmentResponseDto'
      */
-    async getStudentEnrollments(studentId: string): Promise<EnrollmentResponseDto[]> {
-        const enrollments = await prisma.enrollment.findMany({
-            where: { studentId },
-            include: {
-                course: { select: { id: true, title: true, price: true } },
-                student: { select: { id: true, username: true, email: true } },
-                payment: true,
-            },
-            orderBy: { createdAt: 'desc' },
-        });
+    async getStudentEnrollments(studentId: string, page: number = 1, limit: number = 20): Promise<{
+        data: EnrollmentResponseDto[];
+        pagination: {
+            page: number;
+            limit: number;
+            total: number;
+            totalPages: number;
+            hasNext: boolean;
+            hasPrev: boolean;
+        };
+    }> {
+        const skip = (page - 1) * limit;
+        const take = Math.min(limit, 100);
 
-        return enrollments as EnrollmentResponseDto[];
+        const [enrollments, total] = await Promise.all([
+            prisma.enrollment.findMany({
+                where: { studentId },
+                skip,
+                take,
+                include: {
+                    course: { select: { id: true, title: true, price: true } },
+                    student: { select: { id: true, username: true, email: true } },
+                    payment: true,
+                },
+                orderBy: { createdAt: 'desc' },
+            }),
+            prisma.enrollment.count({ where: { studentId } }),
+        ]);
+
+        return {
+            data: enrollments as EnrollmentResponseDto[],
+            pagination: {
+                page,
+                limit: take,
+                total,
+                totalPages: Math.ceil(total / take),
+                hasNext: page * take < total,
+                hasPrev: page > 1,
+            },
+        };
     }
 
     /**

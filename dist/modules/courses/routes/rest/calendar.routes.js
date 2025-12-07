@@ -4,6 +4,8 @@ const express_1 = require("express");
 const calendar_service_1 = require("../../services/calendar.service");
 const auth_1 = require("../../../../middleware/auth");
 const roles_1 = require("../../../../middleware/roles");
+const validation_1 = require("../../../../middleware/validation");
+const validation_schemas_1 = require("../../../../utils/validation-schemas");
 const router = (0, express_1.Router)();
 const calendarService = new calendar_service_1.CalendarService();
 /**
@@ -68,7 +70,7 @@ const calendarService = new calendar_service_1.CalendarService();
  *       500:
  *         description: Server error
  */
-router.post('/events', auth_1.requireAuth, async (req, res) => {
+router.post('/events', auth_1.requireAuth, (0, validation_1.validate)({ body: validation_schemas_1.createCalendarEventSchema }), async (req, res) => {
     try {
         const userId = req.user?.id;
         if (!userId) {
@@ -146,7 +148,7 @@ router.post('/events', auth_1.requireAuth, async (req, res) => {
  *       500:
  *         description: Server error
  */
-router.put('/events/:eventId', auth_1.requireAuth, async (req, res) => {
+router.put('/events/:eventId', auth_1.requireAuth, (0, validation_1.validate)({ params: validation_schemas_1.idParamSchema, body: validation_schemas_1.updateCalendarEventSchema }), async (req, res) => {
     try {
         const userId = req.user?.id;
         const eventId = req.params.eventId;
@@ -202,7 +204,7 @@ router.put('/events/:eventId', auth_1.requireAuth, async (req, res) => {
  *       500:
  *         description: Server error
  */
-router.delete('/events/:eventId', auth_1.requireAuth, async (req, res) => {
+router.delete('/events/:eventId', auth_1.requireAuth, (0, validation_1.validate)({ params: validation_schemas_1.idParamSchema }), async (req, res) => {
     try {
         const userId = req.user?.id;
         const eventId = req.params.eventId;
@@ -277,13 +279,14 @@ router.get('/events', auth_1.requireAuth, async (req, res) => {
             type: req.query.type,
             startDate: req.query.startDate ? new Date(req.query.startDate) : undefined,
             endDate: req.query.endDate ? new Date(req.query.endDate) : undefined,
-            includeAllDay: req.query.includeAllDay ? req.query.includeAllDay === 'true' : undefined
+            includeAllDay: req.query.includeAllDay ? req.query.includeAllDay === 'true' : undefined,
+            page: req.query.page ? parseInt(req.query.page) : undefined,
+            limit: req.query.limit ? parseInt(req.query.limit) : undefined,
         };
-        const events = await calendarService.getEvents(filters);
+        const result = await calendarService.getEvents(filters);
         res.json({
             success: true,
-            data: events,
-            count: events.length
+            ...result
         });
     }
     catch (error) {

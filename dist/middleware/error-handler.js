@@ -3,6 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.asyncHandler = exports.errorHandler = void 0;
 exports.createError = createError;
 const client_1 = require("@prisma/client");
+const sentry_1 = require("../utils/sentry");
 /**
  * Global error handling middleware
  * Handles all errors and returns appropriate responses
@@ -15,6 +16,34 @@ const errorHandler = (err, req, res, next) => {
         path: req.path,
         method: req.method,
     });
+    // Send to Sentry in production (only for server errors, not client errors)
+    const appError = err;
+    const statusCode = appError.statusCode || 500;
+    // Only send server errors (5xx) to Sentry, not client errors (4xx)
+    if (statusCode >= 500) {
+        (0, sentry_1.captureException)(err, {
+            user: req.user ? {
+                id: req.user.id,
+                email: req.user.email,
+                username: req.user.username,
+            } : undefined,
+            tags: {
+                path: req.path,
+                method: req.method,
+                statusCode: statusCode.toString(),
+                requestId: req.requestId || 'unknown',
+            },
+            extra: {
+                requestId: req.requestId,
+                query: req.query,
+                body: req.body,
+                headers: {
+                    'user-agent': req.get('user-agent'),
+                    'content-type': req.get('content-type'),
+                },
+            },
+        });
+    }
     // Prisma errors
     if (err instanceof client_1.Prisma.PrismaClientKnownRequestError) {
         if (err.code === 'P2002') {
@@ -40,9 +69,7 @@ const errorHandler = (err, req, res, next) => {
             message: 'Invalid data provided',
         });
     }
-    // Custom application errors
-    const appError = err;
-    const statusCode = appError.statusCode || 500;
+    // Custom application errors (statusCode already set above)
     const message = appError.isOperational || process.env.NODE_ENV === 'development'
         ? err.message
         : 'An internal server error occurred';

@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { prisma } from '../utils/prisma';
+import { setUser } from '../utils/sentry';
 
 interface AuthenticatedRequest extends Request {
   user?: {
@@ -43,6 +44,14 @@ export const requireAuth = async (req: AuthenticatedRequest, res: Response, next
     }
 
     req.user = user;
+    
+    // Set user context in Sentry for error tracking
+    setUser({
+      id: user.id,
+      email: user.email,
+      username: user.username,
+    });
+    
     next();
   } catch (error) {
     res.status(401).json({ error: 'Invalid token.' });

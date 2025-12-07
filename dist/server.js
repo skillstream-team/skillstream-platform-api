@@ -1,4 +1,37 @@
 "use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
@@ -18,8 +51,16 @@ const env_1 = require("./utils/env");
 const error_handler_1 = require("./middleware/error-handler");
 const security_1 = require("./middleware/security");
 const logger_1 = require("./middleware/logger");
+const request_id_1 = require("./middleware/request-id");
 const prisma_1 = require("./utils/prisma");
 const redis_1 = __importDefault(require("./utils/redis"));
+const sentry_1 = require("./utils/sentry");
+const Sentry = __importStar(require("@sentry/node"));
+const compression_1 = __importDefault(require("compression"));
+const rate_limit_1 = require("./middleware/rate-limit");
+const timeout_1 = require("./middleware/timeout");
+// Initialize Sentry FIRST (before anything else that might throw)
+(0, sentry_1.initSentry)();
 // Validate environment variables on startup
 try {
     (0, env_1.validateEnv)();
@@ -38,13 +79,41 @@ const io = new socket_io_1.Server(server, {
     transports: ['websocket', 'polling'],
 });
 exports.io = io;
+// Add Redis adapter for Socket.IO if Redis is available (enables horizontal scaling)
+if (redis_1.default) {
+    try {
+        // For Socket.IO v4, we use the Redis adapter
+        // Note: socket.io-redis package is for v3, for v4 we need @socket.io/redis-adapter
+        // For now, we'll use the built-in Redis adapter pattern
+        const { createAdapter } = require("@socket.io/redis-adapter");
+        const pubClient = redis_1.default;
+        const subClient = redis_1.default.duplicate();
+        io.adapter(createAdapter(pubClient, subClient));
+        console.log("✅ Socket.IO Redis adapter enabled for horizontal scaling");
+    }
+    catch (error) {
+        console.warn("⚠️  Redis adapter not available. Socket.IO will use in-memory adapter.");
+        console.warn("   Install @socket.io/redis-adapter for horizontal scaling support.");
+    }
+}
 // Initialize admin messaging service with io instance
 (0, admin_messaging_service_1.setSocketIO)(io);
 const PORT = parseInt(env_1.env.PORT, 10);
-// Security middleware (must be first)
+// Sentry request handlers (must be before other middleware)
+// Note: In Sentry v8+, request handling is done via integrations
+// The expressIntegration handles this automatically
+// Request ID tracking (must be early)
+app.use(request_id_1.requestId);
+// Compression middleware
+app.use((0, compression_1.default)());
+// Security middleware
 app.use(security_1.securityHeaders);
 // CORS
 app.use((0, cors_1.default)(security_1.corsOptions));
+// General rate limiting (applied to all routes)
+app.use(rate_limit_1.generalRateLimiter);
+// Request timeout (30 seconds default)
+app.use((0, timeout_1.requestTimeout)(30000));
 // Request logging
 app.use(logger_1.requestLogger);
 // Body parsing with size limits
@@ -189,11 +258,35 @@ process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 // Handle unhandled errors
 process.on('unhandledRejection', (reason, promise) => {
     console.error('❌ Unhandled Rejection at:', promise, 'reason:', reason);
+    // Send to Sentry in production
+    if (process.env.NODE_ENV === 'production' && process.env.SENTRY_DSN) {
+        Sentry.captureException(reason, {
+            tags: {
+                type: 'unhandledRejection',
+            },
+        });
+    }
 });
 process.on('uncaughtException', (error) => {
     console.error('❌ Uncaught Exception:', error);
-    gracefulShutdown('uncaughtException');
+    // Send to Sentry in production before shutdown
+    if (process.env.NODE_ENV === 'production' && process.env.SENTRY_DSN) {
+        Sentry.captureException(error, {
+            tags: {
+                type: 'uncaughtException',
+            },
+        });
+        // Flush Sentry before shutdown
+        Sentry.flush(2000).then(() => {
+            gracefulShutdown('uncaughtException');
+        });
+    }
+    else {
+        gracefulShutdown('uncaughtException');
+    }
 });
+// Sentry error handler (before global error handler)
+// Note: Error handling is done via our custom errorHandler middleware
 // Global error handler (must be last)
 app.use(error_handler_1.errorHandler);
 //

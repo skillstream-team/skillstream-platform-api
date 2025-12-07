@@ -5,6 +5,8 @@ const express_1 = require("express");
 const messaging_service_1 = require("../../services/messaging.service");
 const file_upload_service_1 = require("../../services/file-upload.service");
 const auth_1 = require("../../../../middleware/auth");
+const validation_1 = require("../../../../middleware/validation");
+const validation_schemas_1 = require("../../../../utils/validation-schemas");
 const router = (0, express_1.Router)();
 const messagingService = new messaging_service_1.MessagingService();
 const fileUploadService = new file_upload_service_1.MessagingFileUploadService();
@@ -47,7 +49,7 @@ const fileUploadService = new file_upload_service_1.MessagingFileUploadService()
  *       500:
  *         description: Server error
  */
-router.post('/conversations', auth_1.requireAuth, async (req, res) => {
+router.post('/conversations', auth_1.requireAuth, (0, validation_1.validate)({ body: validation_schemas_1.createConversationSchema }), async (req, res) => {
     try {
         const userId = req.user?.id;
         if (!userId) {
@@ -110,17 +112,17 @@ router.get('/conversations', auth_1.requireAuth, async (req, res) => {
         if (!userId) {
             return res.status(401).json({ error: 'User not authenticated' });
         }
-        const conversations = await messagingService.getConversations(userId, {
+        const result = await messagingService.getConversations(userId, {
             userId,
             type: req.query.type,
             search: req.query.search,
+            page: req.query.page ? parseInt(req.query.page) : undefined,
             limit: req.query.limit ? parseInt(req.query.limit) : undefined,
             offset: req.query.offset ? parseInt(req.query.offset) : undefined,
         });
         res.json({
             success: true,
-            data: conversations,
-            count: conversations.length,
+            ...result
         });
     }
     catch (error) {
@@ -433,7 +435,7 @@ router.delete('/conversations/:conversationId/participants/:participantId', auth
  *       500:
  *         description: Server error
  */
-router.post('/messages', auth_1.requireAuth, async (req, res) => {
+router.post('/messages', auth_1.requireAuth, (0, validation_1.validate)({ body: validation_schemas_1.createMessageSchema }), async (req, res) => {
     try {
         const userId = req.user?.id;
         if (!userId) {
@@ -507,9 +509,10 @@ router.get('/conversations/:conversationId/messages', auth_1.requireAuth, async 
         if (!conversationId) {
             return res.status(400).json({ error: 'Invalid conversation ID' });
         }
-        const messages = await messagingService.getMessages(conversationId, userId, {
+        const result = await messagingService.getMessages(conversationId, userId, {
             conversationId,
             userId,
+            page: req.query.page ? parseInt(req.query.page) : undefined,
             limit: req.query.limit ? parseInt(req.query.limit) : undefined,
             offset: req.query.offset ? parseInt(req.query.offset) : undefined,
             before: req.query.before ? new Date(req.query.before) : undefined,
@@ -517,8 +520,7 @@ router.get('/conversations/:conversationId/messages', auth_1.requireAuth, async 
         });
         res.json({
             success: true,
-            data: messages,
-            count: messages.length,
+            ...result,
         });
     }
     catch (error) {

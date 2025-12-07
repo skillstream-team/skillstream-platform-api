@@ -53,9 +53,13 @@ const CourseType = new GraphQLObjectType({
 const coursesQuery = {
   courses: {
     type: new GraphQLList(CourseType),
-    resolve: async () => {
-      const courses = await service.getAllCourses();
-      return (courses as any[]).map((course: any) => ({
+    args: {
+      page: { type: GraphQLInt },
+      limit: { type: GraphQLInt },
+    },
+    resolve: async (_: any, args: any) => {
+      const result = await service.getAllCourses(args.page || 1, args.limit || 20);
+      return (result.data as any[]).map((course: any) => ({
         ...course,
         id: Number(course.id),
         enrolledCount: course.enrollments?.length || 0,
@@ -99,9 +103,18 @@ const coursesQuery = {
   },
   courseEnrollments: {
     type: new GraphQLList(CourseEnrollmentType),
-    args: { courseId: { type: new GraphQLNonNull(GraphQLInt) } },
+    args: { 
+      courseId: { type: new GraphQLNonNull(GraphQLInt) },
+      page: { type: GraphQLInt },
+      limit: { type: GraphQLInt },
+    },
     resolve: async (_: any, args: any) => {
-      return await enrollmentService.getCourseEnrollments(String(args.courseId));
+      const result = await enrollmentService.getCourseEnrollments(
+        String(args.courseId),
+        args.page || 1,
+        args.limit || 20
+      );
+      return result.data;
     },
   },
   courseStats: {

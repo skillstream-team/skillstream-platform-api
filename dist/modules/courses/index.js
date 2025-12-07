@@ -17,7 +17,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.calendarSchema = exports.recommendationSchema = exports.mediaSchema = exports.enrollmentSchema = exports.coursesSchema = exports.CalendarService = exports.RecommendationService = exports.RealtimeService = exports.CloudflareStreamService = exports.CloudflareR2Service = exports.MediaService = exports.PaymentService = exports.EnrollmentService = exports.CoursesService = void 0;
+exports.calendarSchema = exports.recommendationSchema = exports.mediaSchema = exports.enrollmentSchema = exports.coursesSchema = exports.PollService = exports.CalendarService = exports.RecommendationService = exports.RealtimeService = exports.CloudflareStreamService = exports.CloudflareR2Service = exports.MediaService = exports.PaymentService = exports.EnrollmentService = exports.CoursesService = void 0;
 exports.registerCoursesModule = registerCoursesModule;
 const express_graphql_1 = require("express-graphql");
 const courses_routes_1 = __importDefault(require("./routes/rest/courses.routes"));
@@ -34,6 +34,7 @@ const video_routes_1 = __importDefault(require("./routes/rest/video.routes"));
 const marketing_routes_1 = __importDefault(require("./routes/rest/marketing.routes"));
 const calendar_routes_1 = __importDefault(require("./routes/rest/calendar.routes"));
 const recommendations_routes_1 = __importDefault(require("./routes/rest/recommendations.routes"));
+const polls_routes_1 = __importDefault(require("./routes/rest/polls.routes"));
 const course_resolver_1 = require("./routes/graphql/course.resolver");
 Object.defineProperty(exports, "coursesSchema", { enumerable: true, get: function () { return course_resolver_1.coursesSchema; } });
 const enrollment_resolver_1 = require("./routes/graphql/enrollment.resolver");
@@ -60,6 +61,7 @@ function registerCoursesModule(app) {
     app.use('/api', marketing_routes_1.default);
     app.use('/api/calendar', calendar_routes_1.default);
     app.use('/api/recommendations', recommendations_routes_1.default);
+    app.use('/api/polls', polls_routes_1.default);
     // GraphQL endpoints
     app.use('/graphql/courses', (0, express_graphql_1.graphqlHTTP)({
         schema: course_resolver_1.coursesSchema,
@@ -100,6 +102,8 @@ var recommendation_service_1 = require("./services/recommendation.service");
 Object.defineProperty(exports, "RecommendationService", { enumerable: true, get: function () { return recommendation_service_1.RecommendationService; } });
 var calendar_service_1 = require("./services/calendar.service");
 Object.defineProperty(exports, "CalendarService", { enumerable: true, get: function () { return calendar_service_1.CalendarService; } });
+var poll_service_1 = require("./services/poll.service");
+Object.defineProperty(exports, "PollService", { enumerable: true, get: function () { return poll_service_1.PollService; } });
 __exportStar(require("./dtos/enrollment.dto"), exports);
 __exportStar(require("./dtos/payment.dto"), exports);
 __exportStar(require("./dtos/media.dto"), exports);

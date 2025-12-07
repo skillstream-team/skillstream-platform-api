@@ -6,6 +6,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.optionalAuth = exports.requireAuth = void 0;
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const prisma_1 = require("../utils/prisma");
+const sentry_1 = require("../utils/sentry");
 const requireAuth = async (req, res, next) => {
     try {
         const token = req.header('Authorization')?.replace('Bearer ', '');
@@ -32,6 +33,12 @@ const requireAuth = async (req, res, next) => {
             return res.status(401).json({ error: 'Invalid token. User not found.' });
         }
         req.user = user;
+        // Set user context in Sentry for error tracking
+        (0, sentry_1.setUser)({
+            id: user.id,
+            email: user.email,
+            username: user.username,
+        });
         next();
     }
     catch (error) {

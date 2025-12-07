@@ -2,6 +2,8 @@ import { Router } from 'express';
 import { CalendarService } from '../../services/calendar.service';
 import { requireAuth } from '../../../../middleware/auth';
 import { requireRole } from '../../../../middleware/roles';
+import { validate } from '../../../../middleware/validation';
+import { createCalendarEventSchema, updateCalendarEventSchema, idParamSchema } from '../../../../utils/validation-schemas';
 
 const router = Router();
 const calendarService = new CalendarService();
@@ -68,29 +70,33 @@ const calendarService = new CalendarService();
  *       500:
  *         description: Server error
  */
-router.post('/events', requireAuth, async (req, res) => {
-  try {
-    const userId = (req as any).user?.id;
-    if (!userId) {
-      return res.status(401).json({ error: 'User not authenticated' });
+router.post('/events', 
+  requireAuth,
+  validate({ body: createCalendarEventSchema }),
+  async (req, res) => {
+    try {
+      const userId = (req as any).user?.id;
+      if (!userId) {
+        return res.status(401).json({ error: 'User not authenticated' });
+      }
+
+      const eventData = {
+        ...req.body,
+        startTime: new Date(req.body.startTime),
+        endTime: req.body.endTime ? new Date(req.body.endTime) : undefined
+      };
+
+      const event = await calendarService.createEvent(userId, eventData);
+      res.status(201).json({
+        success: true,
+        data: event
+      });
+    } catch (error) {
+      console.error('Error creating event:', error);
+      res.status(500).json({ error: 'Failed to create event' });
     }
-
-    const eventData = {
-      ...req.body,
-      startTime: new Date(req.body.startTime),
-      endTime: req.body.endTime ? new Date(req.body.endTime) : undefined
-    };
-
-    const event = await calendarService.createEvent(userId, eventData);
-    res.status(201).json({
-      success: true,
-      data: event
-    });
-  } catch (error) {
-    console.error('Error creating event:', error);
-    res.status(500).json({ error: 'Failed to create event' });
   }
-});
+);
 
 /**
  * @swagger
@@ -148,7 +154,10 @@ router.post('/events', requireAuth, async (req, res) => {
  *       500:
  *         description: Server error
  */
-router.put('/events/:eventId', requireAuth, async (req, res) => {
+router.put('/events/:eventId', 
+  requireAuth,
+  validate({ params: idParamSchema, body: updateCalendarEventSchema }),
+  async (req, res) => {
   try {
     const userId = (req as any).user?.id;
     const eventId = req.params.eventId;
@@ -207,7 +216,10 @@ router.put('/events/:eventId', requireAuth, async (req, res) => {
  *       500:
  *         description: Server error
  */
-router.delete('/events/:eventId', requireAuth, async (req, res) => {
+router.delete('/events/:eventId', 
+  requireAuth,
+  validate({ params: idParamSchema }),
+  async (req, res) => {
   try {
     const userId = (req as any).user?.id;
     const eventId = req.params.eventId;
@@ -285,14 +297,15 @@ router.get('/events', requireAuth, async (req, res) => {
       type: req.query.type as string,
       startDate: req.query.startDate ? new Date(req.query.startDate as string) : undefined,
       endDate: req.query.endDate ? new Date(req.query.endDate as string) : undefined,
-      includeAllDay: req.query.includeAllDay ? req.query.includeAllDay === 'true' : undefined
+      includeAllDay: req.query.includeAllDay ? req.query.includeAllDay === 'true' : undefined,
+      page: req.query.page ? parseInt(req.query.page as string) : undefined,
+      limit: req.query.limit ? parseInt(req.query.limit as string) : undefined,
     };
 
-    const events = await calendarService.getEvents(filters);
+    const result = await calendarService.getEvents(filters);
     res.json({
       success: true,
-      data: events,
-      count: events.length
+      ...result
     });
   } catch (error) {
     console.error('Error fetching events:', error);

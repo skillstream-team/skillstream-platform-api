@@ -129,6 +129,96 @@ class RealtimeService {
                 });
                 console.log(`Stream ${streamId} status changed to ${status}`);
             });
+            // ===========================================
+            // WHITEBOARD EVENTS
+            // ===========================================
+            // Join whiteboard room
+            socket.on('join_whiteboard', (data) => {
+                const { whiteboardId } = data;
+                socket.join(`whiteboard:${whiteboardId}`);
+                console.log(`User ${socket.id} joined whiteboard ${whiteboardId}`);
+            });
+            // Leave whiteboard room
+            socket.on('leave_whiteboard', (data) => {
+                const { whiteboardId } = data;
+                socket.leave(`whiteboard:${whiteboardId}`);
+                console.log(`User ${socket.id} left whiteboard ${whiteboardId}`);
+            });
+            // Handle whiteboard drawing actions
+            socket.on('whiteboard_action', (data) => {
+                const { whiteboardId, actionType, data: actionData, userId } = data;
+                // Broadcast action to all users in the whiteboard room (except sender)
+                socket.to(`whiteboard:${whiteboardId}`).emit('whiteboard_action_received', {
+                    type: 'whiteboard_action',
+                    data: {
+                        whiteboardId,
+                        actionType,
+                        data: actionData,
+                        userId,
+                        timestamp: new Date(),
+                    }
+                });
+                console.log(`Whiteboard action ${actionType} on ${whiteboardId} by user ${userId}`);
+            });
+            // Handle whiteboard clear
+            socket.on('whiteboard_clear', (data) => {
+                const { whiteboardId, userId } = data;
+                // Broadcast clear to all users in the whiteboard room
+                this.io.to(`whiteboard:${whiteboardId}`).emit('whiteboard_cleared', {
+                    type: 'whiteboard_clear',
+                    data: {
+                        whiteboardId,
+                        clearedBy: userId,
+                        timestamp: new Date(),
+                    }
+                });
+                console.log(`Whiteboard ${whiteboardId} cleared by user ${userId}`);
+            });
+            // ===========================================
+            // WHITEBOARD EVENTS
+            // ===========================================
+            // Join whiteboard room
+            socket.on('join_whiteboard', (data) => {
+                const { whiteboardId } = data;
+                socket.join(`whiteboard:${whiteboardId}`);
+                console.log(`User ${socket.id} joined whiteboard ${whiteboardId}`);
+            });
+            // Leave whiteboard room
+            socket.on('leave_whiteboard', (data) => {
+                const { whiteboardId } = data;
+                socket.leave(`whiteboard:${whiteboardId}`);
+                console.log(`User ${socket.id} left whiteboard ${whiteboardId}`);
+            });
+            // Handle whiteboard drawing actions
+            socket.on('whiteboard_action', (data) => {
+                const { whiteboardId, userId, actionType, data: actionData } = data;
+                // Broadcast action to all whiteboard viewers (except sender)
+                socket.to(`whiteboard:${whiteboardId}`).emit('whiteboard_action_received', {
+                    type: 'whiteboard_action',
+                    data: {
+                        whiteboardId,
+                        userId,
+                        actionType,
+                        data: actionData,
+                        timestamp: new Date(),
+                    }
+                });
+                console.log(`Whiteboard action ${actionType} on whiteboard ${whiteboardId} by user ${userId}`);
+            });
+            // Handle whiteboard clear
+            socket.on('whiteboard_clear', (data) => {
+                const { whiteboardId, userId } = data;
+                // Broadcast clear to all whiteboard viewers
+                this.io.to(`whiteboard:${whiteboardId}`).emit('whiteboard_cleared', {
+                    type: 'whiteboard_clear',
+                    data: {
+                        whiteboardId,
+                        clearedBy: userId,
+                        timestamp: new Date(),
+                    }
+                });
+                console.log(`Whiteboard ${whiteboardId} cleared by user ${userId}`);
+            });
             // Handle disconnection
             socket.on('disconnect', () => {
                 const streamId = this.userStreams.get(socket.id);

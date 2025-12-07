@@ -47,10 +47,10 @@ router.get('/users/:userId/progress', requireAuth, async (req, res) => {
       enrollments.map(async (enrollment: any) => {
         const [progress, total] = await Promise.all([
           prisma.progress.findMany({
-            where: {
-              studentId: userId,
-              courseId: enrollment.courseId
-            },
+          where: {
+            studentId: userId,
+            courseId: enrollment.courseId
+          },
             skip,
             take: limit,
             select: {
@@ -70,7 +70,7 @@ router.get('/users/:userId/progress', requireAuth, async (req, res) => {
             where: {
               studentId: userId,
               courseId: enrollment.courseId
-            }
+          }
           })
         ]);
         return {
@@ -240,10 +240,10 @@ router.get('/courses/:courseId/progress', requireAuth, async (req, res) => {
 
     const [progress, total] = await Promise.all([
       prisma.progress.findMany({
-        where: {
-          studentId: userId,
-          courseId: courseId
-        },
+      where: {
+        studentId: userId,
+        courseId: courseId
+      },
         skip,
         take: limit,
         select: {
@@ -263,7 +263,7 @@ router.get('/courses/:courseId/progress', requireAuth, async (req, res) => {
         where: {
           studentId: userId,
           courseId: courseId
-        }
+      }
       })
     ]);
     

@@ -14,12 +14,12 @@ router.post('/auth/login',
   loginRateLimiter,
   validate({ body: loginSchema }),
   async (req, res) => {
-    try {
-      const user = await service.login(req.body);
-      res.json(user);
-    } catch (error) {
-      res.status(401).json({ error: (error as Error).message });
-    }
+  try {
+    const user = await service.login(req.body);
+    res.json(user);
+  } catch (error) {
+    res.status(401).json({ error: (error as Error).message });
+  }
   }
 );
 
@@ -28,12 +28,12 @@ router.post('/auth/register',
   registrationRateLimiter,
   validate({ body: createUserSchema }),
   async (req, res) => {
-    try {
-      const user = await service.createUser(req.body);
-      res.status(201).json(user);
-    } catch (error) {
-      res.status(400).json({ error: (error as Error).message });
-    }
+  try {
+    const user = await service.createUser(req.body);
+    res.status(201).json(user);
+  } catch (error) {
+    res.status(400).json({ error: (error as Error).message });
+  }
   }
 );
 
@@ -41,12 +41,12 @@ router.post('/auth/register',
 router.post('/auth/refresh-token', 
   validate({ body: refreshTokenSchema }),
   async (req, res) => {
-    try {
-      const user = await service.refreshToken(req.body.token);
-      res.json(user);
-    } catch (error) {
-      res.status(401).json({ error: (error as Error).message });
-    }
+  try {
+    const user = await service.refreshToken(req.body.token);
+    res.json(user);
+  } catch (error) {
+    res.status(401).json({ error: (error as Error).message });
+  }
   }
 );
 
@@ -55,12 +55,12 @@ router.post('/auth/forgot-password',
   passwordResetRateLimiter,
   validate({ body: forgotPasswordSchema }),
   async (req, res) => {
-    try {
-      const user = await service.forgotPassword(req.body.email);
-      res.json(user);
-    } catch (error) {
-      res.status(404).json({ error: (error as Error).message });
-    }
+  try {
+    const user = await service.forgotPassword(req.body.email);
+    res.json(user);
+  } catch (error) {
+    res.status(404).json({ error: (error as Error).message });
+  }
   }
 );
 
@@ -69,12 +69,12 @@ router.post('/auth/reset-password',
   passwordResetRateLimiter,
   validate({ body: resetPasswordSchema }),
   async (req, res) => {
-    try {
-      const user = await service.resetPassword(req.body);
-      res.json(user);
-    } catch (error) {
-      res.status(400).json({ error: (error as Error).message });
-    }
+  try {
+    const user = await service.resetPassword(req.body);
+    res.json(user);
+  } catch (error) {
+    res.status(400).json({ error: (error as Error).message });
+  }
   }
 );
 

@@ -65,18 +65,18 @@ router.get('/', requireAuth, async (req, res) => {
 
     const [announcements, total] = await Promise.all([
       prisma.announcement.findMany({
-        where,
+      where,
         skip,
         take: limit,
-        include: {
-          creator: {
-            select: { id: true, username: true, email: true }
-          },
-          course: {
-            select: { id: true, title: true }
-          }
+      include: {
+        creator: {
+          select: { id: true, username: true, email: true }
         },
-        orderBy: { createdAt: 'desc' }
+        course: {
+          select: { id: true, title: true }
+        }
+      },
+      orderBy: { createdAt: 'desc' }
       }),
       prisma.announcement.count({ where }),
     ]);
@@ -118,22 +118,22 @@ router.get('/users/:userId/announcements', requireAuth, async (req, res) => {
     const skip = (page - 1) * limit;
 
     const where = {
-      isActive: true,
-      AND: [
-        {
-          OR: [
-            { scope: 'global' },
-            { scope: 'user', targetUserId: userId },
-            { scope: 'course', courseId: { in: courseIds } }
-          ]
-        },
-        {
-          OR: [
-            { expiresAt: null },
-            { expiresAt: { gt: new Date() } }
-          ]
-        }
-      ]
+        isActive: true,
+        AND: [
+          {
+            OR: [
+              { scope: 'global' },
+              { scope: 'user', targetUserId: userId },
+              { scope: 'course', courseId: { in: courseIds } }
+            ]
+          },
+          {
+            OR: [
+              { expiresAt: null },
+              { expiresAt: { gt: new Date() } }
+            ]
+          }
+        ]
     };
 
     const [announcements, total] = await Promise.all([
@@ -141,15 +141,15 @@ router.get('/users/:userId/announcements', requireAuth, async (req, res) => {
         where,
         skip,
         take: limit,
-        include: {
-          creator: {
-            select: { id: true, username: true, email: true }
-          },
-          course: {
-            select: { id: true, title: true }
-          }
+      include: {
+        creator: {
+          select: { id: true, username: true, email: true }
         },
-        orderBy: { createdAt: 'desc' }
+        course: {
+          select: { id: true, title: true }
+        }
+      },
+      orderBy: { createdAt: 'desc' }
       }),
       prisma.announcement.count({ where }),
     ]);
@@ -188,12 +188,12 @@ router.get('/courses/:courseId/announcements', requireAuth, async (req, res) => 
     const skip = (page - 1) * limit;
 
     const where = {
-      courseId,
-      isActive: true,
-      OR: [
-        { expiresAt: null },
-        { expiresAt: { gt: new Date() } }
-      ]
+        courseId,
+        isActive: true,
+        OR: [
+          { expiresAt: null },
+          { expiresAt: { gt: new Date() } }
+        ]
     };
 
     const [announcements, total] = await Promise.all([
@@ -201,15 +201,15 @@ router.get('/courses/:courseId/announcements', requireAuth, async (req, res) => 
         where,
         skip,
         take: limit,
-        include: {
-          creator: {
-            select: { id: true, username: true, email: true }
-          },
-          course: {
-            select: { id: true, title: true }
-          }
+      include: {
+        creator: {
+          select: { id: true, username: true, email: true }
         },
-        orderBy: { createdAt: 'desc' }
+        course: {
+          select: { id: true, title: true }
+        }
+      },
+      orderBy: { createdAt: 'desc' }
       }),
       prisma.announcement.count({ where }),
     ]);

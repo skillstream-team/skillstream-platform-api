@@ -15,6 +15,7 @@ import marketingRoutes from './routes/rest/marketing.routes';
 import calendarRoutes from './routes/rest/calendar.routes';
 import recommendationsRoutes from './routes/rest/recommendations.routes';
 import pollsRoutes from './routes/rest/polls.routes';
+import whiteboardRoutes from './routes/rest/whiteboard.routes';
 import { coursesSchema } from './routes/graphql/course.resolver';
 import { enrollmentSchema } from './routes/graphql/enrollment.resolver';
 import { mediaSchema } from './routes/graphql/media.resolver';
@@ -38,6 +39,7 @@ export function registerCoursesModule(app: express.Application) {
   app.use('/api/calendar', calendarRoutes);
   app.use('/api/recommendations', recommendationsRoutes);
   app.use('/api/polls', pollsRoutes);
+  app.use('/api/whiteboards', whiteboardRoutes);
 
   // GraphQL endpoints
   app.use('/graphql/courses', graphqlHTTP({
@@ -76,6 +78,7 @@ export { RealtimeService } from './services/realtime.service';
 export { RecommendationService } from './services/recommendation.service';
 export { CalendarService } from './services/calendar.service';
 export { PollService } from './services/poll.service';
+export { WhiteboardService } from './services/whiteboard.service';
 export { coursesSchema };
 export { enrollmentSchema };
 export { mediaSchema };
@@ -86,3 +89,4 @@ export * from './dtos/payment.dto';
 export * from './dtos/media.dto';
 export * from './dtos/recommendation.dto';
 export * from './dtos/calendar.dto';
+export * from './dtos/whiteboard.dto';

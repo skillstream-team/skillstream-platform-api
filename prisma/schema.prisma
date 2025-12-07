@@ -51,6 +51,8 @@ model User {
   achievements       Achievement[]
   certificates       Certificate[]
   recommendations    CourseRecommendation[]
+  createdWhiteboards Whiteboard[]            @relation("WhiteboardCreator")
+  whiteboardActions  WhiteboardAction[]      @relation("WhiteboardActionUser")
   interactions       UserInteraction[]
   createdEvents      CalendarEvent[]
   eventAttendees     EventAttendee[]
@@ -116,6 +118,7 @@ model Course {
   events          CalendarEvent[]
   Interaction     Interaction[]
   announcements   Announcement[]
+  whiteboards     Whiteboard[]
 }
 
 model Enrollment {
@@ -364,6 +367,7 @@ model LiveStream {
   questions StreamQuestion[]
   polls     StreamPoll[]
   Poll      Poll[]
+  whiteboards Whiteboard[]
 }
 
 model StreamQuestion {
@@ -891,4 +895,42 @@ model BreakoutRoom {
   updatedAt     DateTime        @updatedAt
 
   @@index([conferenceDbId, status])
+}
+
+model Whiteboard {
+  id          String            @id @default(auto()) @map("_id") @db.ObjectId
+  courseId    String?            @db.ObjectId
+  course      Course?            @relation(fields: [courseId], references: [id])
+  liveStreamId String?           @db.ObjectId
+  liveStream  LiveStream?        @relation(fields: [liveStreamId], references: [id])
+  title       String
+  description String?
+  createdBy   String             @db.ObjectId
+  creator     User               @relation("WhiteboardCreator", fields: [createdBy], references: [id])
+  isActive    Boolean            @default(true)
+  isPublic    Boolean            @default(false)
+  backgroundColor String          @default("#FFFFFF")
+  width       Int                @default(1920)
+  height      Int                @default(1080)
+  actions     WhiteboardAction[]
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  @@index([courseId, createdAt])
+  @@index([liveStreamId, createdAt])
+}
+
+model WhiteboardAction {
+  id          String     @id @default(auto()) @map("_id") @db.ObjectId
+  whiteboardId String    @db.ObjectId
+  whiteboard  Whiteboard @relation(fields: [whiteboardId], references: [id], onDelete: Cascade)
+  userId      String     @db.ObjectId
+  user        User       @relation("WhiteboardActionUser", fields: [userId], references: [id])
+  actionType  String     // "draw", "erase", "clear", "undo", "redo", "add_text", "add_shape"
+  data        Json       // Contains action-specific data (coordinates, color, tool, etc.)
+  timestamp   DateTime   @default(now())
+  createdAt   DateTime   @default(now())
+
+  @@index([whiteboardId, timestamp])
+  @@index([userId, timestamp])
 }

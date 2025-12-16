@@ -12,7 +12,7 @@ const router = Router();
  *     summary: Get earnings report for a teacher
  *     tags: [Earnings]
  */
-router.get('/users/:userId/earnings-report', requireAuth, requireRole('Teacher'), async (req, res) => {
+router.get('/users/:userId/earnings-report', requireAuth, requireRole('TEACHER'), async (req, res) => {
   try {
     const { userId } = req.params;
     const currentUserId = (req as any).user?.id;

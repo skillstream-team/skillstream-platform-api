@@ -16,6 +16,12 @@ import calendarRoutes from './routes/rest/calendar.routes';
 import recommendationsRoutes from './routes/rest/recommendations.routes';
 import pollsRoutes from './routes/rest/polls.routes';
 import whiteboardRoutes from './routes/rest/whiteboard.routes';
+import contentVersioningRoutes from './routes/rest/content-versioning.routes';
+import contentModerationRoutes from './routes/rest/content-moderation.routes';
+import reviewsRoutes from './routes/rest/reviews.routes';
+import forumsRoutes from './routes/rest/forums.routes';
+import videoFeaturesRoutes from './routes/rest/video-features.routes';
+import collaborationRoutes from './routes/rest/collaboration.routes';
 import { coursesSchema } from './routes/graphql/course.resolver';
 import { enrollmentSchema } from './routes/graphql/enrollment.resolver';
 import { mediaSchema } from './routes/graphql/media.resolver';
@@ -40,6 +46,12 @@ export function registerCoursesModule(app: express.Application) {
   app.use('/api/recommendations', recommendationsRoutes);
   app.use('/api/polls', pollsRoutes);
   app.use('/api/whiteboards', whiteboardRoutes);
+  app.use('/api', contentVersioningRoutes);
+  app.use('/api', contentModerationRoutes);
+  app.use('/api', reviewsRoutes);
+  app.use('/api', forumsRoutes);
+  app.use('/api', videoFeaturesRoutes);
+  app.use('/api', collaborationRoutes);
 
   // GraphQL endpoints
   app.use('/graphql/courses', graphqlHTTP({

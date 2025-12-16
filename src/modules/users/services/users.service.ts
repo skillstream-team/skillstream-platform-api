@@ -12,74 +12,73 @@ if (!JWT_SECRET) {
   throw new Error('JWT_SECRET is not defined in your environment variables');
 }
 
-
 const RESET_TOKEN_SECRET = process.env.RESET_TOKEN_SECRET as string;
 if (!RESET_TOKEN_SECRET) {
-    throw new Error('RESET_TOKEN_SECRET is not defined in your environment variables');
+  throw new Error('RESET_TOKEN_SECRET is not defined in your environment variables');
 }
 const RESET_TOKEN_EXPIRY = '15m'; // 15 Minutes
 
 export class UsersService {
-    /**
-     * @swagger
-     * /users:
-     *   post:
-     *     summary: Create a new user
-     *     description: Creates a new user in the database with hashed password and returns a JWT token along with user info.
-     *     tags:
-     *       - Users
-     *     requestBody:
-     *       required: true
-     *       content:
-     *         application/json:
-     *           schema:
-     *             type: object
-     *             required:
-     *               - email
-     *               - password
-     *               - username
-     *               - role
-     *             properties:
-     *               email:
-     *                 type: string
-     *                 format: email
-     *                 example: user@example.com
-     *               password:
-     *                 type: string
-     *                 format: password
-     *                 example: StrongPassword123
-     *               username:
-     *                 type: string
-     *                 example: johndoe
-     *               role:
-     *                 type: string
-     *                 example: student
-     *     responses:
-     *       200:
-     *         description: Successfully created user and returned JWT
-     *         content:
-     *           application/json:
-     *             schema:
-     *               type: object
-     *               properties:
-     *                 token:
-     *                   type: string
-     *                   description: JWT token for authentication
-     *                 user:
-     *                   type: object
-     *                   description: User record from the database
-     *                   properties:
-     *                     id:
-     *                       type: string
-     *                     email:
-     *                       type: string
-     *                     username:
-     *                       type: string
-     *                     role:
-     *                       type: string
-     *       400:
-     *         description: Bad request, invalid input or database error
-     */
+  /**
+   * @swagger
+   * /users:
+   *   post:
+   *     summary: Create a new user
+   *     description: Creates a new user in the database with hashed password and returns a JWT token along with user info.
+   *     tags:
+   *       - Users
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema:
+   *             type: object
+   *             required:
+   *               - email
+   *               - password
+   *               - username
+   *               - role
+   *             properties:
+   *               email:
+   *                 type: string
+   *                 format: email
+   *                 example: user@example.com
+   *               password:
+   *                 type: string
+   *                 format: password
+   *                 example: StrongPassword123
+   *               username:
+   *                 type: string
+   *                 example: johndoe
+   *               role:
+   *                 type: string
+   *                 example: STUDENT
+   *     responses:
+   *       200:
+   *         description: Successfully created user and returned JWT
+   *         content:
+   *           application/json:
+   *             schema:
+   *               type: object
+   *               properties:
+   *                 token:
+   *                   type: string
+   *                   description: JWT token for authentication
+   *                 user:
+   *                   type: object
+   *                   description: User record from the database
+   *                   properties:
+   *                     id:
+   *                       type: string
+   *                     email:
+   *                       type: string
+   *                     username:
+   *                       type: string
+   *                     role:
+   *                       type: string
+   *       400:
+   *         description: Bad request, invalid input or database error
+   */
   async createUser(data: CreateUserDTO) {
     try {
       const { email, password, username, role } = data;
@@ -87,11 +86,8 @@ export class UsersService {
       // Check if user already exists
       const existingUser = await prisma.user.findFirst({
         where: {
-          OR: [
-            { email },
-            { username }
-          ]
-        }
+          OR: [{ email }, { username }],
+        },
       });
 
       if (existingUser) {
@@ -110,6 +106,16 @@ export class UsersService {
           role,
         },
       });
+
+      // Create default settings for new user
+      try {
+        const { SettingsService } = await import('./settings.service');
+        const settingsService = new SettingsService();
+        await settingsService.createDefaultSettings(user.id);
+      } catch (error) {
+        console.error('Error creating default settings:', error);
+        // Don't fail user creation if settings creation fails
+      }
 
       // Send welcome email
       try {
@@ -131,62 +137,63 @@ export class UsersService {
       throw new Error('Error creating user: ' + (error as Error).message);
     }
   }
-    /**
-     * @swagger
-     * /auth/login:
-     *   post:
-     *     summary: User login
-     *     description: Authenticates a user with email and password, and returns a JWT token along with user info (excluding password).
-     *     tags:
-     *       - Authentication
-     *     requestBody:
-     *       required: true
-     *       content:
-     *         application/json:
-     *           schema:
-     *             type: object
-     *             required:
-     *               - email
-     *               - password
-     *             properties:
-     *               email:
-     *                 type: string
-     *                 format: email
-     *                 example: user@example.com
-     *               password:
-     *                 type: string
-     *                 format: password
-     *                 example: StrongPassword123
-     *     responses:
-     *       200:
-     *         description: Successfully authenticated
-     *         content:
-     *           application/json:
-     *             schema:
-     *               type: object
-     *               properties:
-     *                 token:
-     *                   type: string
-     *                   description: JWT token for authentication
-     *                 user:
-     *                   type: object
-     *                   description: Authenticated user details (password excluded)
-     *                   properties:
-     *                     id:
-     *                       type: integer
-     *                     email:
-     *                       type: string
-     *                     username:
-     *                       type: string
-     *                     role:
-     *                       type: string
-     *       401:
-     *         description: Invalid credentials
-     *       500:
-     *         description: Server error during login
-     */
+
+  /**
+   * @swagger
+   * /auth/login:
+   *   post:
+   *     summary: User login
+   *     description: Authenticates a user with email and password, and returns a JWT token along with user info (excluding password).
+   *     tags:
+   *       - Authentication
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema:
+   *             type: object
+   *             required:
+   *               - email
+   *               - password
+   *             properties:
+   *               email:
+   *                 type: string
+   *                 format: email
+   *                 example: user@example.com
+   *               password:
+   *                 type: string
+   *                 format: password
+   *                 example: StrongPassword123
+   *     responses:
+   *       200:
+   *         description: Successfully authenticated
+   *         content:
+   *           application/json:
+   *             schema:
+   *               type: object
+   *               properties:
+   *                 token:
+   *                   type: string
+   *                   description: JWT token for authentication
+   *                 user:
+   *                   type: object
+   *                   description: Authenticated user details (password excluded)
+   *                   properties:
+   *                     id:
+   *                       type: integer
+   *                     email:
+   *                       type: string
+   *                     username:
+   *                       type: string
+   *                     role:
+   *                       type: string
+   *       401:
+   *         description: Invalid credentials
+   *       500:
+   *         description: Server error during login
+   */
   async login({ email, password }: { email: string; password: string }) {
-    try{
+    try {
       const user = await prisma.user.findUnique({ where: { email } });
       if (!user) throw new Error('Invalid credentials');
 
@@ -202,61 +209,60 @@ export class UsersService {
       const token = generateToken({ id: user.id, role: user.role });
 
       return { token, user: userWithoutPassword };
-
-    }catch (error) {
+    } catch (error) {
       throw new Error('Error during login: ' + (error as Error).message);
     }
   }
 
-    /**
-     * @swagger
-     * /auth/refresh-token:
-     *   post:
-     *     summary: Refresh JWT token
-     *     description: Validates the provided JWT token and issues a new token along with user info (excluding password).
-     *     tags:
-     *       - Authentication
-     *     requestBody:
-     *       required: true
-     *       content:
-     *         application/json:
-     *           schema:
-     *             type: object
-     *             required:
-     *               - token
-     *             properties:
-     *               token:
-     *                 type: string
-     *                 description: The current JWT token to be refreshed
-     *                 example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
-     *     responses:
-     *       200:
-     *         description: Token successfully refreshed
-     *         content:
-     *           application/json:
-     *             schema:
-     *               type: object
-     *               properties:
-     *                 token:
-     *                   type: string
-     *                   description: New JWT token
-     *                 user:
-     *                   type: object
-     *                   description: User details excluding password
-     *                   properties:
-     *                     id:
-     *                       type: integer
-     *                     email:
-     *                       type: string
-     *                     username:
-     *                       type: string
-     *                     role:
-     *                       type: string
-     *       401:
-     *         description: Invalid or expired token
-     *       500:
-     *         description: Server error while refreshing token
-     */
+  /**
+   * @swagger
+   * /auth/refresh-token:
+   *   post:
+   *     summary: Refresh JWT token
+   *     description: Validates the provided JWT token and issues a new token along with user info (excluding password).
+   *     tags:
+   *       - Authentication
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema:
+   *             type: object
+   *             required:
+   *               - token
+   *             properties:
+   *               token:
+   *                 type: string
+   *                 description: The current JWT token to be refreshed
+   *                 example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+   *     responses:
+   *       200:
+   *         description: Token successfully refreshed
+   *         content:
+   *           application/json:
+   *             schema:
+   *               type: object
+   *               properties:
+   *                 token:
+   *                   type: string
+   *                   description: New JWT token
+   *                 user:
+   *                   type: object
+   *                   description: User details excluding password
+   *                   properties:
+   *                     id:
+   *                       type: integer
+   *                     email:
+   *                       type: string
+   *                     username:
+   *                       type: string
+   *                     role:
+   *                       type: string
+   *       401:
+   *         description: Invalid or expired token
+   *       500:
+   *         description: Server error while refreshing token
+   */
   async refreshToken(token: string) {
     try {
       const decoded = jwt.verify(token, JWT_SECRET as string) as unknown as JWTPayload;
@@ -264,7 +270,7 @@ export class UsersService {
       // Fetch the user from the DB - support both id and userId for backward compatibility
       const userId = decoded.id || decoded.userId;
       if (!userId) throw new Error('Invalid token payload');
-      
+
       const user = await prisma.user.findUnique({ where: { id: userId } });
       if (!user) throw new Error('User not found');
 
@@ -277,354 +283,343 @@ export class UsersService {
     }
   }
 
-    /**
-     * @swagger
-     * /auth/forgot-password:
-     *   post:
-     *     summary: Send a password reset email to a user
-     *     description: Generates a password reset token and emails a reset link to the user.
-     *     tags:
-     *       - Auth
-     *     requestBody:
-     *       required: true
-     *       content:
-     *         application/json:
-     *           schema:
-     *             type: object
-     *             properties:
-     *               email:
-     *                 type: string
-     *                 example: "user@example.com"
-     *     responses:
-     *       200:
-     *         description: Password reset link sent successfully
-     *       404:
-     *         description: User not found
-     */
-    async forgotPassword(email: string) {
-        const user = await prisma.user.findUnique({ where: { email } });
-        if (!user) throw new Error('User not found');
+  /**
+   * @swagger
+   * /auth/forgot-password:
+   *   post:
+   *     summary: Send a password reset email to a user
+   *     description: Generates a password reset token and emails a reset link to the user.
+   *     tags:
+   *       - Auth
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema:
+   *             type: object
+   *             properties:
+   *               email:
+   *                 type: string
+   *                 example: "user@example.com"
+   *     responses:
+   *       200:
+   *         description: Password reset link sent successfully
+   *       404:
+   *         description: User not found
+   */
+  async forgotPassword(email: string) {
+    const user = await prisma.user.findUnique({ where: { email } });
+    if (!user) throw new Error('User not found');
 
-        try {
-            const resetToken = jwt.sign({ userId: user.id }, RESET_TOKEN_SECRET, { expiresIn: RESET_TOKEN_EXPIRY });
-            const resetLink = `${process.env.FRONTEND_URL}/reset-password?token=${resetToken}`;
+    try {
+      const resetToken = jwt.sign({ userId: user.id }, RESET_TOKEN_SECRET, { expiresIn: RESET_TOKEN_EXPIRY });
+      const resetLink = `${process.env.FRONTEND_URL}/reset-password?token=${resetToken}`;
 
-            await emailService.sendPasswordResetEmail(email, user.username, resetLink);
-            return { message: 'Password reset link sent' };
-        } catch (err) {
-            throw new Error('Error sending password reset email: ' + (err as Error).message);
-        }
+      await emailService.sendPasswordResetEmail(email, user.username, resetLink);
+      return { message: 'Password reset link sent' };
+    } catch (err) {
+      throw new Error('Error sending password reset email: ' + (err as Error).message);
+    }
+  }
+
+  /**
+   * @swagger
+   * /auth/reset-password:
+   *   post:
+   *     summary: Reset user password
+   *     description: Verifies the password reset token and updates the users password.
+   *     tags:
+   *       - Auth
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema:
+   *             type: object
+   *             properties:
+   *               token:
+   *                 type: string
+   *               newPassword:
+   *                 type: string
+   *     responses:
+   *       200:
+   *         description: Password reset successfully
+   *       400:
+   *         description: Invalid or expired token
+   */
+  async resetPassword(data: { token: string; newPassword: string }) {
+    try {
+      const decoded = jwt.verify(data.token, RESET_TOKEN_SECRET) as { userId: string };
+
+      if (!data.newPassword || data.newPassword.length < 6)
+        throw new Error('Password must be at least 6 characters long');
+
+      const hashedPassword = await bcrypt.hash(data.newPassword, 10);
+      await prisma.user.update({
+        where: { id: decoded.userId },
+        data: { password: hashedPassword },
+      });
+
+      return { message: 'Password has been reset successfully' };
+    } catch (error) {
+      throw new Error('Error resetting password: ' + (error as Error).message);
+    }
+  }
+
+  /**
+   * @swagger
+   * /users:
+   *   get:
+   *     summary: Get all users (paginated)
+   *     tags: [Users]
+   *     parameters:
+   *       - in: query
+   *         name: page
+   *         schema:
+   *           type: integer
+   *           default: 1
+   *       - in: query
+   *         name: limit
+   *         schema:
+   *           type: integer
+   *           default: 20
+   *           maximum: 100
+   */
+  async getAllUsers(page: number = 1, limit: number = 20) {
+    const cacheKey = `users:list:${page}:${limit}`;
+
+    // Try cache first
+    const cached = await getCache(cacheKey);
+    if (cached) {
+      return cached;
     }
 
-    /**
-     * @swagger
-     * /auth/reset-password:
-     *   post:
-     *     summary: Reset user password
-     *     description: Verifies the password reset token and updates the user’s password.
-     *     tags:
-     *       - Auth
-     *     requestBody:
-     *       required: true
-     *       content:
-     *         application/json:
-     *           schema:
-     *             type: object
-     *             properties:
-     *               token:
-     *                 type: string
-     *               newPassword:
-     *                 type: string
-     *     responses:
-     *       200:
-     *         description: Password reset successfully
-     *       400:
-     *         description: Invalid or expired token
-     */
-    async resetPassword(data: { token: string; newPassword: string }) {
-        try {
-            const decoded = jwt.verify(data.token, RESET_TOKEN_SECRET) as { userId: string };
+    const skip = (page - 1) * limit;
+    const take = Math.min(limit, 100); // Max 100 per page
 
-            if (!data.newPassword || data.newPassword.length < 6)
-                throw new Error('Password must be at least 6 characters long');
+    const [users, total] = await Promise.all([
+      prisma.user.findMany({
+        skip,
+        take,
+        select: {
+          id: true,
+          username: true,
+          email: true,
+          role: true,
+          firstName: true,
+          lastName: true,
+          avatar: true,
+          createdAt: true,
+        },
+        orderBy: { createdAt: 'desc' },
+      }),
+      prisma.user.count(),
+    ]);
 
-            const hashedPassword = await bcrypt.hash(data.newPassword, 10);
-            await prisma.user.update({
-                where: { id: decoded.userId },
-                data: { password: hashedPassword },
-            });
+    const result = {
+      data: users,
+      pagination: {
+        page,
+        limit: take,
+        total,
+        totalPages: Math.ceil(total / take),
+        hasNext: page * take < total,
+        hasPrev: page > 1,
+      },
+    };
 
-            return { message: 'Password has been reset successfully' };
-        } catch (error) {
-            throw new Error('Error resetting password: ' + (error as Error).message);
-        }
+    // Cache result
+    await setCache(cacheKey, result, CACHE_TTL.SHORT);
+
+    return result;
+  }
+
+  /**
+   * @swagger
+   * /users/{id}:
+   *   get:
+   *     summary: Get a user by ID
+   *     tags:
+   *       - Users
+   *     parameters:
+   *       - name: id
+   *         in: path
+   *         required: true
+   *         schema:
+   *           type: integer
+   *     responses:
+   *       200:
+   *         description: User details
+   *       404:
+   *         description: User not found
+   */
+  async getUserById(id: string) {
+    const cacheKey = cacheKeys.user(id);
+
+    // Try cache first
+    const cached = await getCache(cacheKey);
+    if (cached) {
+      return cached;
     }
 
-    /**
-     * @swagger
-     * /users:
-     *   get:
-     *     summary: Get all users
-     *     tags:
-     *       - Users
-     *     responses:
-     *       200:
-     *         description: List of users
-     */
-    /**
-     * @swagger
-     * /users:
-     *   get:
-     *     summary: Get all users (paginated)
-     *     tags: [Users]
-     *     parameters:
-     *       - in: query
-     *         name: page
-     *         schema:
-     *           type: integer
-     *           default: 1
-     *       - in: query
-     *         name: limit
-     *         schema:
-     *           type: integer
-     *           default: 20
-     *           maximum: 100
-     */
-    async getAllUsers(page: number = 1, limit: number = 20) {
-        const cacheKey = `users:list:${page}:${limit}`;
-        
-        // Try cache first
-        const cached = await getCache(cacheKey);
-        if (cached) {
-            return cached;
-        }
+    const user = await prisma.user.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        username: true,
+        email: true,
+        role: true,
+        firstName: true,
+        lastName: true,
+        avatar: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
 
-        const skip = (page - 1) * limit;
-        const take = Math.min(limit, 100); // Max 100 per page
-
-        const [users, total] = await Promise.all([
-            prisma.user.findMany({
-                skip,
-                take,
-                select: {
-                    id: true,
-                    username: true,
-                    email: true,
-                    role: true,
-                    firstName: true,
-                    lastName: true,
-                    avatar: true,
-                    createdAt: true,
-                },
-                orderBy: { createdAt: 'desc' },
-            }),
-            prisma.user.count(),
-        ]);
-
-        const result = {
-            data: users,
-            pagination: {
-                page,
-                limit: take,
-                total,
-                totalPages: Math.ceil(total / take),
-                hasNext: page * take < total,
-                hasPrev: page > 1,
-            },
-        };
-
-        // Cache result
-        await setCache(cacheKey, result, CACHE_TTL.SHORT);
-        
-        return result;
+    if (user) {
+      await setCache(cacheKey, user, CACHE_TTL.MEDIUM);
     }
 
-    /**
-     * @swagger
-     * /users/{id}:
-     *   get:
-     *     summary: Get a user by ID
-     *     tags:
-     *       - Users
-     *     parameters:
-     *       - name: id
-     *         in: path
-     *         required: true
-     *         schema:
-     *           type: integer
-     *     responses:
-     *       200:
-     *         description: User details
-     *       404:
-     *         description: User not found
-     */
-    async getUserById(id: string) {
-        const cacheKey = cacheKeys.user(id);
-        
-        // Try cache first
-        const cached = await getCache(cacheKey);
-        if (cached) {
-            return cached;
-        }
+    return user;
+  }
 
-        const user = await prisma.user.findUnique({ 
-            where: { id },
-            select: {
-                id: true,
-                username: true,
-                email: true,
-                role: true,
-                firstName: true,
-                lastName: true,
-                avatar: true,
-                createdAt: true,
-                updatedAt: true,
-            }
-        });
+  /**
+   * @swagger
+   * /users/profile/{userId}:
+   *   get:
+   *     summary: Get the profile of a specific user
+   *     tags:
+   *       - Users
+   */
+  async getUserProfile(userId: string) {
+    const cacheKey = cacheKeys.userProfile(userId);
 
-        if (user) {
-            await setCache(cacheKey, user, CACHE_TTL.MEDIUM);
-        }
-
-        return user;
+    // Try cache first
+    const cached = await getCache(cacheKey);
+    if (cached) {
+      return cached;
     }
 
-    /**
-     * @swagger
-     * /users/profile/{userId}:
-     *   get:
-     *     summary: Get the profile of a specific user
-     *     tags:
-     *       - Users
-     */
-    async getUserProfile(userId: string) {
-        const cacheKey = cacheKeys.userProfile(userId);
-        
-        // Try cache first
-        const cached = await getCache(cacheKey);
-        if (cached) {
-            return cached;
-        }
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        username: true,
+        email: true,
+        role: true,
+        firstName: true,
+        lastName: true,
+        avatar: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
 
-        const user = await prisma.user.findUnique({ 
-            where: { id: userId },
-            select: {
-                id: true,
-                username: true,
-                email: true,
-                role: true,
-                firstName: true,
-                lastName: true,
-                avatar: true,
-                createdAt: true,
-                updatedAt: true,
-            }
-        });
-
-        if (user) {
-            await setCache(cacheKey, user, CACHE_TTL.MEDIUM);
-        }
-
-        return user;
+    if (user) {
+      await setCache(cacheKey, user, CACHE_TTL.MEDIUM);
     }
 
-    /**
-     * @swagger
-     * /roles:
-     *   get:
-     *     summary: Get all predefined roles
-     *     tags:
-     *       - Users
-     */
-    async getRoles() {
-        return ['ADMIN', 'Teacher', 'STUDENT'];
-    }
+    return user;
+  }
 
-    /**
-     * @swagger
-     * /users/{id}/change-password:
-     *   patch:
-     *     summary: Change a user's password
-     *     tags:
-     *       - Users
-     *     requestBody:
-     *       required: true
-     *       content:
-     *         application/json:
-     *           schema:
-     *             type: object
-     *             properties:
-     *               newPassword:
-     *                 type: string
-     *                 example: "NewPass123"
-     */
-    async changePassword(id: string, newPassword: string) {
-        try {
-            if (!newPassword || newPassword.length < 6)
-                throw new Error('Password must be at least 6 characters long');
+  /**
+   * @swagger
+   * /roles:
+   *   get:
+   *     summary: Get all predefined roles
+   *     tags:
+   *       - Users
+   */
+  async getRoles() {
+    return ['ADMIN', 'TEACHER', 'STUDENT'];
+  }
 
-            const hashedPassword = await bcrypt.hash(newPassword, 10);
-            await prisma.user.update({
-                where: { id },
-                data: { password: hashedPassword },
-            });
-            return { message: 'Password changed successfully' };
-        } catch (error) {
-            throw new Error('Error changing password: ' + (error as Error).message);
-        }
-    }
+  /**
+   * @swagger
+   * /users/{id}/change-password:
+   *   patch:
+   *     summary: Change a user's password
+   *     tags:
+   *       - Users
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema:
+   *             type: object
+   *             properties:
+   *               newPassword:
+   *                 type: string
+   *                 example: "NewPass123"
+   */
+  async changePassword(id: string, newPassword: string) {
+    try {
+      if (!newPassword || newPassword.length < 6)
+        throw new Error('Password must be at least 6 characters long');
 
-    /**
-     * @swagger
-     * /users/{id}:
-     *   put:
-     *     summary: Update a user
-     *     tags:
-     *       - Users
-     */
-    async updateUser(id: string, data: Partial<CreateUserDTO>) {
-        try {
-            if (data.password) {
-                data.password = await bcrypt.hash(data.password, 10);
-            }
-            return prisma.user.update({ where: { id }, data });
-        } catch (error) {
-            throw new Error('Error updating user: ' + (error as Error).message);
-        }
+      const hashedPassword = await bcrypt.hash(newPassword, 10);
+      await prisma.user.update({
+        where: { id },
+        data: { password: hashedPassword },
+      });
+      return { message: 'Password changed successfully' };
+    } catch (error) {
+      throw new Error('Error changing password: ' + (error as Error).message);
     }
+  }
 
-    /**
-     * @swagger
-     * /users/{id}:
-     *   delete:
-     *     summary: Delete a user
-     *     tags:
-     *       - Users
-     */
-    async deleteUser(id: string) {
-        try {
-            return prisma.user.delete({ where: { id } });
-        } catch (error) {
-            throw new Error('Error deleting user: ' + (error as Error).message);
-        }
+  /**
+   * @swagger
+   * /users/{id}:
+   *   put:
+   *     summary: Update a user
+   *     tags:
+   *       - Users
+   */
+  async updateUser(id: string, data: Partial<CreateUserDTO>) {
+    try {
+      if (data.password) {
+        data.password = await bcrypt.hash(data.password, 10);
+      }
+      return prisma.user.update({ where: { id }, data });
+    } catch (error) {
+      throw new Error('Error updating user: ' + (error as Error).message);
     }
+  }
 
-    /**
-     * @swagger
-     * /users/{id}/roles:
-     *   patch:
-     *     summary: Update user roles
-     *     tags:
-     *       - Users
-     */
-    async updateUserRole(id: string, roles: string[]) {
-        try {
-            return prisma.user.update({
-                where: { id },
-                data: { role: roles.join(',') },
-            });
-        } catch (error) {
-            throw new Error('Error updating user roles: ' + (error as Error).message);
-        }
+  /**
+   * @swagger
+   * /users/{id}:
+   *   delete:
+   *     summary: Delete a user
+   *     tags:
+   *       - Users
+   */
+  async deleteUser(id: string) {
+    try {
+      return prisma.user.delete({ where: { id } });
+    } catch (error) {
+      throw new Error('Error deleting user: ' + (error as Error).message);
     }
+  }
+
+  /**
+   * @swagger
+   * /users/{id}/roles:
+   *   patch:
+   *     summary: Update user roles
+   *     tags:
+   *       - Users
+   */
+  async updateUserRole(id: string, roles: string[]) {
+    try {
+      return prisma.user.update({
+        where: { id },
+        data: { role: roles.join(',') },
+      });
+    } catch (error) {
+      throw new Error('Error updating user roles: ' + (error as Error).message);
+    }
+  }
 }

@@ -35,14 +35,24 @@ class EmailService {
         }
     }
     // Send a general email
-    async sendEmail(to, subject, html, fromTeam = false) {
+    async sendEmail(to, subject, html, fromTeam = false, attachmentContent, attachmentFilename) {
         try {
-            await this.transporter.sendMail({
+            const mailOptions = {
                 from: fromTeam ? TEAM_EMAIL : (process.env.SMTP_FROM || 'no-reply@skillstream.com'),
                 to,
                 subject,
                 html,
-            });
+            };
+            // Add attachment if provided
+            if (attachmentContent && attachmentFilename) {
+                mailOptions.attachments = [
+                    {
+                        filename: attachmentFilename,
+                        content: attachmentContent,
+                    },
+                ];
+            }
+            await this.transporter.sendMail(mailOptions);
         }
         catch (err) {
             console.error('Error sending email:', err);

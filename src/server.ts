@@ -101,23 +101,88 @@ registerMessagingModule(app, io);
 // Setup Swagger docs
 setupSwagger(app);
 
-// Health check endpoint
+// Enhanced health check endpoint
 app.get("/health", async (req, res) => {
-    const dbConnected = await testDatabaseConnection();
-    const redisConnected = redisClient ? await redisClient.ping().then(() => true).catch(() => false) : false;
+    const startTime = Date.now();
+    const timestamp = new Date().toISOString();
+    
+    // Check database
+    let dbStatus = 'unknown';
+    let dbLatency = 0;
+    try {
+        const dbStart = Date.now();
+        const dbConnected = await testDatabaseConnection();
+        dbLatency = Date.now() - dbStart;
+        dbStatus = dbConnected ? 'healthy' : 'unhealthy';
+    } catch (error) {
+        dbStatus = 'unhealthy';
+    }
+    
+    // Check Redis
+    let redisStatus = 'unknown';
+    let redisLatency = 0;
+    if (redisClient) {
+        try {
+            const redisStart = Date.now();
+            await redisClient.ping();
+            redisLatency = Date.now() - redisStart;
+            redisStatus = 'healthy';
+        } catch (error) {
+            redisStatus = 'unhealthy';
+        }
+    } else {
+        redisStatus = 'not_configured';
+    }
+    
+    // Check Kafka
+    const kafkaStatus = isKafkaAvailable() ? 'available' : 'unavailable';
+    
+    // Memory usage
+    const memoryUsage = process.memoryUsage();
+    const memoryMB = {
+        rss: Math.round(memoryUsage.rss / 1024 / 1024),
+        heapTotal: Math.round(memoryUsage.heapTotal / 1024 / 1024),
+        heapUsed: Math.round(memoryUsage.heapUsed / 1024 / 1024),
+        external: Math.round(memoryUsage.external / 1024 / 1024),
+    };
+    
+    // CPU usage (approximate)
+    const cpuUsage = process.cpuUsage();
+    
+    // Overall status
+    const overallStatus = dbStatus === 'healthy' ? 'ok' : 'degraded';
+    const totalLatency = Date.now() - startTime;
     
     const health = {
-        status: dbConnected ? "ok" : "degraded",
-        timestamp: new Date().toISOString(),
+        status: overallStatus,
+        timestamp,
+        uptime: Math.round(process.uptime()),
+        responseTime: totalLatency,
         services: {
-            database: dbConnected,
-            redis: redisConnected,
-            kafka: isKafkaAvailable(),
+            database: {
+                status: dbStatus,
+                latency: `${dbLatency}ms`,
+            },
+            redis: {
+                status: redisStatus,
+                latency: redisLatency > 0 ? `${redisLatency}ms` : 'N/A',
+            },
+            kafka: {
+                status: kafkaStatus,
+            },
         },
-        uptime: process.uptime(),
+        system: {
+            memory: memoryMB,
+            cpu: {
+                user: cpuUsage.user,
+                system: cpuUsage.system,
+            },
+            nodeVersion: process.version,
+            platform: process.platform,
+        },
     };
 
-    const statusCode = dbConnected ? 200 : 503;
+    const statusCode = overallStatus === 'ok' ? 200 : 503;
     res.status(statusCode).json(health);
 });
 

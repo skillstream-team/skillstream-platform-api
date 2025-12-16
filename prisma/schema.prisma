@@ -58,7 +58,7 @@ model User {
   eventAttendees     EventAttendee[]
   eventReminders     EventReminder[]
   Poll               Poll[]
-  Notification       Notification[]
+  notifications      Notification[]
   AuditLog           AuditLog[]
   Interaction        Interaction[]
   sentMessages       Message[]                    @relation("MessageSender")
@@ -76,6 +76,29 @@ model User {
   quickLessons       QuickLesson[]         @relation("QuickLessonTeacher")
   lessonResourcesCreated LessonResource[]  @relation("LessonResourceSharer")
   videoConferencesHosted VideoConference[] @relation("VideoConferenceHost")
+  settings                UserSettings?
+  apiKeys                 ApiKey[]         @relation("ApiKeyUser")
+  activityLogs            ActivityLog[]    @relation("ActivityLogUser")
+  contentVersions         ContentVersion[] @relation("ContentVersionCreator")
+  contentFlagsReported    ContentFlag[]     @relation("ContentFlagReporter")
+  contentFlagsReviewed    ContentFlag[]    @relation("ContentFlagReviewer")
+  createdGroups           StudyGroup[]      @relation("GroupCreator")
+  waitlistEntries         WaitlistEntry[]
+  videoAnalytics          VideoAnalytics[]
+  groupMembers            GroupMember[]
+  sharedWorkspaces         SharedWorkspace[]
+  loginStreaks            LoginStreak[]
+  videoNotes              VideoNote[]
+  videoBookmarks          VideoBookmark[]
+  earnedBadges            EarnedBadge[]
+  leaderboardEntries      LeaderboardEntry[]
+  reviews                 CourseReview[]
+  reviewHelpful           ReviewHelpful[]
+  forumPosts              ForumPost[]
+  forumReplies            ForumReply[]
+  forumUpvotes            ForumUpvote[]
+  userPoints              UserPoints?       @relation("UserPointsUser")
+  userLevels              UserLevel[]       @relation("UserLevelUser")
 }
 
 model SecurityLog {
@@ -119,6 +142,12 @@ model Course {
   Interaction     Interaction[]
   announcements   Announcement[]
   whiteboards     Whiteboard[]
+  reviews         CourseReview[]
+  forumPosts      ForumPost[]
+  studyGroups     StudyGroup[]
+  sharedWorkspaces SharedWorkspace[]
+  waitlistEntries WaitlistEntry[]
+  leaderboardEntries LeaderboardEntry[]
 }
 
 model Enrollment {
@@ -342,6 +371,12 @@ model Video {
   scheduledAt  DateTime?
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
+
+  chapters     VideoChapter[]
+  transcript   VideoTranscript?
+  analytics    VideoAnalytics[]
+  notes        VideoNote[]
+  bookmarks    VideoBookmark[]
 }
 
 model LiveStream {
@@ -416,15 +451,20 @@ model PollResponse {
 
 model Notification {
   id        String    @id @default(auto()) @map("_id") @db.ObjectId
-  toUserId  String    @db.ObjectId
-  toUser    User      @relation(fields: [toUserId], references: [id])
+  userId    String    @db.ObjectId
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      String    // "system", "course", "message", "assignment", "quiz", "certificate", "announcement"
   title     String
   message   String
-  type      String
-  metadata  Json?
-  isRead    Boolean   @default(false)
-  createdAt DateTime  @default(now())
+  link      String?
+  read      Boolean   @default(false)
   readAt    DateTime?
+  metadata  Json?     // Additional data (courseId, messageId, etc.)
+  createdAt DateTime  @default(now())
+
+  @@index([userId, read, createdAt])
+  @@index([userId, createdAt])
+  @@index([type, createdAt])
 }
 
 model CourseModule {
@@ -557,7 +597,11 @@ model CalendarEvent {
   quiz         Quiz?       @relation(fields: [quizId], references: [id])
 
   isRecurring    Boolean @default(false)
-  recurrenceRule String?
+  recurrenceRule String? // RRULE format (e.g., "FREQ=WEEKLY;BYDAY=MO")
+  recurrenceEnd  DateTime?
+  timezone       String  @default("UTC")
+  maxAttendees   Int?
+  waitlistEnabled Boolean @default(false)
 
   reminderMinutes Int[] @default([15])
 
@@ -567,9 +611,11 @@ model CalendarEvent {
 
   attendees EventAttendee[]
   reminders EventReminder[]
+  waitlist  WaitlistEntry[]
 
   @@index([courseId, startTime])
   @@index([createdBy, startTime])
+  @@index([isRecurring, recurrenceEnd])
 }
 
 model EventAttendee {
@@ -608,6 +654,472 @@ model AuditLog {
   entityId  String?  @db.ObjectId
   metadata  Json?
   createdAt DateTime @default(now())
+}
+
+
+model Webhook {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  url         String
+  secret      String
+  events      String[] // ["enrollment.created", "course.completed", "payment.completed", etc.]
+  isActive    Boolean  @default(true)
+  lastTriggered DateTime?
+  failureCount Int     @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  deliveries WebhookDelivery[]
+
+  @@index([isActive, createdAt])
+}
+
+model WebhookDelivery {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  webhookId String   @db.ObjectId
+  webhook   Webhook  @relation(fields: [webhookId], references: [id], onDelete: Cascade)
+  event     String
+  payload   Json
+  status    String   // "pending", "success", "failed"
+  statusCode Int?
+  response  String?
+  attempts  Int      @default(0)
+  nextRetry DateTime?
+  createdAt DateTime @default(now())
+  deliveredAt DateTime?
+
+  @@index([webhookId, status, createdAt])
+  @@index([status, nextRetry])
+}
+
+model ApiKey {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  name        String
+  keyHash     String   @unique
+  userId      String?  @db.ObjectId
+  user        User?    @relation("ApiKeyUser", fields: [userId], references: [id], onDelete: Cascade)
+  permissions String[] // ["read", "write", "admin"]
+  rateLimit   Int      @default(1000) // requests per hour
+  lastUsed    DateTime?
+  expiresAt   DateTime?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([userId, isActive])
+}
+
+model ActivityLog {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId    String   @db.ObjectId
+  user      User     @relation("ActivityLogUser", fields: [userId], references: [id], onDelete: Cascade)
+  action    String   // "course.viewed", "quiz.completed", "enrollment.created", etc.
+  entity    String   // "course", "quiz", "enrollment", etc.
+  entityId  String?  @db.ObjectId
+  metadata  Json?
+  createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([entity, entityId, createdAt])
+  @@index([action, createdAt])
+}
+
+model ContentVersion {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  entityType  String   // "course", "lesson", "quiz", "assignment"
+  entityId    String   @db.ObjectId
+  version     Int
+  content     Json     // Full content snapshot
+  createdBy   String   @db.ObjectId
+  creator     User     @relation("ContentVersionCreator", fields: [createdBy], references: [id])
+  changeNote  String?
+  isCurrent   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  @@unique([entityType, entityId, version])
+  @@index([entityType, entityId, isCurrent])
+  @@index([createdBy, createdAt])
+}
+
+model ContentFlag {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  contentId   String   @db.ObjectId
+  contentType String   // "course", "lesson", "quiz", "assignment", "message", "comment"
+  reason      String   // "spam", "inappropriate", "copyright", "harassment", "other"
+  reportedBy  String   @db.ObjectId
+  reporter    User     @relation("ContentFlagReporter", fields: [reportedBy], references: [id])
+  description String?
+  status      String   @default("pending") // "pending", "under_review", "approved", "rejected", "removed"
+  reviewedBy  String?  @db.ObjectId
+  reviewer    User?    @relation("ContentFlagReviewer", fields: [reviewedBy], references: [id])
+  reviewedAt  DateTime?
+  action      String?  // Notes or action taken
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([contentId, contentType, status])
+  @@index([status, createdAt])
+  @@index([reportedBy, createdAt])
+}
+
+model CourseReview {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  courseId    String   @db.ObjectId
+  course      Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  studentId   String   @db.ObjectId
+  student     User     @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  rating      Int      // 1-5 stars
+  title       String?
+  content     String
+  isVerified  Boolean  @default(false) // Verified purchase/enrollment
+  isPublished Boolean  @default(true)
+  helpfulCount Int     @default(0)
+  instructorResponse String?
+  instructorResponseAt DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  helpfulVotes ReviewHelpful[]
+
+  @@unique([courseId, studentId])
+  @@index([courseId, rating, createdAt])
+  @@index([studentId, createdAt])
+  @@index([isPublished, createdAt])
+}
+
+model ReviewHelpful {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  reviewId  String   @db.ObjectId
+  review    CourseReview @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+  userId    String   @db.ObjectId
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  isHelpful Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  @@unique([reviewId, userId])
+  @@index([reviewId, isHelpful])
+}
+
+model ForumPost {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  courseId    String   @db.ObjectId
+  course      Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  authorId    String   @db.ObjectId
+  author      User     @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  title       String
+  content     String
+  isPinned    Boolean  @default(false)
+  isLocked    Boolean  @default(false)
+  isResolved  Boolean  @default(false)
+  bestAnswerId String? @unique @db.ObjectId
+  bestAnswer  ForumReply? @relation("PostBestAnswer", fields: [bestAnswerId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  upvoteCount Int      @default(0)
+  replyCount  Int      @default(0)
+  viewCount   Int      @default(0)
+  lastReplyAt DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  replies     ForumReply[] @relation("PostReplies")
+  upvotes     ForumUpvote[] @relation("PostUpvotes")
+
+  @@index([courseId, createdAt])
+  @@index([courseId, isPinned, createdAt])
+  @@index([authorId, createdAt])
+  @@index([isResolved, createdAt])
+}
+
+model ForumReply {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  postId    String   @db.ObjectId
+  post      ForumPost @relation("PostReplies", fields: [postId], references: [id], onDelete: Cascade)
+  authorId  String   @db.ObjectId
+  author    User     @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  content   String
+  parentId  String?  @db.ObjectId
+  parent    ForumReply? @relation("ReplyParent", fields: [parentId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  replies   ForumReply[] @relation("ReplyParent")
+  upvoteCount Int    @default(0)
+  isBestAnswer Boolean @default(false)
+  bestAnswerFor ForumPost? @relation("PostBestAnswer")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  upvotes   ForumUpvote[] @relation("ReplyUpvotes")
+
+  @@index([postId, createdAt])
+  @@index([authorId, createdAt])
+  @@index([parentId, createdAt])
+}
+
+model ForumUpvote {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  postId    String?  @db.ObjectId
+  post      ForumPost? @relation("PostUpvotes", fields: [postId], references: [id], onDelete: Cascade)
+  replyId   String?  @db.ObjectId
+  reply     ForumReply? @relation("ReplyUpvotes", fields: [replyId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  userId    String   @db.ObjectId
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([postId, userId])
+  @@unique([replyId, userId])
+  @@index([userId, createdAt])
+}
+
+model UserPoints {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId    String   @unique @db.ObjectId
+  user      User     @relation("UserPointsUser", fields: [userId], references: [id], onDelete: Cascade)
+  totalPoints Int    @default(0)
+  currentLevel Int   @default(1)
+  currentXP   Int    @default(0)
+  xpToNextLevel Int  @default(100)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([totalPoints])
+  @@index([currentLevel])
+}
+
+model UserLevel {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId    String   @db.ObjectId
+  user      User     @relation("UserLevelUser", fields: [userId], references: [id], onDelete: Cascade)
+  level     Int
+  xpEarned  Int
+  achievedAt DateTime @default(now())
+
+  @@index([userId, achievedAt])
+  @@index([level, achievedAt])
+}
+
+model Badge {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  name        String   @unique
+  description String
+  icon        String?
+  category    String   // "course", "achievement", "social", "learning"
+  rarity      String   @default("common") // "common", "rare", "epic", "legendary"
+  points      Int      @default(0)
+  criteria    Json?    // Conditions to earn badge
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  earnedBy    EarnedBadge[]
+
+  @@index([category, rarity])
+}
+
+model EarnedBadge {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId    String   @db.ObjectId
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  badgeId   String   @db.ObjectId
+  badge     Badge    @relation(fields: [badgeId], references: [id], onDelete: Cascade)
+  earnedAt  DateTime @default(now())
+  metadata  Json?
+
+  @@unique([userId, badgeId])
+  @@index([userId, earnedAt])
+  @@index([badgeId, earnedAt])
+}
+
+model LeaderboardEntry {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId    String   @db.ObjectId
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  courseId  String?  @db.ObjectId
+  course    Course?  @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  period    String   // "daily", "weekly", "monthly", "all_time"
+  points    Int      @default(0)
+  rank      Int
+  periodStart DateTime
+  periodEnd   DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, courseId, period, periodStart])
+  @@index([courseId, period, points])
+  @@index([period, points, rank])
+}
+
+model LoginStreak {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId    String   @unique @db.ObjectId
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  currentStreak Int  @default(0)
+  longestStreak  Int @default(0)
+  lastLoginDate DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([currentStreak])
+}
+
+model VideoNote {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  videoId   String   @db.ObjectId
+  video     Video    @relation(fields: [videoId], references: [id], onDelete: Cascade)
+  userId    String   @db.ObjectId
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  timestamp Float    // Time in seconds
+  content   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([videoId, userId, timestamp])
+  @@index([userId, createdAt])
+}
+
+model VideoBookmark {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  videoId   String   @db.ObjectId
+  video     Video    @relation(fields: [videoId], references: [id], onDelete: Cascade)
+  userId    String   @db.ObjectId
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  timestamp Float    // Time in seconds
+  title     String?
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([videoId, userId, timestamp])
+  @@index([userId, createdAt])
+}
+
+model VideoChapter {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  videoId   String   @db.ObjectId
+  video     Video    @relation(fields: [videoId], references: [id], onDelete: Cascade)
+  title     String
+  startTime Float    // Time in seconds
+  endTime   Float?
+  order     Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([videoId, order])
+}
+
+model VideoTranscript {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  videoId   String   @unique @db.ObjectId
+  video     Video    @relation(fields: [videoId], references: [id], onDelete: Cascade)
+  language  String   @default("en")
+  segments  Json     // Array of {start, end, text}
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([videoId, language])
+}
+
+model VideoAnalytics {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  videoId  String   @db.ObjectId
+  video    Video    @relation(fields: [videoId], references: [id], onDelete: Cascade)
+  userId   String   @db.ObjectId
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  watchTime Float   // Total seconds watched
+  completionRate Float // Percentage watched
+  dropOffPoints Json? // Array of timestamps where users stopped
+  playbackSpeed Float @default(1.0)
+  lastWatchedAt DateTime
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([videoId, userId])
+  @@index([videoId, completionRate])
+  @@index([userId, lastWatchedAt])
+}
+
+model StudyGroup {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  courseId    String?  @db.ObjectId
+  course      Course?  @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  name        String
+  description String?
+  createdBy   String   @db.ObjectId
+  creator     User     @relation("GroupCreator", fields: [createdBy], references: [id])
+  maxMembers  Int      @default(10)
+  isPublic    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  members     GroupMember[]
+  projects    GroupProject[]
+  workspaces  SharedWorkspace[]
+
+  @@index([courseId, createdAt])
+  @@index([createdBy, createdAt])
+}
+
+model GroupMember {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  groupId   String   @db.ObjectId
+  group     StudyGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  userId    String   @db.ObjectId
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role      String   @default("member") // "admin", "member"
+  joinedAt  DateTime @default(now())
+
+  @@unique([groupId, userId])
+  @@index([userId, joinedAt])
+}
+
+model GroupProject {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  groupId     String   @db.ObjectId
+  group       StudyGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  title       String
+  description String?
+  dueDate     DateTime?
+  status      String   @default("in_progress") // "planning", "in_progress", "completed"
+  createdBy   String   @db.ObjectId
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([groupId, status, dueDate])
+}
+
+model SharedWorkspace {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  groupId     String?  @db.ObjectId
+  group       StudyGroup? @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  courseId    String?  @db.ObjectId
+  course      Course?  @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  userId      String   @db.ObjectId
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name        String
+  description String?
+  type        String   @default("document") // "document", "whiteboard", "code"
+  content     Json?    // Workspace content
+  isPublic    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([groupId, createdAt])
+  @@index([courseId, createdAt])
+  @@index([userId, createdAt])
+}
+
+model WaitlistEntry {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  courseId  String?  @db.ObjectId
+  course    Course?  @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  eventId   String?  @db.ObjectId
+  event     CalendarEvent? @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  userId    String   @db.ObjectId
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  position  Int
+  notifiedAt DateTime?
+  enrolledAt DateTime?
+  createdAt DateTime @default(now())
+
+  @@unique([courseId, userId])
+  @@unique([eventId, userId])
+  @@index([courseId, position])
+  @@index([eventId, position])
+  @@index([userId, createdAt])
 }
 
 model Interaction {
@@ -933,4 +1445,54 @@ model WhiteboardAction {
 
   @@index([whiteboardId, timestamp])
   @@index([userId, timestamp])
+}
+
+model UserSettings {
+  id                    String    @id @default(auto()) @map("_id") @db.ObjectId
+  userId                String    @unique @db.ObjectId
+  user                  User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // Notification preferences
+  emailNotifications    Boolean   @default(true)
+  pushNotifications     Boolean   @default(true)
+  courseUpdates         Boolean   @default(true)
+  deadlineReminders     Boolean   @default(true)
+  newMessages           Boolean   @default(true)
+  marketingEmails       Boolean   @default(false)
+  weeklyDigest          Boolean   @default(true)
+  certificateIssued     Boolean   @default(true)
+  assignmentGraded      Boolean   @default(true)
+  quizResults           Boolean   @default(true)
+  
+  // Privacy settings
+  profileVisibility     String    @default("public") // "public", "private", "friends"
+  showEmail             Boolean   @default(false)
+  showProgress          Boolean   @default(true)
+  showAchievements      Boolean   @default(true)
+  showCertificates      Boolean   @default(true)
+  
+  // Learning preferences
+  language              String    @default("en")
+  timezone              String    @default("UTC")
+  dateFormat            String    @default("MM/DD/YYYY")
+  videoPlaybackSpeed    Float     @default(1.0)
+  autoPlayVideos        Boolean   @default(false)
+  showSubtitles         Boolean   @default(false)
+  preferredSubtitleLang String    @default("en")
+  
+  // Account settings
+  twoFactorEnabled      Boolean   @default(false)
+  twoFactorSecret       String?
+  connectedAccounts     Json?     // OAuth connected accounts
+  lastPasswordChange    DateTime?
+  accountDeletionRequested Boolean @default(false)
+  accountDeletionDate   DateTime?
+  
+  // UI preferences (for frontend)
+  theme                 String    @default("light") // "light", "dark", "auto"
+  compactMode           Boolean   @default(false)
+  sidebarCollapsed      Boolean   @default(false)
+  
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
 }

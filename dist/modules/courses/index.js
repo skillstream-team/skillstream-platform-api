@@ -36,6 +36,12 @@ const calendar_routes_1 = __importDefault(require("./routes/rest/calendar.routes
 const recommendations_routes_1 = __importDefault(require("./routes/rest/recommendations.routes"));
 const polls_routes_1 = __importDefault(require("./routes/rest/polls.routes"));
 const whiteboard_routes_1 = __importDefault(require("./routes/rest/whiteboard.routes"));
+const content_versioning_routes_1 = __importDefault(require("./routes/rest/content-versioning.routes"));
+const content_moderation_routes_1 = __importDefault(require("./routes/rest/content-moderation.routes"));
+const reviews_routes_1 = __importDefault(require("./routes/rest/reviews.routes"));
+const forums_routes_1 = __importDefault(require("./routes/rest/forums.routes"));
+const video_features_routes_1 = __importDefault(require("./routes/rest/video-features.routes"));
+const collaboration_routes_1 = __importDefault(require("./routes/rest/collaboration.routes"));
 const course_resolver_1 = require("./routes/graphql/course.resolver");
 Object.defineProperty(exports, "coursesSchema", { enumerable: true, get: function () { return course_resolver_1.coursesSchema; } });
 const enrollment_resolver_1 = require("./routes/graphql/enrollment.resolver");
@@ -64,6 +70,12 @@ function registerCoursesModule(app) {
     app.use('/api/recommendations', recommendations_routes_1.default);
     app.use('/api/polls', polls_routes_1.default);
     app.use('/api/whiteboards', whiteboard_routes_1.default);
+    app.use('/api', content_versioning_routes_1.default);
+    app.use('/api', content_moderation_routes_1.default);
+    app.use('/api', reviews_routes_1.default);
+    app.use('/api', forums_routes_1.default);
+    app.use('/api', video_features_routes_1.default);
+    app.use('/api', collaboration_routes_1.default);
     // GraphQL endpoints
     app.use('/graphql/courses', (0, express_graphql_1.graphqlHTTP)({
         schema: course_resolver_1.coursesSchema,

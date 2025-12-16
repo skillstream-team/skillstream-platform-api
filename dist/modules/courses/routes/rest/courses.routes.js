@@ -46,12 +46,18 @@ router.post('/:id/lessons/:lessonId/quiz', (0, roles_1.requireRole)('Teacher'), 
         res.status(400).json({ error: err.message });
     }
 });
-// Get all courses (paginated)
+// Get all courses (paginated, searchable, filterable)
 router.get('/', async (req, res) => {
     try {
         const page = parseInt(req.query.page) || 1;
         const limit = parseInt(req.query.limit) || 20;
-        const result = await service.getAllCourses(page, limit);
+        const search = req.query.search;
+        const minPrice = req.query.minPrice ? parseFloat(req.query.minPrice) : undefined;
+        const maxPrice = req.query.maxPrice ? parseFloat(req.query.maxPrice) : undefined;
+        const instructorId = req.query.instructorId;
+        const sortBy = req.query.sortBy || 'createdAt';
+        const sortOrder = req.query.sortOrder || 'desc';
+        const result = await service.getAllCourses(page, limit, search, minPrice, maxPrice, instructorId, sortBy, sortOrder);
         res.json(result);
     }
     catch (err) {

@@ -29,10 +29,14 @@ export const updateCourseSchema = z.object({
 
 // User schemas
 export const createUserSchema = z.object({
-  username: z.string().min(3).max(50).regex(/^[a-zA-Z0-9_-]+$/, 'Username can only contain letters, numbers, underscores, and hyphens'),
+  username: z
+    .string()
+    .min(3)
+    .max(50)
+    .regex(/^[a-zA-Z0-9_-]+$/, 'Username can only contain letters, numbers, underscores, and hyphens'),
   email: z.string().email(),
   password: z.string().min(6).max(100),
-  role: z.enum(['STUDENT', 'Teacher', 'ADMIN']),
+  role: z.enum(['STUDENT', 'TEACHER', 'ADMIN']),
   firstName: z.string().max(100).optional(),
   lastName: z.string().max(100).optional(),
 });

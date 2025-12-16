@@ -125,21 +125,83 @@ app.use(express_1.default.urlencoded({ extended: true, limit: '10mb' }));
 (0, messaging_1.registerMessagingModule)(app, io);
 // Setup Swagger docs
 (0, swagger_1.setupSwagger)(app);
-// Health check endpoint
+// Enhanced health check endpoint
 app.get("/health", async (req, res) => {
-    const dbConnected = await (0, prisma_1.testDatabaseConnection)();
-    const redisConnected = redis_1.default ? await redis_1.default.ping().then(() => true).catch(() => false) : false;
-    const health = {
-        status: dbConnected ? "ok" : "degraded",
-        timestamp: new Date().toISOString(),
-        services: {
-            database: dbConnected,
-            redis: redisConnected,
-            kafka: (0, kafka_1.isKafkaAvailable)(),
-        },
-        uptime: process.uptime(),
+    const startTime = Date.now();
+    const timestamp = new Date().toISOString();
+    // Check database
+    let dbStatus = 'unknown';
+    let dbLatency = 0;
+    try {
+        const dbStart = Date.now();
+        const dbConnected = await (0, prisma_1.testDatabaseConnection)();
+        dbLatency = Date.now() - dbStart;
+        dbStatus = dbConnected ? 'healthy' : 'unhealthy';
+    }
+    catch (error) {
+        dbStatus = 'unhealthy';
+    }
+    // Check Redis
+    let redisStatus = 'unknown';
+    let redisLatency = 0;
+    if (redis_1.default) {
+        try {
+            const redisStart = Date.now();
+            await redis_1.default.ping();
+            redisLatency = Date.now() - redisStart;
+            redisStatus = 'healthy';
+        }
+        catch (error) {
+            redisStatus = 'unhealthy';
+        }
+    }
+    else {
+        redisStatus = 'not_configured';
+    }
+    // Check Kafka
+    const kafkaStatus = (0, kafka_1.isKafkaAvailable)() ? 'available' : 'unavailable';
+    // Memory usage
+    const memoryUsage = process.memoryUsage();
+    const memoryMB = {
+        rss: Math.round(memoryUsage.rss / 1024 / 1024),
+        heapTotal: Math.round(memoryUsage.heapTotal / 1024 / 1024),
+        heapUsed: Math.round(memoryUsage.heapUsed / 1024 / 1024),
+        external: Math.round(memoryUsage.external / 1024 / 1024),
     };
-    const statusCode = dbConnected ? 200 : 503;
+    // CPU usage (approximate)
+    const cpuUsage = process.cpuUsage();
+    // Overall status
+    const overallStatus = dbStatus === 'healthy' ? 'ok' : 'degraded';
+    const totalLatency = Date.now() - startTime;
+    const health = {
+        status: overallStatus,
+        timestamp,
+        uptime: Math.round(process.uptime()),
+        responseTime: totalLatency,
+        services: {
+            database: {
+                status: dbStatus,
+                latency: `${dbLatency}ms`,
+            },
+            redis: {
+                status: redisStatus,
+                latency: redisLatency > 0 ? `${redisLatency}ms` : 'N/A',
+            },
+            kafka: {
+                status: kafkaStatus,
+            },
+        },
+        system: {
+            memory: memoryMB,
+            cpu: {
+                user: cpuUsage.user,
+                system: cpuUsage.system,
+            },
+            nodeVersion: process.version,
+            platform: process.platform,
+        },
+    };
+    const statusCode = overallStatus === 'ok' ? 200 : 503;
     res.status(statusCode).json(health);
 });
 // Root endpoint

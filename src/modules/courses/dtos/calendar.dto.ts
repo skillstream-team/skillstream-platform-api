@@ -11,6 +11,10 @@ export interface CreateCalendarEventDto {
   quizId?: string;
   isRecurring?: boolean;
   recurrenceRule?: string;
+  recurrenceEnd?: Date;
+  timezone?: string;
+  maxAttendees?: number;
+  waitlistEnabled?: boolean;
   reminderMinutes?: number[];
   attendeeIds?: string[];
   metadata?: any;
@@ -25,6 +29,10 @@ export interface UpdateCalendarEventDto {
   location?: string;
   isRecurring?: boolean;
   recurrenceRule?: string;
+  recurrenceEnd?: Date;
+  timezone?: string;
+  maxAttendees?: number;
+  waitlistEnabled?: boolean;
   reminderMinutes?: number[];
   metadata?: any;
 }
@@ -43,6 +51,10 @@ export interface CalendarEventResponseDto {
   quizId?: string;
   isRecurring: boolean;
   recurrenceRule?: string;
+  recurrenceEnd?: Date;
+  timezone: string;
+  maxAttendees?: number;
+  waitlistEnabled: boolean;
   reminderMinutes: number[];
   metadata?: any;
   createdAt: Date;

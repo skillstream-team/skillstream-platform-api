@@ -46,9 +46,10 @@ const createPollSchema = z.object({
   options: z.array(z.string().min(1)).min(2).max(10),
 });
 
-router.post('/',
+router.post(
+  '/',
   requireAuth,
-  requireRole('Teacher'),
+  requireRole('TEACHER'),
   validate({ body: createPollSchema }),
   async (req, res) => {
     try {

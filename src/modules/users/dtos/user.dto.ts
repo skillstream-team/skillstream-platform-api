@@ -3,12 +3,12 @@ export interface CreateUserDTO {
   username: string;
   email: string;
   password: string;
-  role: 'STUDENT' | 'Teacher' | 'ADMIN';
+  role: 'STUDENT' | 'TEACHER' | 'ADMIN';
 }
 
 export interface UpdateUserDTO {
   username?: string;
   email?: string;
   password?: string;
-  role?: 'STUDENT' | 'Teacher' | 'ADMIN';
+  role?: 'STUDENT' | 'TEACHER' | 'ADMIN';
 }

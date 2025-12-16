@@ -63,14 +63,14 @@ export class AdminMessagingService {
         userIds.map(userId =>
           prisma.notification.create({
             data: {
-              toUserId: userId,
+              userId: userId,
               title: data.title,
               message: data.message,
               type: data.type || 'system',
               metadata: data.metadata || {},
             },
             include: {
-              toUser: {
+              user: {
                 select: { id: true, email: true, username: true }
               }
             }
@@ -81,7 +81,7 @@ export class AdminMessagingService {
       // Send real-time notifications via Socket.IO
       if (globalIo) {
         notifications.forEach(notification => {
-          globalIo!.to(`user-${notification.toUserId}`).emit('notification', {
+          globalIo!.to(`user-${notification.userId}`).emit('notification', {
             id: notification.id,
             title: notification.title,
             message: notification.message,
@@ -97,13 +97,13 @@ export class AdminMessagingService {
           notifications.map(async (notification) => {
             try {
               await emailService.sendSystemNotificationEmail(
-                notification.toUser.email,
+                notification.user.email,
                 notification.title,
                 notification.message,
                 data.link
               );
             } catch (error) {
-              console.error(`Error sending email to ${notification.toUser.email}:`, error);
+              console.error(`Error sending email to ${notification.user.email}:`, error);
               // Continue with other emails even if one fails
             }
           })
@@ -115,8 +115,8 @@ export class AdminMessagingService {
         sentCount: notifications.length,
         notifications: notifications.map(n => ({
           id: n.id,
-          userId: n.toUserId,
-          email: n.toUser.email
+          userId: n.userId,
+          email: n.user.email
         }))
       };
     } catch (error) {

@@ -53,7 +53,7 @@ class CoursesService {
      * @swagger
      * /courses:
      *   get:
-     *     summary: Get all courses (paginated)
+     *     summary: Get all courses (paginated, searchable, filterable)
      *     tags: [Courses]
      *     parameters:
      *       - in: query
@@ -67,11 +67,40 @@ class CoursesService {
      *           type: integer
      *           default: 20
      *           maximum: 100
+     *       - in: query
+     *         name: search
+     *         schema:
+     *           type: string
+     *         description: Search in title and description
+     *       - in: query
+     *         name: minPrice
+     *         schema:
+     *           type: number
+     *       - in: query
+     *         name: maxPrice
+     *         schema:
+     *           type: number
+     *       - in: query
+     *         name: instructorId
+     *         schema:
+     *           type: string
+     *       - in: query
+     *         name: sortBy
+     *         schema:
+     *           type: string
+     *           enum: [createdAt, price, title, popularity]
+     *           default: createdAt
+     *       - in: query
+     *         name: sortOrder
+     *         schema:
+     *           type: string
+     *           enum: [asc, desc]
+     *           default: desc
      *     responses:
      *       200:
      *         description: Paginated list of courses
      */
-    async getAllCourses(page = 1, limit = 20) {
+    async getAllCourses(page = 1, limit = 20, search, minPrice, maxPrice, instructorId, sortBy = 'createdAt', sortOrder = 'desc') {
         const cacheKey = cache_1.cacheKeys.courseList(page, limit);
         // Try cache first
         const cached = await (0, cache_1.getCache)(cacheKey);
@@ -80,8 +109,46 @@ class CoursesService {
         }
         const skip = (page - 1) * limit;
         const take = Math.min(limit, 100); // Max 100 per page
+        // Build where clause
+        const where = {};
+        // Search filter
+        if (search) {
+            where.OR = [
+                { title: { contains: search, mode: 'insensitive' } },
+                { description: { contains: search, mode: 'insensitive' } },
+            ];
+        }
+        // Price filters
+        if (minPrice !== undefined || maxPrice !== undefined) {
+            where.price = {};
+            if (minPrice !== undefined)
+                where.price.gte = minPrice;
+            if (maxPrice !== undefined)
+                where.price.lte = maxPrice;
+        }
+        // Instructor filter
+        if (instructorId) {
+            where.instructorId = instructorId;
+        }
+        // Build orderBy
+        let orderBy = {};
+        switch (sortBy) {
+            case 'price':
+                orderBy = { price: sortOrder };
+                break;
+            case 'title':
+                orderBy = { title: sortOrder };
+                break;
+            case 'popularity':
+                // Sort by enrollment count (requires aggregation or separate query)
+                orderBy = { createdAt: sortOrder }; // Fallback
+                break;
+            default:
+                orderBy = { createdAt: sortOrder };
+        }
         const [courses, total] = await Promise.all([
             prisma_1.prisma.course.findMany({
+                where,
                 skip,
                 take,
                 select: {
@@ -105,10 +172,18 @@ class CoursesService {
                         }
                     }
                 },
-                orderBy: { createdAt: 'desc' },
+                orderBy,
             }),
-            prisma_1.prisma.course.count(),
+            prisma_1.prisma.course.count({ where }),
         ]);
+        // For popularity sorting, we need to sort by enrollment count
+        if (sortBy === 'popularity') {
+            courses.sort((a, b) => {
+                const aCount = a._count.enrollments;
+                const bCount = b._count.enrollments;
+                return sortOrder === 'desc' ? bCount - aCount : aCount - bCount;
+            });
+        }
         const result = {
             data: courses,
             pagination: {

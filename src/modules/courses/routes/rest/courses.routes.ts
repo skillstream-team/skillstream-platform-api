@@ -9,7 +9,7 @@ const service = new CoursesService();
 
 // Create course (teacher only)
 router.post('/course', 
-  requireRole('Teacher'),
+  requireRole('TEACHER'),
   validate({ body: createCourseSchema }),
   async (req, res) => {
     try {
@@ -22,7 +22,7 @@ router.post('/course',
 );
 
 router.post('/:id/modules', 
-    requireRole('Teacher'),
+    requireRole('TEACHER'),
     validate({ params: courseIdParamSchema, body: createModuleSchema }),
     async (req, res) => {
         try{
@@ -35,7 +35,7 @@ router.post('/:id/modules',
 )
 
 //POST /api/v1/courses/{courseId}/modules/{moduleId}/lessons
-router.post('/:id/modules/:moduleId/lessons', requireRole('Teacher'), async (req,res) => {
+router.post('/:id/modules/:moduleId/lessons', requireRole('TEACHER'), async (req,res) => {
     try{
         const lesson = await service.addLessonToModule(req.params.moduleId, req.body);
         res.json(lesson);
@@ -46,7 +46,7 @@ router.post('/:id/modules/:moduleId/lessons', requireRole('Teacher'), async (req
 
 // /api/v1/courses/{courseId}/lessons/{lessonId}/quiz
 
-router.post('/:id/lessons/:lessonId/quiz', requireRole('Teacher'), async (req,res) => {
+router.post('/:id/lessons/:lessonId/quiz', requireRole('TEACHER'), async (req,res) => {
     try{
         const quiz = await service.addQuizToLesson(req.params.lessonId, req.body);
         res.json(quiz);
@@ -55,12 +55,28 @@ router.post('/:id/lessons/:lessonId/quiz', requireRole('Teacher'), async (req,re
     }
 })
 
-// Get all courses (paginated)
+// Get all courses (paginated, searchable, filterable)
 router.get('/', async (req, res) => {
     try {
         const page = parseInt(req.query.page as string) || 1;
         const limit = parseInt(req.query.limit as string) || 20;
-        const result = await service.getAllCourses(page, limit);
+        const search = req.query.search as string | undefined;
+        const minPrice = req.query.minPrice ? parseFloat(req.query.minPrice as string) : undefined;
+        const maxPrice = req.query.maxPrice ? parseFloat(req.query.maxPrice as string) : undefined;
+        const instructorId = req.query.instructorId as string | undefined;
+        const sortBy = (req.query.sortBy as string) || 'createdAt';
+        const sortOrder = (req.query.sortOrder as 'asc' | 'desc') || 'desc';
+        
+        const result = await service.getAllCourses(
+            page,
+            limit,
+            search,
+            minPrice,
+            maxPrice,
+            instructorId,
+            sortBy,
+            sortOrder
+        );
         res.json(result);
     } catch (err) {
         res.status(500).json({ error: 'Failed to fetch courses' });
@@ -83,7 +99,7 @@ router.get('/:id',
 
 // Update course
 router.put('/:id', 
-  requireRole('Teacher'),
+  requireRole('TEACHER'),
   validate({ params: courseIdParamSchema, body: updateCourseSchema }),
   async (req, res) => {
     try {
@@ -97,7 +113,7 @@ router.put('/:id',
 
 // Delete course
 router.delete('/:id', 
-  requireRole('Teacher'),
+  requireRole('TEACHER'),
   validate({ params: courseIdParamSchema }),
   async (req, res) => {
     try {

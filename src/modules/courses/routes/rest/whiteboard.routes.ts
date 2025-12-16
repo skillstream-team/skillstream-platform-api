@@ -28,7 +28,7 @@ const createWhiteboardSchema = z.object({
 
 router.post('/',
   requireAuth,
-  requireRole('Teacher'),
+  requireRole('TEACHER'),
   validate({ body: createWhiteboardSchema }),
   async (req, res) => {
     try {
@@ -143,7 +143,7 @@ const updateWhiteboardSchema = z.object({
 
 router.put('/:whiteboardId',
   requireAuth,
-  requireRole('Teacher'),
+  requireRole('TEACHER'),
   validate({ 
     params: z.object({ whiteboardId: z.string().min(1) }),
     body: updateWhiteboardSchema 
@@ -173,7 +173,7 @@ router.put('/:whiteboardId',
  */
 router.delete('/:whiteboardId',
   requireAuth,
-  requireRole('Teacher'),
+  requireRole('TEACHER'),
   validate({ params: z.object({ whiteboardId: z.string().min(1) }) }),
   async (req, res) => {
     try {
@@ -263,7 +263,7 @@ router.get('/:whiteboardId/actions',
  */
 router.post('/:whiteboardId/clear',
   requireAuth,
-  requireRole('Teacher'),
+  requireRole('TEACHER'),
   validate({ params: z.object({ whiteboardId: z.string().min(1) }) }),
   async (req, res) => {
     try {

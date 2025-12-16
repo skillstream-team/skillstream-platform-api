@@ -36,14 +36,14 @@ class AdminMessagingService {
             // Create notifications
             const notifications = await Promise.all(userIds.map(userId => prisma_1.prisma.notification.create({
                 data: {
-                    toUserId: userId,
+                    userId: userId,
                     title: data.title,
                     message: data.message,
                     type: data.type || 'system',
                     metadata: data.metadata || {},
                 },
                 include: {
-                    toUser: {
+                    user: {
                         select: { id: true, email: true, username: true }
                     }
                 }
@@ -51,7 +51,7 @@ class AdminMessagingService {
             // Send real-time notifications via Socket.IO
             if (globalIo) {
                 notifications.forEach(notification => {
-                    globalIo.to(`user-${notification.toUserId}`).emit('notification', {
+                    globalIo.to(`user-${notification.userId}`).emit('notification', {
                         id: notification.id,
                         title: notification.title,
                         message: notification.message,
@@ -64,10 +64,10 @@ class AdminMessagingService {
             if (data.sendEmail) {
                 await Promise.all(notifications.map(async (notification) => {
                     try {
-                        await email_service_1.emailService.sendSystemNotificationEmail(notification.toUser.email, notification.title, notification.message, data.link);
+                        await email_service_1.emailService.sendSystemNotificationEmail(notification.user.email, notification.title, notification.message, data.link);
                     }
                     catch (error) {
-                        console.error(`Error sending email to ${notification.toUser.email}:`, error);
+                        console.error(`Error sending email to ${notification.user.email}:`, error);
                         // Continue with other emails even if one fails
                     }
                 }));
@@ -77,8 +77,8 @@ class AdminMessagingService {
                 sentCount: notifications.length,
                 notifications: notifications.map(n => ({
                     id: n.id,
-                    userId: n.toUserId,
-                    email: n.toUser.email
+                    userId: n.userId,
+                    email: n.user.email
                 }))
             };
         }

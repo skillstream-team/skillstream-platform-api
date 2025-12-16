@@ -781,6 +781,19 @@ export class LearningService {
         },
       });
 
+      // Check if course is completed and auto-issue certificate if needed
+      // Only check if this progress update marks something as completed
+      if (data.status === 'completed' || data.status === 'passed') {
+        try {
+          // Import certificate service dynamically to avoid circular dependency
+          const { certificateService } = await import('./certificate.service');
+          await certificateService.autoIssueCertificate(data.studentId, data.courseId);
+        } catch (certError) {
+          // Log but don't fail progress update if certificate issuance fails
+          console.warn('Certificate auto-issuance failed:', certError);
+        }
+      }
+
       return progress as ProgressResponseDto;
     } catch (error) {
       throw new Error(`Failed to update progress: ${error instanceof Error ? error.message : 'Unknown error'}`);

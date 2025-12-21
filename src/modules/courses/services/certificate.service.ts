@@ -1,6 +1,7 @@
 import PDFDocument from 'pdfkit';
 import { prisma } from '../../../utils/prisma';
 import { emailService } from '../../users/services/email.service';
+import { DashboardService } from './dashboard.service';
 
 export interface CertificateData {
   id: string;
@@ -236,17 +237,27 @@ export class CertificateService {
         },
       });
 
-      // Send email notification
+      // Send certificate email
       try {
-        await emailService.sendSystemNotificationEmail(
+        const certificateUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/courses/${courseId}/certificates/${certificate.id}`;
+        await emailService.sendCertificateEmail(
           student.email,
-          'Course Completed - Certificate Issued! 🎉',
-          `Congratulations ${student.firstName || student.username}! You have successfully completed the course "${course.title}" and your certificate has been issued.`,
-          `${process.env.FRONTEND_URL || 'http://localhost:3000'}/courses/${courseId}/certificates/${studentId}`
+          student.username,
+          course.title,
+          certificateUrl
         );
       } catch (emailError) {
-        console.error('Failed to send certificate email:', emailError);
+        console.warn('Failed to send certificate email:', emailError);
         // Don't fail certificate issuance if email fails
+      }
+
+      // Clear dashboard cache
+      try {
+        const { DashboardService } = await import('./dashboard.service');
+        const dashboardService = new DashboardService();
+        await dashboardService.clearDashboardCache(studentId);
+      } catch (error) {
+        console.warn('Failed to clear dashboard cache:', error);
       }
 
       return {
@@ -311,16 +322,26 @@ export class CertificateService {
       },
     });
 
-    // Send email notification
+    // Send certificate email
     try {
-      await emailService.sendSystemNotificationEmail(
+      const certificateUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/courses/${courseId}/certificates/${certificate.id}`;
+      await emailService.sendCertificateEmail(
         student.email,
-        'Certificate Issued! 🎉',
-        `Congratulations! Your certificate for "${course.title}" has been issued.`,
-        `${process.env.FRONTEND_URL || 'http://localhost:3000'}/courses/${courseId}/certificates/${studentId}`
+        student.username,
+        course.title,
+        certificateUrl
       );
     } catch (emailError) {
-      console.error('Failed to send certificate email:', emailError);
+      console.warn('Failed to send certificate email:', emailError);
+      // Don't fail certificate issuance if email fails
+    }
+
+    // Clear dashboard cache
+    try {
+      const dashboardService = new DashboardService();
+      await dashboardService.clearDashboardCache(studentId);
+    } catch (error) {
+      console.warn('Failed to clear dashboard cache:', error);
     }
 
     return certificate;

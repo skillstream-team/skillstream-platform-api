@@ -81,6 +81,48 @@ const CourseEnrollmentType = new GraphQLObjectType({
   }),
 });
 
+const ActivityBreakdownType = new GraphQLObjectType({
+  name: 'ActivityBreakdown',
+  fields: () => ({
+    progress: { type: new GraphQLNonNull(GraphQLInt) },
+    activityLogs: { type: new GraphQLNonNull(GraphQLInt) },
+    interactions: { type: new GraphQLNonNull(GraphQLInt) },
+    forumPosts: { type: new GraphQLNonNull(GraphQLInt) },
+    forumReplies: { type: new GraphQLNonNull(GraphQLInt) },
+    videoViews: { type: new GraphQLNonNull(GraphQLInt) },
+  }),
+});
+
+const ActiveUserType = new GraphQLObjectType({
+  name: 'ActiveUser',
+  fields: () => ({
+    id: { type: new GraphQLNonNull(GraphQLString) },
+    username: { type: new GraphQLNonNull(GraphQLString) },
+    email: { type: new GraphQLNonNull(GraphQLString) },
+    enrollmentDate: { type: new GraphQLNonNull(GraphQLString) },
+    lastAccessed: { type: new GraphQLNonNull(GraphQLString) },
+    totalActivityCount: { type: new GraphQLNonNull(GraphQLInt) },
+    activityBreakdown: { type: new GraphQLNonNull(ActivityBreakdownType) },
+  }),
+});
+
+const ActiveUsersResponseType = new GraphQLObjectType({
+  name: 'ActiveUsersResponse',
+  fields: () => ({
+    data: { type: new GraphQLList(ActiveUserType) },
+    summary: {
+      type: new GraphQLObjectType({
+        name: 'ActiveUsersSummary',
+        fields: () => ({
+          totalEnrolled: { type: new GraphQLNonNull(GraphQLInt) },
+          activeCount: { type: new GraphQLNonNull(GraphQLInt) },
+          activePercentage: { type: new GraphQLNonNull(GraphQLFloat) },
+        }),
+      }),
+    },
+  }),
+});
+
 const CourseStatsType = new GraphQLObjectType({
   name: 'CourseStats',
   fields: () => ({
@@ -131,6 +173,42 @@ const enrollmentQueries = {
     args: { courseId: { type: new GraphQLNonNull(GraphQLInt) } },
     resolve: async (_: any, args: any) => {
       return await paymentService.getPaymentsByCourse(args.courseId);
+    },
+  },
+  activeUsersInCourse: {
+    type: ActiveUsersResponseType,
+    args: {
+      courseId: { type: new GraphQLNonNull(GraphQLString) },
+      days: { type: GraphQLInt, defaultValue: 7 },
+      page: { type: GraphQLInt, defaultValue: 1 },
+      limit: { type: GraphQLInt, defaultValue: 20 },
+    },
+    resolve: async (_: any, args: any) => {
+      const result = await enrollmentService.getActiveUsersInCourse(
+        args.courseId,
+        args.days || 7,
+        args.page || 1,
+        args.limit || 20
+      );
+      return {
+        data: result.data.map((user) => ({
+          ...user,
+          enrollmentDate: user.enrollmentDate.toISOString(),
+          lastAccessed: user.lastAccessed.toISOString(),
+          activityBreakdown: user.activityBreakdown,
+        })),
+        summary: result.summary,
+      };
+    },
+  },
+  activeUserCount: {
+    type: GraphQLInt,
+    args: {
+      courseId: { type: new GraphQLNonNull(GraphQLString) },
+      days: { type: GraphQLInt, defaultValue: 7 },
+    },
+    resolve: async (_: any, args: any) => {
+      return await enrollmentService.getActiveUserCount(args.courseId, args.days || 7);
     },
   },
 };

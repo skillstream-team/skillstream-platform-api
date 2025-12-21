@@ -18,6 +18,13 @@ export const createCourseSchema = z.object({
   order: z.number().int().min(0),
   createdBy: z.string().min(1),
   instructorId: z.string().min(1),
+  thumbnailUrl: z.string().url().optional().or(z.literal('')),
+  categoryId: z.string().optional(),
+  difficulty: z.enum(['BEGINNER', 'INTERMEDIATE', 'ADVANCED', 'EXPERT']).optional(),
+  duration: z.number().int().min(0).optional(),
+  language: z.string().optional(),
+  learningObjectives: z.array(z.string()).optional(),
+  requirements: z.array(z.string()).optional(),
 });
 
 export const updateCourseSchema = z.object({
@@ -25,6 +32,13 @@ export const updateCourseSchema = z.object({
   description: z.string().max(5000).optional(),
   price: z.number().min(0).optional(),
   order: z.number().int().min(0).optional(),
+  thumbnailUrl: z.string().url().optional().or(z.literal('')),
+  categoryId: z.string().optional(),
+  difficulty: z.enum(['BEGINNER', 'INTERMEDIATE', 'ADVANCED', 'EXPERT']).optional(),
+  duration: z.number().int().min(0).optional(),
+  language: z.string().optional(),
+  learningObjectives: z.array(z.string()).optional(),
+  requirements: z.array(z.string()).optional(),
 });
 
 // User schemas
@@ -90,6 +104,17 @@ export const createQuizSchema = z.object({
   passingScore: z.number().min(0).max(100).optional(),
   dueDate: z.string().datetime().optional(),
   createdBy: z.string().min(1),
+});
+
+// Subscription schemas
+export const createSubscriptionSchema = z.object({
+  provider: z.string().min(1),
+  transactionId: z.string().optional(),
+});
+
+export const activateSubscriptionSchema = z.object({
+  transactionId: z.string().min(1),
+  provider: z.string().min(1),
 });
 
 // Assignment schemas

@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { ReviewsService } from '../../services/reviews.service';
 import { requireAuth } from '../../../../middleware/auth';
 import { requireRole } from '../../../../middleware/roles';
+import { requireSubscription } from '../../../../middleware/subscription';
 import { validate } from '../../../../middleware/validation';
 import { z } from 'zod';
 
@@ -23,6 +24,7 @@ const createReviewSchema = z.object({
 
 router.post('/courses/:courseId/reviews',
   requireAuth,
+  requireSubscription,
   validate({
     params: z.object({ courseId: z.string().min(1) }),
     body: createReviewSchema,

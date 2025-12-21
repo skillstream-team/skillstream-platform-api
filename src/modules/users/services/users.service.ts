@@ -6,6 +6,7 @@ import jwt from 'jsonwebtoken';
 import { generateToken, JWTPayload } from '../../../utils/jwt';
 import { emailService } from './email.service';
 import { getCache, setCache, deleteCachePattern, cacheKeys, CACHE_TTL } from '../../../utils/cache';
+import { ReferralService } from '../../courses/services/referral.service';
 
 const JWT_SECRET = process.env.JWT_SECRET as string;
 if (!JWT_SECRET) {
@@ -91,7 +92,7 @@ export class UsersService {
       });
 
       if (existingUser) {
-        throw new Error('User with this email or username already exists');
+        throw new Error('User already exists');
       }
 
       // Hash password if provided
@@ -115,6 +116,17 @@ export class UsersService {
       } catch (error) {
         console.error('Error creating default settings:', error);
         // Don't fail user creation if settings creation fails
+      }
+
+      // Apply referral code if provided
+      if (data.referralCode) {
+        try {
+          const referralService = new ReferralService();
+          await referralService.applyReferralCode(data.referralCode, user.id);
+        } catch (referralError) {
+          console.warn('Failed to apply referral code:', referralError);
+          // Don't fail user creation if referral fails
+        }
       }
 
       // Send welcome email

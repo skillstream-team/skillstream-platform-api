@@ -116,6 +116,181 @@ export class EmailService {
         await this.sendFromTeam(to, subject, html);
     }
 
+    // Course enrollment confirmation
+    async sendEnrollmentConfirmation(
+        to: string,
+        username: string,
+        courseTitle: string,
+        courseId: string
+    ) {
+        const subject = `Welcome to ${courseTitle}! 🎓`;
+        const html = `
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta charset="utf-8">
+                <style>
+                    body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+                    .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+                    .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
+                    .content { background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px; }
+                    .button { display: inline-block; background: #667eea; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; margin: 20px 0; }
+                </style>
+            </head>
+            <body>
+                <div class="container">
+                    <div class="header">
+                        <h1>You're Enrolled! 🎉</h1>
+                    </div>
+                    <div class="content">
+                        <p>Hi ${username},</p>
+                        <p>Congratulations! You've successfully enrolled in <strong>${courseTitle}</strong>.</p>
+                        <p>You can now start learning at your own pace. Access your course materials, watch videos, complete assignments, and track your progress.</p>
+                        <p style="text-align: center;">
+                            <a href="${FRONTEND_URL}/courses/${courseId}" class="button">Start Learning</a>
+                        </p>
+                        <p>Happy learning!</p>
+                        <p>Best regards,<br><strong>The SkillStream Team</strong></p>
+                    </div>
+                </div>
+            </body>
+            </html>
+        `;
+        await this.sendFromTeam(to, subject, html);
+    }
+
+    // Assignment deadline reminder
+    async sendDeadlineReminder(
+        to: string,
+        username: string,
+        assignmentTitle: string,
+        courseTitle: string,
+        dueDate: Date
+    ) {
+        const subject = `Reminder: ${assignmentTitle} due soon`;
+        const daysUntil = Math.ceil((dueDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+        const html = `
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta charset="utf-8">
+                <style>
+                    body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+                    .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+                    .header { background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
+                    .content { background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px; }
+                    .button { display: inline-block; background: #f5576c; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; margin: 20px 0; }
+                </style>
+            </head>
+            <body>
+                <div class="container">
+                    <div class="header">
+                        <h1>Deadline Reminder ⏰</h1>
+                    </div>
+                    <div class="content">
+                        <p>Hi ${username},</p>
+                        <p>This is a reminder that <strong>${assignmentTitle}</strong> in <strong>${courseTitle}</strong> is due in ${daysUntil} day${daysUntil !== 1 ? 's' : ''}.</p>
+                        <p><strong>Due Date:</strong> ${dueDate.toLocaleDateString()} at ${dueDate.toLocaleTimeString()}</p>
+                        <p style="text-align: center;">
+                            <a href="${FRONTEND_URL}/assignments" class="button">View Assignment</a>
+                        </p>
+                        <p>Don't forget to submit on time!</p>
+                        <p>Best regards,<br><strong>The SkillStream Team</strong></p>
+                    </div>
+                </div>
+            </body>
+            </html>
+        `;
+        await this.sendFromTeam(to, subject, html);
+    }
+
+    // Course completion certificate
+    async sendCertificateEmail(
+        to: string,
+        username: string,
+        courseTitle: string,
+        certificateUrl: string
+    ) {
+        const subject = `Congratulations! You've completed ${courseTitle} 🎓`;
+        const html = `
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta charset="utf-8">
+                <style>
+                    body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+                    .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+                    .header { background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
+                    .content { background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px; }
+                    .button { display: inline-block; background: #4facfe; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; margin: 20px 0; }
+                </style>
+            </head>
+            <body>
+                <div class="container">
+                    <div class="header">
+                        <h1>🎉 Course Completed! 🎉</h1>
+                    </div>
+                    <div class="content">
+                        <p>Hi ${username},</p>
+                        <p>Congratulations! You've successfully completed <strong>${courseTitle}</strong>!</p>
+                        <p>Your certificate of completion is ready. You can download it and share your achievement.</p>
+                        <p style="text-align: center;">
+                            <a href="${certificateUrl}" class="button">Download Certificate</a>
+                        </p>
+                        <p>Keep up the great work and continue your learning journey!</p>
+                        <p>Best regards,<br><strong>The SkillStream Team</strong></p>
+                    </div>
+                </div>
+            </body>
+            </html>
+        `;
+        await this.sendFromTeam(to, subject, html);
+    }
+
+    // New course announcement
+    async sendCourseAnnouncement(
+        to: string,
+        username: string,
+        courseTitle: string,
+        courseId: string,
+        instructorName: string
+    ) {
+        const subject = `New Course Available: ${courseTitle}`;
+        const html = `
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta charset="utf-8">
+                <style>
+                    body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+                    .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+                    .header { background: linear-gradient(135deg, #fa709a 0%, #fee140 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
+                    .content { background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px; }
+                    .button { display: inline-block; background: #fa709a; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; margin: 20px 0; }
+                </style>
+            </head>
+            <body>
+                <div class="container">
+                    <div class="header">
+                        <h1>New Course Available! 🚀</h1>
+                    </div>
+                    <div class="content">
+                        <p>Hi ${username},</p>
+                        <p>We're excited to announce a new course: <strong>${courseTitle}</strong> by ${instructorName}!</p>
+                        <p>This course is now available for enrollment. Don't miss out on this learning opportunity!</p>
+                        <p style="text-align: center;">
+                            <a href="${FRONTEND_URL}/courses/${courseId}" class="button">View Course</a>
+                        </p>
+                        <p>Happy learning!</p>
+                        <p>Best regards,<br><strong>The SkillStream Team</strong></p>
+                    </div>
+                </div>
+            </body>
+            </html>
+        `;
+        await this.sendFromTeam(to, subject, html);
+    }
+
     // Promotional email
     async sendPromotionalEmail(to: string, subject: string, content: string, ctaText?: string, ctaLink?: string) {
         const html = `

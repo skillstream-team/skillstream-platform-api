@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { requireAuth } from '../../../../middleware/auth';
 import { requireRole } from '../../../../middleware/roles';
+import { requireSubscription } from '../../../../middleware/subscription';
 import { prisma } from '../../../../utils/prisma';
 
 const router = Router();
@@ -57,7 +58,7 @@ router.post('/lessons/quick', requireAuth, requireRole('TEACHER'), async (req, r
  *     summary: Get lessons (for teacher or student)
  *     tags: [Lessons]
  */
-router.get('/lessons', requireAuth, async (req, res) => {
+router.get('/lessons', requireAuth, requireSubscription, async (req, res) => {
   try {
     const userId = (req as any).user?.id;
     const { role, status } = req.query;

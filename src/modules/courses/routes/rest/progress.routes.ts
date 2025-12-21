@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { LearningService } from '../../services/learning.service';
 import { EnrollmentService } from '../../services/enrollment.service';
 import { requireAuth } from '../../../../middleware/auth';
+import { requireSubscription } from '../../../../middleware/subscription';
 import { prisma } from '../../../../utils/prisma';
 
 const router = Router();
@@ -27,7 +28,7 @@ const enrollmentService = new EnrollmentService();
  *       404:
  *         description: User not found
  */
-router.get('/users/:userId/progress', requireAuth, async (req, res) => {
+router.get('/users/:userId/progress', requireAuth, requireSubscription, async (req, res) => {
   try {
     const { userId } = req.params;
     const { status } = req.query;
@@ -141,7 +142,7 @@ router.get('/users/:userId/progress', requireAuth, async (req, res) => {
  *           type: string
  *           enum: [in_progress, completed]
  */
-router.get('/users/:userId/progress/courses', requireAuth, async (req, res) => {
+router.get('/users/:userId/progress/courses', requireAuth, requireSubscription, async (req, res) => {
   try {
     const { userId } = req.params;
     const { status } = req.query;
@@ -225,7 +226,7 @@ router.get('/users/:userId/progress/courses', requireAuth, async (req, res) => {
  *       200:
  *         description: Progress retrieved successfully
  */
-router.get('/courses/:courseId/progress', requireAuth, async (req, res) => {
+router.get('/courses/:courseId/progress', requireAuth, requireSubscription, async (req, res) => {
   try {
     const { courseId } = req.params;
     const userId = (req as any).user?.id;

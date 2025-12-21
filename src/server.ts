@@ -7,6 +7,7 @@ import { producer, consumer, isKafkaAvailable } from "./utils/kafka";
 import { registerUserModule } from "./modules/users";
 import { registerCoursesModule } from "./modules/courses";
 import { registerMessagingModule } from "./modules/messaging";
+import { registerSubscriptionRoutes } from "./modules/subscriptions";
 import { setSocketIO } from "./modules/users/services/admin-messaging.service";
 import { validateEnv, env } from "./utils/env";
 import { errorHandler } from "./middleware/error-handler";
@@ -97,6 +98,7 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 registerUserModule(app);
 registerCoursesModule(app);
 registerMessagingModule(app, io);
+registerSubscriptionRoutes(app);
 
 // Setup Swagger docs
 setupSwagger(app);

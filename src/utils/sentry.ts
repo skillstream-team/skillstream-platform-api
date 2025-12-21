@@ -1,6 +1,15 @@
 import * as Sentry from "@sentry/node";
-import { nodeProfilingIntegration } from "@sentry/profiling-node";
 import { expressIntegration } from "@sentry/node";
+
+// Conditionally import profiling integration (may not be available)
+let nodeProfilingIntegration: any = null;
+try {
+  const profilingModule = require("@sentry/profiling-node");
+  nodeProfilingIntegration = profilingModule.nodeProfilingIntegration;
+} catch (error) {
+  // Profiling module not available - that's okay, we'll skip it
+  console.warn("⚠️  Sentry profiling module not available. Profiling disabled.");
+}
 
 /**
  * Initialize Sentry for error tracking and performance monitoring
@@ -12,23 +21,31 @@ export function initSentry() {
 
   // Only initialize in production with a valid DSN
   if (environment === 'production' && dsn) {
+    const integrations: any[] = [
+      expressIntegration(),
+    ];
+
+    // Only add profiling integration if available
+    if (nodeProfilingIntegration) {
+      integrations.push(nodeProfilingIntegration());
+    }
+
     Sentry.init({
       dsn: dsn,
       environment: environment,
       
       // Integrations
-      integrations: [
-        expressIntegration(),
-        nodeProfilingIntegration(),
-      ],
+      integrations,
 
       // Performance Monitoring
       // Sample 10% of transactions for performance monitoring
       tracesSampleRate: parseFloat(process.env.SENTRY_TRACES_SAMPLE_RATE || '0.1'),
       
-      // Profiling
+      // Profiling (only if module is available)
       // Sample 10% of transactions for profiling
-      profilesSampleRate: parseFloat(process.env.SENTRY_PROFILES_SAMPLE_RATE || '0.1'),
+      profilesSampleRate: nodeProfilingIntegration 
+        ? parseFloat(process.env.SENTRY_PROFILES_SAMPLE_RATE || '0.1')
+        : undefined,
 
       // Release tracking (useful for versioning)
       release: process.env.SENTRY_RELEASE || process.env.npm_package_version || undefined,

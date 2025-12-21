@@ -1,5 +1,6 @@
 import { Router } from 'express';
-import { requireAuth, requireRole } from '../../../../middleware/auth';
+import { requireAuth } from '../../../../middleware/auth';
+import { requireRole } from '../../../../middleware/roles';
 import { TagsService } from '../../services/tags.service';
 
 const router = Router();

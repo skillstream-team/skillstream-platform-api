@@ -184,7 +184,7 @@ export class TeacherEarningsService {
             })
         );
 
-        const activeUserCount = activeUserCounts.reduce((sum, count) => sum + count, 0);
+        const activeUserCount = activeUserCounts.reduce((sum: number, count) => sum + count, 0);
         const amount = activeUserCount * RATE_PER_ACTIVE_USER;
 
         // Upsert earnings record

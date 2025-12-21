@@ -124,7 +124,6 @@ router.get('/:id/preview', async (req, res) => {
                 select: {
                     id: true,
                     title: true,
-                    description: true,
                     order: true,
                     duration: true,
                     createdAt: true,

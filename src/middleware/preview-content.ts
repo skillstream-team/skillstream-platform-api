@@ -100,7 +100,6 @@ export async function getPreviewContent(
         select: {
           id: true,
           title: true,
-          description: true,
           order: true,
           duration: true,
           createdAt: true,

@@ -129,7 +129,11 @@ export class TagsService {
     ]);
 
     return {
-      data: courses,
+      data: courses.map(c => ({
+        id: c.id,
+        title: c.title,
+        thumbnailUrl: c.thumbnailUrl || undefined,
+      })),
       pagination: {
         page,
         limit: take,

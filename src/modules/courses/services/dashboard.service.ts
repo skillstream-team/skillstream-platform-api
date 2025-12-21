@@ -282,14 +282,11 @@ export class DashboardService {
     // Get recent achievements
     const achievements = await prisma.achievement.findMany({
       where: { studentId: userId },
-      include: {
-        badge: {
-          select: {
-            name: true,
-            description: true,
-            icon: true,
-          },
-        },
+      select: {
+        id: true,
+        badgeName: true,
+        badgeIcon: true,
+        earnedAt: true,
       },
       orderBy: { earnedAt: 'desc' },
       take: 5,
@@ -305,9 +302,9 @@ export class DashboardService {
         id: a.id,
         badgeName: a.badgeName,
         badge: {
-          name: a.badge.name,
-          description: a.badge.description || undefined,
-          icon: a.badge.icon || undefined,
+          name: a.badgeName,
+          description: undefined,
+          icon: a.badgeIcon || undefined,
         },
         earnedAt: a.earnedAt,
       })),

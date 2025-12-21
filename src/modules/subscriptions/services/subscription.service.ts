@@ -123,11 +123,12 @@ export class SubscriptionService {
 
     // Check if subscription is active and not expired
     const now = new Date();
-    const isActive = 
+    const isActive = Boolean(
       subscription.status === 'COMPLETED' &&
       subscription.expiresAt &&
       subscription.expiresAt > now &&
-      user.subscriptionStatus === 'ACTIVE';
+      user.subscriptionStatus === 'ACTIVE'
+    );
 
     return {
       isActive,

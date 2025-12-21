@@ -34,12 +34,12 @@ export class ReferralService {
    * Generate referral code for user
    */
   async generateReferralCode(userId: string): Promise<string> {
-    // Check if user already has a referral code
+    // Check if user already has a referral code as referrer
     const existing = await prisma.referral.findFirst({
       where: {
         referrerId: userId,
-        status: { in: ['PENDING', 'ACTIVE'] },
       },
+      orderBy: { createdAt: 'desc' },
     });
 
     if (existing) {
@@ -49,14 +49,9 @@ export class ReferralService {
     // Generate unique code
     const code = this.generateCode(userId);
     
-    // Create referral record (without referred user yet)
-    await prisma.referral.create({
-      data: {
-        referrerId: userId,
-        code,
-        status: 'PENDING',
-      },
-    });
+    // Note: We can't create a referral without referredId since it's required
+    // The referral will be created when someone applies the code
+    // For now, we just return the code - it will be created in applyReferralCode
 
     return code;
   }

@@ -1,5 +1,6 @@
 import { Router } from 'express';
-import { requireAuth, requireRole } from '../../../../middleware/auth';
+import { requireAuth } from '../../../../middleware/auth';
+import { requireRole } from '../../../../middleware/roles';
 import { InstructorQAService } from '../../services/instructor-qa.service';
 
 const router = Router();

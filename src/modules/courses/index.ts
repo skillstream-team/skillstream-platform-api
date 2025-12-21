@@ -31,6 +31,7 @@ import bundlesRoutes from './routes/rest/bundles.routes';
 import couponsRoutes from './routes/rest/coupons.routes';
 import learningPathsRoutes from './routes/rest/learning-paths.routes';
 import tagsRoutes from './routes/rest/tags.routes';
+import tagsPlatformRoutes from './routes/rest/tags-platform.routes';
 import instructorQARoutes from './routes/rest/instructor-qa.routes';
 import referralRoutes from './routes/rest/referral.routes';
 import shareRoutes from './routes/rest/share.routes';
@@ -73,7 +74,8 @@ export function registerCoursesModule(app: express.Application) {
   app.use('/api/bundles', bundlesRoutes);
   app.use('/api/coupons', couponsRoutes);
   app.use('/api/learning-paths', learningPathsRoutes);
-  app.use('/api/courses', tagsRoutes);
+  app.use('/api/courses', tagsRoutes); // Course-specific tag routes
+  app.use('/api/tags', tagsPlatformRoutes); // Platform-wide tag routes
   app.use('/api/courses', instructorQARoutes);
   app.use('/api/referrals', referralRoutes);
   app.use('/api/courses', shareRoutes);

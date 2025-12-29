@@ -170,7 +170,7 @@ router.get('/conversations/:conversationId', requireAuth, async (req, res) => {
       return res.status(401).json({ error: 'User not authenticated' });
     }
 
-    if (!conversationId) {
+    if (!conversationId || conversationId === 'undefined' || conversationId === 'null') {
       return res.status(400).json({ error: 'Invalid conversation ID' });
     }
 
@@ -534,7 +534,7 @@ router.get('/conversations/:conversationId/messages', requireAuth, async (req, r
       return res.status(401).json({ error: 'User not authenticated' });
     }
 
-    if (!conversationId) {
+    if (!conversationId || conversationId === 'undefined' || conversationId === 'null') {
       return res.status(400).json({ error: 'Invalid conversation ID' });
     }
 
@@ -715,14 +715,14 @@ router.post('/conversations/:conversationId/read', requireAuth, async (req, res)
       return res.status(401).json({ error: 'User not authenticated' });
     }
 
-    if (!conversationId) {
+    if (!conversationId || conversationId === 'undefined' || conversationId === 'null') {
       return res.status(400).json({ error: 'Invalid conversation ID' });
     }
 
-    await messagingService.markMessagesAsRead(conversationId, userId);
+    const result = await messagingService.markMessagesAsRead(conversationId, userId);
     res.json({
       success: true,
-      message: 'Messages marked as read successfully',
+      markedCount: result.markedCount,
     });
   } catch (error) {
     console.error('Error marking messages as read:', error);

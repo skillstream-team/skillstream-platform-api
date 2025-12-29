@@ -120,6 +120,9 @@ export class MessagingService {
                   id: true,
                   username: true,
                   email: true,
+                  firstName: true,
+                  lastName: true,
+                  avatar: true,
                 },
               },
             },
@@ -129,6 +132,9 @@ export class MessagingService {
               id: true,
               username: true,
               email: true,
+              firstName: true,
+              lastName: true,
+              avatar: true,
             },
           },
           messages: {
@@ -142,6 +148,9 @@ export class MessagingService {
                   id: true,
                   username: true,
                   email: true,
+                  firstName: true,
+                  lastName: true,
+                  avatar: true,
                 },
               },
               receiver: {
@@ -149,6 +158,9 @@ export class MessagingService {
                   id: true,
                   username: true,
                   email: true,
+                  firstName: true,
+                  lastName: true,
+                  avatar: true,
                 },
               },
             },
@@ -171,7 +183,7 @@ export class MessagingService {
     userId: string,
     filters: ConversationFiltersDto
   ): Promise<{
-    data: ConversationResponseDto[];
+    conversations: ConversationResponseDto[];
     pagination: {
       page: number;
       limit: number;
@@ -284,7 +296,7 @@ export class MessagingService {
       );
 
       return {
-        data: conversationsWithUnread.map((conv: any) => this.mapConversationToDto(conv)),
+        conversations: conversationsWithUnread.map((conv: any) => this.mapConversationToDto(conv)),
         pagination: {
           page,
           limit,
@@ -327,6 +339,9 @@ export class MessagingService {
                   id: true,
                   username: true,
                   email: true,
+                  firstName: true,
+                  lastName: true,
+                  avatar: true,
                 },
               },
             },
@@ -336,6 +351,9 @@ export class MessagingService {
               id: true,
               username: true,
               email: true,
+              firstName: true,
+              lastName: true,
+              avatar: true,
             },
           },
           messages: {
@@ -349,6 +367,9 @@ export class MessagingService {
                   id: true,
                   username: true,
                   email: true,
+                  firstName: true,
+                  lastName: true,
+                  avatar: true,
                 },
               },
               receiver: {
@@ -356,6 +377,9 @@ export class MessagingService {
                   id: true,
                   username: true,
                   email: true,
+                  firstName: true,
+                  lastName: true,
+                  avatar: true,
                 },
               },
             },
@@ -433,6 +457,9 @@ export class MessagingService {
                   id: true,
                   username: true,
                   email: true,
+                  firstName: true,
+                  lastName: true,
+                  avatar: true,
                 },
               },
             },
@@ -442,6 +469,9 @@ export class MessagingService {
               id: true,
               username: true,
               email: true,
+              firstName: true,
+              lastName: true,
+              avatar: true,
             },
           },
           messages: {
@@ -455,6 +485,9 @@ export class MessagingService {
                   id: true,
                   username: true,
                   email: true,
+                  firstName: true,
+                  lastName: true,
+                  avatar: true,
                 },
               },
               receiver: {
@@ -462,6 +495,9 @@ export class MessagingService {
                   id: true,
                   username: true,
                   email: true,
+                  firstName: true,
+                  lastName: true,
+                  avatar: true,
                 },
               },
             },
@@ -667,6 +703,9 @@ export class MessagingService {
                   id: true,
                   username: true,
                   email: true,
+                  firstName: true,
+                  lastName: true,
+                  avatar: true,
                 },
               },
             },
@@ -696,7 +735,7 @@ export class MessagingService {
     userId: string,
     filters: MessageFiltersDto
   ): Promise<{
-    data: MessageResponseDto[];
+    messages: MessageResponseDto[];
     pagination: {
       page: number;
       limit: number;
@@ -798,7 +837,7 @@ export class MessagingService {
       ]);
 
       return {
-        data: messages.reverse().map((msg: any) => this.mapMessageToDto(msg)),
+        messages: messages.reverse().map((msg: any) => this.mapMessageToDto(msg)),
         pagination: {
           page,
           limit,
@@ -866,6 +905,9 @@ export class MessagingService {
                   id: true,
                   username: true,
                   email: true,
+                  firstName: true,
+                  lastName: true,
+                  avatar: true,
                 },
               },
             },
@@ -916,7 +958,7 @@ export class MessagingService {
   /**
    * Mark messages as read
    */
-  async markMessagesAsRead(conversationId: string, userId: string): Promise<void> {
+  async markMessagesAsRead(conversationId: string, userId: string): Promise<{ markedCount: number }> {
     try {
       // Verify user is a participant
       const participant = await prisma.conversationParticipant.findFirst({
@@ -932,7 +974,7 @@ export class MessagingService {
       }
 
       // Mark all unread messages as read
-      await prisma.message.updateMany({
+      const result = await prisma.message.updateMany({
         where: {
           conversationId,
           receiverId: userId,
@@ -953,6 +995,8 @@ export class MessagingService {
           lastReadAt: new Date(),
         },
       });
+
+      return { markedCount: result.count };
     } catch (error) {
       throw new Error(
         `Failed to mark messages as read: ${error instanceof Error ? error.message : 'Unknown error'}`
@@ -1041,6 +1085,9 @@ export class MessagingService {
                   id: true,
                   username: true,
                   email: true,
+                  firstName: true,
+                  lastName: true,
+                  avatar: true,
                 },
               },
             },
@@ -1322,9 +1369,23 @@ export class MessagingService {
       id: message.id,
       conversationId: message.conversationId,
       senderId: message.senderId,
-      sender: message.sender,
+      sender: message.sender ? {
+        id: message.sender.id,
+        username: message.sender.username,
+        email: message.sender.email,
+        firstName: message.sender.firstName || null,
+        lastName: message.sender.lastName || null,
+        avatar: message.sender.avatar || null,
+      } : undefined,
       receiverId: message.receiverId || undefined,
-      receiver: message.receiver || undefined,
+      receiver: message.receiver ? {
+        id: message.receiver.id,
+        username: message.receiver.username,
+        email: message.receiver.email,
+        firstName: message.receiver.firstName || null,
+        lastName: message.receiver.lastName || null,
+        avatar: message.receiver.avatar || null,
+      } : undefined,
       content: message.content,
       type: message.type,
       attachments: (message.attachments as any) || undefined,
@@ -1360,6 +1421,8 @@ export class MessagingService {
   }
 
   private mapConversationToDto(conversation: any): ConversationResponseDto {
+    const activeParticipants = (conversation.participants || []).filter((p: any) => !p.leftAt);
+    
     return {
       id: conversation.id,
       type: conversation.type,
@@ -1367,17 +1430,22 @@ export class MessagingService {
       description: conversation.description || undefined,
       createdBy: conversation.createdBy,
       creator: conversation.creator,
-      participants: (conversation.participants || [])
-        .filter((p: any) => !p.leftAt)
-        .map((p: any) => ({
-          id: p.id,
-          userId: p.userId,
-          user: p.user,
-          role: p.role,
-          joinedAt: p.joinedAt,
-          lastReadAt: p.lastReadAt || undefined,
-          isMuted: p.isMuted,
-        })),
+      participantIds: activeParticipants.map((p: any) => p.userId),
+      participants: activeParticipants.map((p: any) => ({
+        id: p.user?.id || p.userId,
+        userId: p.userId,
+        username: p.user?.username || '',
+        email: p.user?.email || '',
+        firstName: p.user?.firstName || null,
+        lastName: p.user?.lastName || null,
+        avatar: p.user?.avatar || null,
+        role: p.role,
+        joinedAt: p.joinedAt,
+        lastReadAt: p.lastReadAt || undefined,
+        isMuted: p.isMuted,
+        // Keep nested user for backward compatibility
+        user: p.user,
+      })),
       lastMessage:
         conversation.messages && conversation.messages.length > 0
           ? this.mapMessageToDto(conversation.messages[0])

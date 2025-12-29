@@ -28,12 +28,18 @@ export interface MessageResponseDto {
     id: string;
     username: string;
     email: string;
+    firstName?: string | null;
+    lastName?: string | null;
+    avatar?: string | null;
   };
   receiverId?: string;
   receiver?: {
     id: string;
     username: string;
     email: string;
+    firstName?: string | null;
+    lastName?: string | null;
+    avatar?: string | null;
   };
   content: string;
   type: string;
@@ -97,19 +103,32 @@ export interface ConversationResponseDto {
     id: string;
     username: string;
     email: string;
+    firstName?: string | null;
+    lastName?: string | null;
+    avatar?: string | null;
   };
+  participantIds: string[];
   participants: Array<{
     id: string;
     userId: string;
-    user: {
-      id: string;
-      username: string;
-      email: string;
-    };
+    username: string;
+    email: string;
+    firstName?: string | null;
+    lastName?: string | null;
+    avatar?: string | null;
     role: string;
     joinedAt: Date;
     lastReadAt?: Date;
     isMuted: boolean;
+    // Keep nested user for backward compatibility
+    user?: {
+      id: string;
+      username: string;
+      email: string;
+      firstName?: string | null;
+      lastName?: string | null;
+      avatar?: string | null;
+    };
   }>;
   lastMessage?: MessageResponseDto;
   unreadCount?: number;

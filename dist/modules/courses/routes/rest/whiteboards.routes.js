@@ -27,7 +27,7 @@ const createWhiteboardSchema = zod_1.z.object({
 }).refine(data => data.courseId || data.liveStreamId, {
     message: "Either courseId or liveStreamId must be provided",
 });
-router.post('/', auth_1.requireAuth, (0, roles_1.requireRole)('Teacher'), (0, validation_1.validate)({ body: createWhiteboardSchema }), async (req, res) => {
+router.post('/', auth_1.requireAuth, (0, roles_1.requireRole)('TEACHER'), (0, validation_1.validate)({ body: createWhiteboardSchema }), async (req, res) => {
     try {
         const userId = req.user?.id;
         if (!userId) {
@@ -125,7 +125,7 @@ const updateWhiteboardSchema = zod_1.z.object({
     isActive: zod_1.z.boolean().optional(),
     isPublic: zod_1.z.boolean().optional(),
 });
-router.put('/:whiteboardId', auth_1.requireAuth, (0, roles_1.requireRole)('Teacher'), (0, validation_1.validate)({
+router.put('/:whiteboardId', auth_1.requireAuth, (0, roles_1.requireRole)('TEACHER'), (0, validation_1.validate)({
     params: zod_1.z.object({ whiteboardId: zod_1.z.string().min(1) }),
     body: updateWhiteboardSchema
 }), async (req, res) => {
@@ -154,7 +154,7 @@ router.put('/:whiteboardId', auth_1.requireAuth, (0, roles_1.requireRole)('Teach
  *     summary: Delete whiteboard
  *     tags: [Whiteboards]
  */
-router.delete('/:whiteboardId', auth_1.requireAuth, (0, roles_1.requireRole)('Teacher'), (0, validation_1.validate)({ params: zod_1.z.object({ whiteboardId: zod_1.z.string().min(1) }) }), async (req, res) => {
+router.delete('/:whiteboardId', auth_1.requireAuth, (0, roles_1.requireRole)('TEACHER'), (0, validation_1.validate)({ params: zod_1.z.object({ whiteboardId: zod_1.z.string().min(1) }) }), async (req, res) => {
     try {
         const userId = req.user?.id;
         if (!userId) {
@@ -237,7 +237,7 @@ router.get('/:whiteboardId/actions', auth_1.requireAuth, (0, validation_1.valida
  *     summary: Clear whiteboard (delete all actions)
  *     tags: [Whiteboards]
  */
-router.post('/:whiteboardId/clear', auth_1.requireAuth, (0, roles_1.requireRole)('Teacher'), (0, validation_1.validate)({ params: zod_1.z.object({ whiteboardId: zod_1.z.string().min(1) }) }), async (req, res) => {
+router.post('/:whiteboardId/clear', auth_1.requireAuth, (0, roles_1.requireRole)('TEACHER'), (0, validation_1.validate)({ params: zod_1.z.object({ whiteboardId: zod_1.z.string().min(1) }) }), async (req, res) => {
     try {
         const userId = req.user?.id;
         if (!userId) {

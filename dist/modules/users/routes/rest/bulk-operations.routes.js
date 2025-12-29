@@ -74,7 +74,7 @@ const bulkCourseImportSchema = zod_1.z.object({
         order: zod_1.z.number(),
     })).min(1),
 });
-router.post('/bulk/courses/import', auth_1.requireAuth, (0, roles_1.requireRole)('Teacher'), (0, validation_1.validate)({ body: bulkCourseImportSchema }), async (req, res) => {
+router.post('/bulk/courses/import', auth_1.requireAuth, (0, roles_1.requireRole)('TEACHER'), (0, validation_1.validate)({ body: bulkCourseImportSchema }), async (req, res) => {
     try {
         const result = await bulkService.bulkImportCourses(req.body);
         res.json({

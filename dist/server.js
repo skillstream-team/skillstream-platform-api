@@ -46,6 +46,7 @@ const kafka_1 = require("./utils/kafka");
 const users_1 = require("./modules/users");
 const courses_1 = require("./modules/courses");
 const messaging_1 = require("./modules/messaging");
+const subscriptions_1 = require("./modules/subscriptions");
 const admin_messaging_service_1 = require("./modules/users/services/admin-messaging.service");
 const env_1 = require("./utils/env");
 const error_handler_1 = require("./middleware/error-handler");
@@ -59,6 +60,7 @@ const Sentry = __importStar(require("@sentry/node"));
 const compression_1 = __importDefault(require("compression"));
 const rate_limit_1 = require("./middleware/rate-limit");
 const timeout_1 = require("./middleware/timeout");
+const scheduled_tasks_service_1 = require("./services/scheduled-tasks.service");
 // Initialize Sentry FIRST (before anything else that might throw)
 (0, sentry_1.initSentry)();
 // Validate environment variables on startup
@@ -123,6 +125,7 @@ app.use(express_1.default.urlencoded({ extended: true, limit: '10mb' }));
 (0, users_1.registerUserModule)(app);
 (0, courses_1.registerCoursesModule)(app);
 (0, messaging_1.registerMessagingModule)(app, io);
+(0, subscriptions_1.registerSubscriptionRoutes)(app);
 // Setup Swagger docs
 (0, swagger_1.setupSwagger)(app);
 // Enhanced health check endpoint
@@ -366,6 +369,9 @@ app.use(error_handler_1.errorHandler);
         console.log("✅ Database connected");
         // Start Kafka consumer (non-blocking if not available)
         await startKafka();
+        // Start scheduled tasks
+        const scheduledTasks = new scheduled_tasks_service_1.ScheduledTasksService();
+        scheduledTasks.start();
         server.listen(PORT, () => {
             console.log(`🚀 Server running on port ${PORT}`);
             console.log(`🌍 Environment: ${env_1.env.NODE_ENV}`);

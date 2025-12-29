@@ -16,6 +16,14 @@ const optionalEnvVars = [
     'KAFKA_BROKERS',
     'FRONTEND_URL',
     'SERVER_URL',
+    'VAPID_PUBLIC_KEY',
+    'VAPID_PRIVATE_KEY',
+    'VAPID_CONTACT_EMAIL',
+    'UDEMY_CLIENT_ID',
+    'UDEMY_CLIENT_SECRET',
+    'YOUTUBE_API_KEY',
+    'COURSERA_API_KEY',
+    'PLURALSIGHT_API_KEY',
 ];
 function validateEnv() {
     const missing = [];

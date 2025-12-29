@@ -4,6 +4,7 @@ const express_1 = require("express");
 const learning_service_1 = require("../../services/learning.service");
 const enrollment_service_1 = require("../../services/enrollment.service");
 const auth_1 = require("../../../../middleware/auth");
+const subscription_1 = require("../../../../middleware/subscription");
 const prisma_1 = require("../../../../utils/prisma");
 const router = (0, express_1.Router)();
 const learningService = new learning_service_1.LearningService();
@@ -27,7 +28,7 @@ const enrollmentService = new enrollment_service_1.EnrollmentService();
  *       404:
  *         description: User not found
  */
-router.get('/users/:userId/progress', auth_1.requireAuth, async (req, res) => {
+router.get('/users/:userId/progress', auth_1.requireAuth, subscription_1.requireSubscription, async (req, res) => {
     try {
         const { userId } = req.params;
         const { status } = req.query;
@@ -134,7 +135,7 @@ router.get('/users/:userId/progress', auth_1.requireAuth, async (req, res) => {
  *           type: string
  *           enum: [in_progress, completed]
  */
-router.get('/users/:userId/progress/courses', auth_1.requireAuth, async (req, res) => {
+router.get('/users/:userId/progress/courses', auth_1.requireAuth, subscription_1.requireSubscription, async (req, res) => {
     try {
         const { userId } = req.params;
         const { status } = req.query;
@@ -210,7 +211,7 @@ router.get('/users/:userId/progress/courses', auth_1.requireAuth, async (req, re
  *       200:
  *         description: Progress retrieved successfully
  */
-router.get('/courses/:courseId/progress', auth_1.requireAuth, async (req, res) => {
+router.get('/courses/:courseId/progress', auth_1.requireAuth, subscription_1.requireSubscription, async (req, res) => {
     try {
         const { courseId } = req.params;
         const userId = req.user?.id;

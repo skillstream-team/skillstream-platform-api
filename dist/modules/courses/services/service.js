@@ -44,7 +44,29 @@ class CoursesService {
         if (!instructor) {
             throw new Error('Instructor not found');
         }
-        const course = await prisma_1.prisma.course.create({ data });
+        const courseData = {
+            title: data.title,
+            description: data.description,
+            price: data.price,
+            order: data.order,
+            createdBy: data.createdBy,
+            instructorId: data.instructorId,
+        };
+        if (data.thumbnailUrl)
+            courseData.thumbnailUrl = data.thumbnailUrl;
+        if (data.categoryId)
+            courseData.categoryId = data.categoryId;
+        if (data.difficulty)
+            courseData.difficulty = data.difficulty;
+        if (data.duration)
+            courseData.duration = data.duration;
+        if (data.language)
+            courseData.language = data.language;
+        if (data.learningObjectives)
+            courseData.learningObjectives = data.learningObjectives;
+        if (data.requirements)
+            courseData.requirements = data.requirements;
+        const course = await prisma_1.prisma.course.create({ data: courseData });
         // Invalidate course list cache
         await (0, cache_1.deleteCachePattern)('courses:list:*');
         return course;
@@ -85,10 +107,51 @@ class CoursesService {
      *         schema:
      *           type: string
      *       - in: query
+     *         name: categoryId
+     *         schema:
+     *           type: string
+     *         description: Filter by category ID
+     *       - in: query
+     *         name: difficulty
+     *         schema:
+     *           type: string
+     *           enum: [BEGINNER, INTERMEDIATE, ADVANCED, EXPERT]
+     *         description: Filter by difficulty level
+     *       - in: query
+     *         name: minRating
+     *         schema:
+     *           type: number
+     *         description: Minimum average rating (0-5)
+     *       - in: query
+     *         name: maxRating
+     *         schema:
+     *           type: number
+     *         description: Maximum average rating (0-5)
+     *       - in: query
+     *         name: minDuration
+     *         schema:
+     *           type: integer
+     *         description: Minimum course duration in hours
+     *       - in: query
+     *         name: maxDuration
+     *         schema:
+     *           type: integer
+     *         description: Maximum course duration in hours
+     *       - in: query
+     *         name: language
+     *         schema:
+     *           type: string
+     *         description: Filter by language code (e.g., en, es, fr)
+     *       - in: query
+     *         name: tags
+     *         schema:
+     *           type: string
+     *         description: Comma-separated list of tags
+     *       - in: query
      *         name: sortBy
      *         schema:
      *           type: string
-     *           enum: [createdAt, price, title, popularity]
+     *           enum: [createdAt, price, title, popularity, rating]
      *           default: createdAt
      *       - in: query
      *         name: sortOrder
@@ -100,7 +163,7 @@ class CoursesService {
      *       200:
      *         description: Paginated list of courses
      */
-    async getAllCourses(page = 1, limit = 20, search, minPrice, maxPrice, instructorId, sortBy = 'createdAt', sortOrder = 'desc') {
+    async getAllCourses(page = 1, limit = 20, search, minPrice, maxPrice, instructorId, categoryId, difficulty, minRating, maxRating, minDuration, maxDuration, language, tags, sortBy = 'createdAt', sortOrder = 'desc') {
         const cacheKey = cache_1.cacheKeys.courseList(page, limit);
         // Try cache first
         const cached = await (0, cache_1.getCache)(cacheKey);
@@ -130,6 +193,35 @@ class CoursesService {
         if (instructorId) {
             where.instructorId = instructorId;
         }
+        // Category filter
+        if (categoryId) {
+            where.categoryId = categoryId;
+        }
+        // Difficulty filter
+        if (difficulty) {
+            where.difficulty = difficulty.toUpperCase();
+        }
+        // Rating filter (will be applied after fetching reviews)
+        // Duration filter
+        if (minDuration !== undefined || maxDuration !== undefined) {
+            where.duration = {};
+            if (minDuration !== undefined)
+                where.duration.gte = minDuration;
+            if (maxDuration !== undefined)
+                where.duration.lte = maxDuration;
+        }
+        // Language filter
+        if (language) {
+            where.language = language.toLowerCase();
+        }
+        // Tags filter
+        if (tags && tags.length > 0) {
+            where.tags = {
+                some: {
+                    name: { in: tags.map((t) => t.toLowerCase()) },
+                },
+            };
+        }
         // Build orderBy
         let orderBy = {};
         switch (sortBy) {
@@ -142,6 +234,10 @@ class CoursesService {
             case 'popularity':
                 // Sort by enrollment count (requires aggregation or separate query)
                 orderBy = { createdAt: sortOrder }; // Fallback
+                break;
+            case 'rating':
+                // Will be sorted after fetching reviews
+                orderBy = { createdAt: sortOrder };
                 break;
             default:
                 orderBy = { createdAt: sortOrder };
@@ -157,6 +253,16 @@ class CoursesService {
                     description: true,
                     price: true,
                     order: true,
+                    thumbnailUrl: true,
+                    categoryId: true,
+                    difficulty: true,
+                    duration: true,
+                    language: true,
+                    learningObjectives: true,
+                    requirements: true,
+                    category: {
+                        select: { id: true, name: true, slug: true }
+                    },
                     createdAt: true,
                     updatedAt: true,
                     createdBy: true,
@@ -169,6 +275,7 @@ class CoursesService {
                             enrollments: true,
                             lessons: true,
                             quizzes: true,
+                            reviews: true,
                         }
                     }
                 },
@@ -176,22 +283,101 @@ class CoursesService {
             }),
             prisma_1.prisma.course.count({ where }),
         ]);
+        // Fetch average ratings for all courses
+        const courseIds = courses.map(c => c.id);
+        const reviews = await prisma_1.prisma.courseReview.findMany({
+            where: {
+                courseId: { in: courseIds },
+                isPublished: true,
+            },
+            select: {
+                courseId: true,
+                rating: true,
+            },
+        });
+        // Calculate average rating per course
+        const ratingsMap = new Map();
+        for (const courseId of courseIds) {
+            const courseReviews = reviews.filter(r => r.courseId === courseId);
+            const average = courseReviews.length > 0
+                ? courseReviews.reduce((sum, r) => sum + r.rating, 0) / courseReviews.length
+                : 0;
+            ratingsMap.set(courseId, {
+                average: Math.round(average * 10) / 10,
+                count: courseReviews.length,
+            });
+        }
+        // Add ratings to courses
+        let coursesWithRatings = courses.map(course => {
+            const enrollmentCount = course._count.enrollments;
+            const averageRating = ratingsMap.get(course.id)?.average || 0;
+            const reviewCount = ratingsMap.get(course.id)?.count || 0;
+            return {
+                ...course,
+                averageRating,
+                reviewCount,
+                enrollmentCount,
+            };
+        });
+        // Apply rating filter if specified
+        if (minRating !== undefined || maxRating !== undefined) {
+            coursesWithRatings = coursesWithRatings.filter((course) => {
+                if (minRating !== undefined && course.averageRating < minRating)
+                    return false;
+                if (maxRating !== undefined && course.averageRating > maxRating)
+                    return false;
+                return true;
+            });
+        }
         // For popularity sorting, we need to sort by enrollment count
         if (sortBy === 'popularity') {
-            courses.sort((a, b) => {
-                const aCount = a._count.enrollments;
-                const bCount = b._count.enrollments;
+            coursesWithRatings.sort((a, b) => {
+                const aCount = a.enrollmentCount;
+                const bCount = b.enrollmentCount;
                 return sortOrder === 'desc' ? bCount - aCount : aCount - bCount;
             });
         }
+        // For rating sorting
+        if (sortBy === 'rating') {
+            coursesWithRatings.sort((a, b) => {
+                return sortOrder === 'desc'
+                    ? b.averageRating - a.averageRating
+                    : a.averageRating - b.averageRating;
+            });
+        }
+        // Recalculate total after rating filter
+        const filteredTotal = coursesWithRatings.length;
+        const actualTotal = minRating !== undefined || maxRating !== undefined
+            ? filteredTotal
+            : total;
+        // Include tags in response
+        const courseIdsForTags = coursesWithRatings.map((c) => c.id);
+        const courseTags = await prisma_1.prisma.courseTag.findMany({
+            where: { courseId: { in: courseIdsForTags } },
+            select: {
+                courseId: true,
+                name: true,
+            },
+        });
+        const tagsMap = new Map();
+        for (const tag of courseTags) {
+            if (!tagsMap.has(tag.courseId)) {
+                tagsMap.set(tag.courseId, []);
+            }
+            tagsMap.get(tag.courseId).push(tag.name);
+        }
+        const coursesWithTags = coursesWithRatings.map((course) => ({
+            ...course,
+            tags: tagsMap.get(course.id) || [],
+        }));
         const result = {
-            data: courses,
+            data: coursesWithTags,
             pagination: {
                 page,
                 limit: take,
-                total,
-                totalPages: Math.ceil(total / take),
-                hasNext: page * take < total,
+                total: actualTotal,
+                totalPages: Math.ceil(actualTotal / take),
+                hasNext: page * take < actualTotal,
                 hasPrev: page > 1,
             },
         };
@@ -231,6 +417,20 @@ class CoursesService {
                 description: true,
                 price: true,
                 order: true,
+                thumbnailUrl: true,
+                categoryId: true,
+                difficulty: true,
+                duration: true,
+                language: true,
+                learningObjectives: true,
+                requirements: true,
+                category: {
+                    select: {
+                        id: true,
+                        name: true,
+                        slug: true,
+                    }
+                },
                 createdAt: true,
                 updatedAt: true,
                 createdBy: true,
@@ -251,15 +451,69 @@ class CoursesService {
                     select: {
                         enrollments: true,
                         payments: true,
+                        reviews: true,
                     }
                 }
             },
         });
-        if (course) {
-            // Cache result
-            await (0, cache_1.setCache)(cacheKey, course, cache_1.CACHE_TTL.MEDIUM);
+        if (!course) {
+            return null;
         }
-        return course;
+        // Calculate average rating
+        const reviews = await prisma_1.prisma.courseReview.findMany({
+            where: {
+                courseId: id,
+                isPublished: true,
+            },
+            select: {
+                rating: true,
+            },
+        });
+        const averageRating = reviews.length > 0
+            ? Math.round((reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length) * 10) / 10
+            : 0;
+        // Get prerequisites
+        const prerequisites = await prisma_1.prisma.coursePrerequisite.findMany({
+            where: { courseId: id },
+            include: {
+                prerequisite: {
+                    select: {
+                        id: true,
+                        title: true,
+                        difficulty: true,
+                        thumbnailUrl: true,
+                    },
+                },
+            },
+            orderBy: { createdAt: 'asc' },
+        });
+        // Get tags for course
+        const tags = await prisma_1.prisma.courseTag.findMany({
+            where: { courseId: id },
+            select: { name: true },
+        });
+        // Get tags for course
+        const courseTags = await prisma_1.prisma.courseTag.findMany({
+            where: { courseId: id },
+            select: { name: true },
+        });
+        const courseWithRating = {
+            ...course,
+            averageRating,
+            reviewCount: course._count.reviews,
+            prerequisites: prerequisites.map((p) => ({
+                id: p.id,
+                prerequisiteId: p.prerequisiteId,
+                prerequisite: p.prerequisite,
+                isRequired: p.isRequired,
+            })),
+            tags: courseTags.map((t) => t.name),
+            learningObjectives: course.learningObjectives ? course.learningObjectives : undefined,
+            requirements: course.requirements ? course.requirements : undefined,
+        };
+        // Cache result
+        await (0, cache_1.setCache)(cacheKey, courseWithRating, cache_1.CACHE_TTL.MEDIUM);
+        return courseWithRating;
     }
     /**
      * @swagger

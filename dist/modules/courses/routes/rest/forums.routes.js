@@ -4,6 +4,7 @@ const express_1 = require("express");
 const forums_service_1 = require("../../services/forums.service");
 const auth_1 = require("../../../../middleware/auth");
 const roles_1 = require("../../../../middleware/roles");
+const subscription_1 = require("../../../../middleware/subscription");
 const validation_1 = require("../../../../middleware/validation");
 const zod_1 = require("zod");
 const router = (0, express_1.Router)();
@@ -19,7 +20,7 @@ const createPostSchema = zod_1.z.object({
     title: zod_1.z.string().min(1),
     content: zod_1.z.string().min(10),
 });
-router.post('/courses/:courseId/forum/posts', auth_1.requireAuth, (0, validation_1.validate)({
+router.post('/courses/:courseId/forum/posts', auth_1.requireAuth, subscription_1.requireSubscription, (0, validation_1.validate)({
     params: zod_1.z.object({ courseId: zod_1.z.string().min(1) }),
     body: createPostSchema,
 }), async (req, res) => {
@@ -202,7 +203,7 @@ router.post('/forum/replies/:replyId/upvote', auth_1.requireAuth, (0, validation
  *     summary: Mark best answer (Teacher only)
  *     tags: [Forums]
  */
-router.post('/forum/posts/:postId/best-answer', auth_1.requireAuth, (0, roles_1.requireRole)('Teacher'), (0, validation_1.validate)({
+router.post('/forum/posts/:postId/best-answer', auth_1.requireAuth, (0, roles_1.requireRole)('TEACHER'), (0, validation_1.validate)({
     params: zod_1.z.object({
         postId: zod_1.z.string().min(1),
     }),
@@ -231,7 +232,7 @@ router.post('/forum/posts/:postId/best-answer', auth_1.requireAuth, (0, roles_1.
  *     summary: Pin/unpin a post (Teacher/Admin only)
  *     tags: [Forums]
  */
-router.put('/forum/posts/:postId/pin', auth_1.requireAuth, (0, roles_1.requireRole)('Teacher'), (0, validation_1.validate)({
+router.put('/forum/posts/:postId/pin', auth_1.requireAuth, (0, roles_1.requireRole)('TEACHER'), (0, validation_1.validate)({
     params: zod_1.z.object({ postId: zod_1.z.string().min(1) }),
     body: zod_1.z.object({ isPinned: zod_1.z.boolean() }),
 }), async (req, res) => {
@@ -256,7 +257,7 @@ router.put('/forum/posts/:postId/pin', auth_1.requireAuth, (0, roles_1.requireRo
  *     summary: Lock/unlock a post (Teacher/Admin only)
  *     tags: [Forums]
  */
-router.put('/forum/posts/:postId/lock', auth_1.requireAuth, (0, roles_1.requireRole)('Teacher'), (0, validation_1.validate)({
+router.put('/forum/posts/:postId/lock', auth_1.requireAuth, (0, roles_1.requireRole)('TEACHER'), (0, validation_1.validate)({
     params: zod_1.z.object({ postId: zod_1.z.string().min(1) }),
     body: zod_1.z.object({ isLocked: zod_1.z.boolean() }),
 }), async (req, res) => {

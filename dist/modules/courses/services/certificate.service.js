@@ -1,4 +1,37 @@
 "use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
@@ -7,6 +40,7 @@ exports.certificateService = exports.CertificateService = void 0;
 const pdfkit_1 = __importDefault(require("pdfkit"));
 const prisma_1 = require("../../../utils/prisma");
 const email_service_1 = require("../../users/services/email.service");
+const dashboard_service_1 = require("./dashboard.service");
 class CertificateService {
     /**
      * Check if a student has completed a course
@@ -196,13 +230,23 @@ class CertificateService {
                     },
                 },
             });
-            // Send email notification
+            // Send certificate email
             try {
-                await email_service_1.emailService.sendSystemNotificationEmail(student.email, 'Course Completed - Certificate Issued! 🎉', `Congratulations ${student.firstName || student.username}! You have successfully completed the course "${course.title}" and your certificate has been issued.`, `${process.env.FRONTEND_URL || 'http://localhost:3000'}/courses/${courseId}/certificates/${studentId}`);
+                const certificateUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/courses/${courseId}/certificates/${certificate.id}`;
+                await email_service_1.emailService.sendCertificateEmail(student.email, student.username, course.title, certificateUrl);
             }
             catch (emailError) {
-                console.error('Failed to send certificate email:', emailError);
+                console.warn('Failed to send certificate email:', emailError);
                 // Don't fail certificate issuance if email fails
+            }
+            // Clear dashboard cache
+            try {
+                const { DashboardService } = await Promise.resolve().then(() => __importStar(require('./dashboard.service')));
+                const dashboardService = new DashboardService();
+                await dashboardService.clearDashboardCache(studentId);
+            }
+            catch (error) {
+                console.warn('Failed to clear dashboard cache:', error);
             }
             return {
                 issued: true,
@@ -261,12 +305,22 @@ class CertificateService {
                 },
             },
         });
-        // Send email notification
+        // Send certificate email
         try {
-            await email_service_1.emailService.sendSystemNotificationEmail(student.email, 'Certificate Issued! 🎉', `Congratulations! Your certificate for "${course.title}" has been issued.`, `${process.env.FRONTEND_URL || 'http://localhost:3000'}/courses/${courseId}/certificates/${studentId}`);
+            const certificateUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/courses/${courseId}/certificates/${certificate.id}`;
+            await email_service_1.emailService.sendCertificateEmail(student.email, student.username, course.title, certificateUrl);
         }
         catch (emailError) {
-            console.error('Failed to send certificate email:', emailError);
+            console.warn('Failed to send certificate email:', emailError);
+            // Don't fail certificate issuance if email fails
+        }
+        // Clear dashboard cache
+        try {
+            const dashboardService = new dashboard_service_1.DashboardService();
+            await dashboardService.clearDashboardCache(studentId);
+        }
+        catch (error) {
+            console.warn('Failed to clear dashboard cache:', error);
         }
         return certificate;
     }

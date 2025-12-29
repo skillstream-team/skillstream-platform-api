@@ -26,6 +26,10 @@ model User {
   lastName  String?
   avatar    String?
 
+  // Account status
+  isActive  Boolean  @default(true)
+  isVerified Boolean @default(false)
+
   // Subscription fields (deprecated - use Subscription model)
   subscriptionStatus    String    @default("INACTIVE") // "ACTIVE", "INACTIVE", "EXPIRED", "CANCELLED"
   subscriptionExpiresAt DateTime?
@@ -116,6 +120,9 @@ model User {
   bundleEnrollments      BundleEnrollment[]
   learningPathEnrollments LearningPathEnrollment[]
   couponRedemptions      CouponRedemption[]
+  pushSubscription       PushSubscription?
+  courseImports          CourseImport[]
+  broadcasts            Broadcast[]
 
   @@index([provider, providerId])
 }
@@ -161,6 +168,12 @@ model Course {
   language     String?  @default("en") // Language code (en, es, fr, etc.)
   learningObjectives Json? // Array of learning objectives
   requirements Json?   // Array of course requirements
+  
+  // Moderation & Publishing
+  moderationStatus String @default("PENDING") // "PENDING", "APPROVED", "REJECTED"
+  isPublished      Boolean @default(false)
+  rejectionReason  String? // Reason if rejected
+  
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
   createdBy    String   @db.ObjectId
@@ -203,9 +216,12 @@ model Course {
   shares             CourseShare[]
   learningPathCourses LearningPathCourse[] @relation("LearningPathCourses")
   coupons            Coupon[]
+  imports            CourseImport[]
   
   @@index([difficulty])
   @@index([language])
+  @@index([moderationStatus, isPublished])
+  @@index([isPublished, createdAt])
   @@index([duration])
 }
 
@@ -230,17 +246,31 @@ model Payment {
   id        String @id @default(auto()) @map("_id") @db.ObjectId
   studentId String @db.ObjectId
   student   User   @relation(fields: [studentId], references: [id])
-  courseId  String @db.ObjectId
-  course    Course @relation(fields: [courseId], references: [id])
-
+  
+  // Course payment (existing)
+  courseId  String? @db.ObjectId
+  course    Course? @relation(fields: [courseId], references: [id])
   enrollment Enrollment?
+
+  // Lesson/Booking payment (new)
+  bookingId String? @unique @db.ObjectId
+  booking   Booking? @relation(fields: [bookingId], references: [id])
+  lessonId  String? @db.ObjectId
+  lesson    QuickLesson? @relation(fields: [lessonId], references: [id])
 
   amount        Float
   currency      String   @default("USD")
-  status        String
+  status        String   @default("PENDING") // "PENDING", "COMPLETED", "FAILED", "REFUNDED"
   provider      String
   transactionId String?
+  paidAt        DateTime?
+  dueAt         DateTime? // Payment deadline (24 hours before lesson)
   createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([studentId, status])
+  @@index([lessonId])
+  @@index([status, dueAt])
 }
 
 model Material {
@@ -774,12 +804,14 @@ model ApiKey {
 
 model ActivityLog {
   id        String   @id @default(auto()) @map("_id") @db.ObjectId
-  userId    String   @db.ObjectId
-  user      User     @relation("ActivityLogUser", fields: [userId], references: [id], onDelete: Cascade)
+  userId    String?  @db.ObjectId
+  user      User?    @relation("ActivityLogUser", fields: [userId], references: [id], onDelete: Cascade)
   action    String // "course.viewed", "quiz.completed", "enrollment.created", etc.
   entity    String // "course", "quiz", "enrollment", etc.
   entityId  String?  @db.ObjectId
   metadata  Json?
+  ipAddress String?
+  userAgent String?
   createdAt DateTime @default(now())
 
   @@index([userId, createdAt])
@@ -1382,20 +1414,24 @@ model Booking {
   student     User       @relation("BookingStudent", fields: [studentId], references: [id])
   teacherId   String     @db.ObjectId
   teacher     User       @relation("BookingTeacher", fields: [teacherId], references: [id])
-  status      String     @default("confirmed") // "confirmed", "cancelled", "completed"
+  status      String     @default("pending_payment") // "pending_payment", "confirmed", "cancelled", "completed", "payment_failed"
   subject     String?
   notes       String?
+  price       Float? // Price for this booking
   joinLink    String?
   meetingId   String?
+  paymentDueAt DateTime? // Payment deadline (24 hours before lesson)
   cancelledAt DateTime?
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
 
   attendance Attendance?
+  payment    Payment?
 
   @@index([studentId, createdAt])
   @@index([teacherId, createdAt])
   @@index([status])
+  @@index([paymentDueAt, status])
 }
 
 model QuickLesson {
@@ -1407,17 +1443,25 @@ model QuickLesson {
   scheduledAt DateTime
   subject     String?
   duration    Int? // Duration in minutes
+  price       Float? // Price per student for this lesson
   joinLink    String?
   meetingId   String?
   status      String   @default("scheduled") // "scheduled", "in_progress", "completed", "cancelled"
+  
+  // Student selection
+  invitedStudentIds String[] // IDs of students invited to this lesson
+  maxStudents       Int? // Maximum number of students allowed
+  
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
   attendance Attendance[]
   resources  LessonResource[]
+  payments   Payment[]
 
   @@index([teacherId, scheduledAt])
   @@index([status])
+  @@index([scheduledAt])
 }
 
 model Attendance {
@@ -1923,4 +1967,88 @@ model UserDashboard {
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   lastUpdated DateTime @default(now())
   data      Json     // Cached dashboard data
+}
+
+model PushSubscription {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId    String   @unique @db.ObjectId
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  endpoint  String
+  keys      Json     // { p256dh: string, auth: string }
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model CourseImport {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  createdBy   String   @db.ObjectId
+  creator     User     @relation(fields: [createdBy], references: [id], onDelete: Cascade)
+  platform    String   // "udemy", "coursera", "skillshare", "youtube", "custom", etc.
+  sourceUrl   String?  // URL of the course to import
+  sourceData Json?    // Platform-specific data (API keys, course IDs, etc.)
+  status      String   @default("PENDING") // "PENDING", "PROCESSING", "COMPLETED", "FAILED", "CANCELLED"
+  progress    Float    @default(0) // 0-100
+  importedCourseId String? @db.ObjectId
+  importedCourse Course? @relation(fields: [importedCourseId], references: [id], onDelete: SetNull)
+  errorMessage String?
+  metadata    Json?    // Additional metadata about the import
+  startedAt   DateTime?
+  completedAt DateTime?
+  cancelledAt DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([createdBy, status])
+  @@index([status, createdAt])
+  @@index([platform])
+}
+
+model CertificateTemplate {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  name      String
+  design    Json     // Template design (colors, fonts, layout, etc.)
+  fields    String[] // Required fields (e.g., ["courseName", "studentName", "completionDate"])
+  isDefault Boolean  @default(false)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([isActive, isDefault])
+}
+
+model Banner {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  title       String
+  description String?
+  imageUrl    String?
+  linkUrl     String?
+  position    String   @default("top") // "top", "bottom", "sidebar", etc.
+  startDate   DateTime?
+  endDate     DateTime?
+  isActive    Boolean  @default(true)
+  priority    Int      @default(0) // Higher priority shows first
+  targetAudience String? // "all", "students", "teachers", "admins"
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([isActive, position, priority])
+  @@index([startDate, endDate])
+}
+
+model Broadcast {
+  id            String   @id @default(auto()) @map("_id") @db.ObjectId
+  createdBy     String   @db.ObjectId
+  creator       User     @relation(fields: [createdBy], references: [id], onDelete: Cascade)
+  title         String
+  message       String
+  targetAudience String  @default("all") // "all", "students", "teachers", "admins"
+  userIds       String[] // Specific user IDs if targeting specific users
+  sentTo         Int      @default(0) // Number of users who received it
+  sendEmail     Boolean  @default(false)
+  sendPush      Boolean  @default(false)
+  metadata      Json?    // Additional metadata
+  createdAt     DateTime @default(now())
+
+  @@index([createdBy, createdAt])
+  @@index([targetAudience, createdAt])
 }

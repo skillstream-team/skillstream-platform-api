@@ -4,6 +4,7 @@ const express_1 = require("express");
 const video_features_service_1 = require("../../services/video-features.service");
 const auth_1 = require("../../../../middleware/auth");
 const roles_1 = require("../../../../middleware/roles");
+const subscription_1 = require("../../../../middleware/subscription");
 const validation_1 = require("../../../../middleware/validation");
 const zod_1 = require("zod");
 const router = (0, express_1.Router)();
@@ -21,7 +22,7 @@ const createChapterSchema = zod_1.z.object({
     endTime: zod_1.z.number().min(0).optional(),
     order: zod_1.z.number().int().min(0),
 });
-router.post('/videos/:videoId/chapters', auth_1.requireAuth, (0, roles_1.requireRole)('Teacher'), (0, validation_1.validate)({
+router.post('/videos/:videoId/chapters', auth_1.requireAuth, (0, roles_1.requireRole)('TEACHER'), (0, validation_1.validate)({
     params: zod_1.z.object({ videoId: zod_1.z.string().min(1) }),
     body: createChapterSchema,
 }), async (req, res) => {
@@ -74,7 +75,7 @@ const createNoteSchema = zod_1.z.object({
     timestamp: zod_1.z.number().min(0),
     content: zod_1.z.string().min(1),
 });
-router.post('/videos/:videoId/notes', auth_1.requireAuth, (0, validation_1.validate)({
+router.post('/videos/:videoId/notes', auth_1.requireAuth, subscription_1.requireSubscription, (0, validation_1.validate)({
     params: zod_1.z.object({ videoId: zod_1.z.string().min(1) }),
     body: createNoteSchema,
 }), async (req, res) => {
@@ -104,7 +105,7 @@ router.post('/videos/:videoId/notes', auth_1.requireAuth, (0, validation_1.valid
  *     summary: Get user's video notes
  *     tags: [Video Features]
  */
-router.get('/videos/:videoId/notes', auth_1.requireAuth, (0, validation_1.validate)({ params: zod_1.z.object({ videoId: zod_1.z.string().min(1) }) }), async (req, res) => {
+router.get('/videos/:videoId/notes', auth_1.requireAuth, subscription_1.requireSubscription, (0, validation_1.validate)({ params: zod_1.z.object({ videoId: zod_1.z.string().min(1) }) }), async (req, res) => {
     try {
         const { videoId } = req.params;
         const userId = req.user?.id;
@@ -131,7 +132,7 @@ const createBookmarkSchema = zod_1.z.object({
     title: zod_1.z.string().optional(),
     notes: zod_1.z.string().optional(),
 });
-router.post('/videos/:videoId/bookmarks', auth_1.requireAuth, (0, validation_1.validate)({
+router.post('/videos/:videoId/bookmarks', auth_1.requireAuth, subscription_1.requireSubscription, (0, validation_1.validate)({
     params: zod_1.z.object({ videoId: zod_1.z.string().min(1) }),
     body: createBookmarkSchema,
 }), async (req, res) => {
@@ -161,7 +162,7 @@ router.post('/videos/:videoId/bookmarks', auth_1.requireAuth, (0, validation_1.v
  *     summary: Get user's video bookmarks
  *     tags: [Video Features]
  */
-router.get('/videos/:videoId/bookmarks', auth_1.requireAuth, (0, validation_1.validate)({ params: zod_1.z.object({ videoId: zod_1.z.string().min(1) }) }), async (req, res) => {
+router.get('/videos/:videoId/bookmarks', auth_1.requireAuth, subscription_1.requireSubscription, (0, validation_1.validate)({ params: zod_1.z.object({ videoId: zod_1.z.string().min(1) }) }), async (req, res) => {
     try {
         const { videoId } = req.params;
         const userId = req.user?.id;
@@ -191,7 +192,7 @@ const createTranscriptSchema = zod_1.z.object({
         text: zod_1.z.string(),
     })),
 });
-router.post('/videos/:videoId/transcript', auth_1.requireAuth, (0, roles_1.requireRole)('Teacher'), (0, validation_1.validate)({
+router.post('/videos/:videoId/transcript', auth_1.requireAuth, (0, roles_1.requireRole)('TEACHER'), (0, validation_1.validate)({
     params: zod_1.z.object({ videoId: zod_1.z.string().min(1) }),
     body: createTranscriptSchema,
 }), async (req, res) => {
@@ -285,7 +286,7 @@ router.put('/videos/:videoId/analytics', auth_1.requireAuth, (0, validation_1.va
  *     summary: Get video analytics (aggregated)
  *     tags: [Video Features]
  */
-router.get('/videos/:videoId/analytics', auth_1.requireAuth, (0, roles_1.requireRole)('Teacher'), (0, validation_1.validate)({ params: zod_1.z.object({ videoId: zod_1.z.string().min(1) }) }), async (req, res) => {
+router.get('/videos/:videoId/analytics', auth_1.requireAuth, (0, roles_1.requireRole)('TEACHER'), (0, validation_1.validate)({ params: zod_1.z.object({ videoId: zod_1.z.string().min(1) }) }), async (req, res) => {
     try {
         const { videoId } = req.params;
         const analytics = await videoFeaturesService.getVideoAnalytics(videoId);

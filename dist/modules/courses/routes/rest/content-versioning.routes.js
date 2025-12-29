@@ -19,7 +19,7 @@ const createVersionSchema = zod_1.z.object({
     content: zod_1.z.any(),
     changeNote: zod_1.z.string().optional(),
 });
-router.post('/content/:entityType/:entityId/versions', auth_1.requireAuth, (0, roles_1.requireRole)('Teacher'), (0, validation_1.validate)({
+router.post('/content/:entityType/:entityId/versions', auth_1.requireAuth, (0, roles_1.requireRole)('TEACHER'), (0, validation_1.validate)({
     params: zod_1.z.object({
         entityType: zod_1.z.enum(['course', 'lesson', 'quiz', 'assignment']),
         entityId: zod_1.z.string().min(1),
@@ -140,7 +140,7 @@ router.get('/content/:entityType/:entityId/versions/:version', auth_1.requireAut
  *     summary: Restore a version (Teacher/Admin only)
  *     tags: [Content Versioning]
  */
-router.post('/content/:entityType/:entityId/versions/:version/restore', auth_1.requireAuth, (0, roles_1.requireRole)('Teacher'), (0, validation_1.validate)({
+router.post('/content/:entityType/:entityId/versions/:version/restore', auth_1.requireAuth, (0, roles_1.requireRole)('TEACHER'), (0, validation_1.validate)({
     params: zod_1.z.object({
         entityType: zod_1.z.enum(['course', 'lesson', 'quiz', 'assignment']),
         entityId: zod_1.z.string().min(1),
@@ -170,7 +170,7 @@ router.post('/content/:entityType/:entityId/versions/:version/restore', auth_1.r
  *     summary: Delete a version (Teacher/Admin only)
  *     tags: [Content Versioning]
  */
-router.delete('/content/:entityType/:entityId/versions/:version', auth_1.requireAuth, (0, roles_1.requireRole)('Teacher'), (0, validation_1.validate)({
+router.delete('/content/:entityType/:entityId/versions/:version', auth_1.requireAuth, (0, roles_1.requireRole)('TEACHER'), (0, validation_1.validate)({
     params: zod_1.z.object({
         entityType: zod_1.z.enum(['course', 'lesson', 'quiz', 'assignment']),
         entityId: zod_1.z.string().min(1),

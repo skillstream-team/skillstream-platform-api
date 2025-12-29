@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.updateCalendarEventSchema = exports.createCalendarEventSchema = exports.refreshTokenSchema = exports.resetPasswordSchema = exports.forgotPasswordSchema = exports.updateProgressSchema = exports.updateAssignmentSchema = exports.updateQuizSchema = exports.submitQuizAttemptSchema = exports.startQuizAttemptSchema = exports.createQuizQuestionSchema = exports.courseIdParamSchema = exports.idParamSchema = exports.createConversationSchema = exports.createMessageSchema = exports.createProgressSchema = exports.createAssignmentSchema = exports.createQuizSchema = exports.createModuleSchema = exports.createEnrollmentSchema = exports.changePasswordSchema = exports.updateUserSchema = exports.loginSchema = exports.createUserSchema = exports.updateCourseSchema = exports.createCourseSchema = exports.paginationSchema = void 0;
+exports.updateCalendarEventSchema = exports.createCalendarEventSchema = exports.refreshTokenSchema = exports.resetPasswordSchema = exports.forgotPasswordSchema = exports.updateProgressSchema = exports.updateAssignmentSchema = exports.updateQuizSchema = exports.submitQuizAttemptSchema = exports.startQuizAttemptSchema = exports.createQuizQuestionSchema = exports.courseIdParamSchema = exports.idParamSchema = exports.createConversationSchema = exports.createMessageSchema = exports.createProgressSchema = exports.createAssignmentSchema = exports.activateSubscriptionSchema = exports.createSubscriptionSchema = exports.createQuizSchema = exports.createModuleSchema = exports.createEnrollmentSchema = exports.changePasswordSchema = exports.updateUserSchema = exports.loginSchema = exports.createUserSchema = exports.updateCourseSchema = exports.createCourseSchema = exports.paginationSchema = void 0;
 const zod_1 = require("zod");
 /**
  * Common validation schemas
@@ -18,19 +18,37 @@ exports.createCourseSchema = zod_1.z.object({
     order: zod_1.z.number().int().min(0),
     createdBy: zod_1.z.string().min(1),
     instructorId: zod_1.z.string().min(1),
+    thumbnailUrl: zod_1.z.string().url().optional().or(zod_1.z.literal('')),
+    categoryId: zod_1.z.string().optional(),
+    difficulty: zod_1.z.enum(['BEGINNER', 'INTERMEDIATE', 'ADVANCED', 'EXPERT']).optional(),
+    duration: zod_1.z.number().int().min(0).optional(),
+    language: zod_1.z.string().optional(),
+    learningObjectives: zod_1.z.array(zod_1.z.string()).optional(),
+    requirements: zod_1.z.array(zod_1.z.string()).optional(),
 });
 exports.updateCourseSchema = zod_1.z.object({
     title: zod_1.z.string().min(1).max(200).optional(),
     description: zod_1.z.string().max(5000).optional(),
     price: zod_1.z.number().min(0).optional(),
     order: zod_1.z.number().int().min(0).optional(),
+    thumbnailUrl: zod_1.z.string().url().optional().or(zod_1.z.literal('')),
+    categoryId: zod_1.z.string().optional(),
+    difficulty: zod_1.z.enum(['BEGINNER', 'INTERMEDIATE', 'ADVANCED', 'EXPERT']).optional(),
+    duration: zod_1.z.number().int().min(0).optional(),
+    language: zod_1.z.string().optional(),
+    learningObjectives: zod_1.z.array(zod_1.z.string()).optional(),
+    requirements: zod_1.z.array(zod_1.z.string()).optional(),
 });
 // User schemas
 exports.createUserSchema = zod_1.z.object({
-    username: zod_1.z.string().min(3).max(50).regex(/^[a-zA-Z0-9_-]+$/, 'Username can only contain letters, numbers, underscores, and hyphens'),
+    username: zod_1.z
+        .string()
+        .min(3)
+        .max(50)
+        .regex(/^[a-zA-Z0-9_-]+$/, 'Username can only contain letters, numbers, underscores, and hyphens'),
     email: zod_1.z.string().email(),
     password: zod_1.z.string().min(6).max(100),
-    role: zod_1.z.enum(['STUDENT', 'Teacher', 'ADMIN']),
+    role: zod_1.z.enum(['STUDENT', 'TEACHER', 'ADMIN']),
     firstName: zod_1.z.string().max(100).optional(),
     lastName: zod_1.z.string().max(100).optional(),
 });
@@ -78,6 +96,15 @@ exports.createQuizSchema = zod_1.z.object({
     passingScore: zod_1.z.number().min(0).max(100).optional(),
     dueDate: zod_1.z.string().datetime().optional(),
     createdBy: zod_1.z.string().min(1),
+});
+// Subscription schemas
+exports.createSubscriptionSchema = zod_1.z.object({
+    provider: zod_1.z.string().min(1),
+    transactionId: zod_1.z.string().optional(),
+});
+exports.activateSubscriptionSchema = zod_1.z.object({
+    transactionId: zod_1.z.string().min(1),
+    provider: zod_1.z.string().min(1),
 });
 // Assignment schemas
 exports.createAssignmentSchema = zod_1.z.object({

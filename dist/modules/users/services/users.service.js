@@ -44,6 +44,7 @@ const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const jwt_1 = require("../../../utils/jwt");
 const email_service_1 = require("./email.service");
 const cache_1 = require("../../../utils/cache");
+const referral_service_1 = require("../../courses/services/referral.service");
 const JWT_SECRET = process.env.JWT_SECRET;
 if (!JWT_SECRET) {
     throw new Error('JWT_SECRET is not defined in your environment variables');
@@ -87,7 +88,7 @@ class UsersService {
      *                 example: johndoe
      *               role:
      *                 type: string
-     *                 example: student
+     *                 example: STUDENT
      *     responses:
      *       200:
      *         description: Successfully created user and returned JWT
@@ -120,14 +121,11 @@ class UsersService {
             // Check if user already exists
             const existingUser = await user_model_1.prisma.user.findFirst({
                 where: {
-                    OR: [
-                        { email },
-                        { username }
-                    ]
-                }
+                    OR: [{ email }, { username }],
+                },
             });
             if (existingUser) {
-                throw new Error('User with this email or username already exists');
+                throw new Error('User already exists');
             }
             // Hash password if provided
             const hashedPassword = password ? await bcrypt_1.default.hash(password, 10) : null;
@@ -149,6 +147,17 @@ class UsersService {
             catch (error) {
                 console.error('Error creating default settings:', error);
                 // Don't fail user creation if settings creation fails
+            }
+            // Apply referral code if provided
+            if (data.referralCode) {
+                try {
+                    const referralService = new referral_service_1.ReferralService();
+                    await referralService.applyReferralCode(data.referralCode, user.id);
+                }
+                catch (referralError) {
+                    console.warn('Failed to apply referral code:', referralError);
+                    // Don't fail user creation if referral fails
+                }
             }
             // Send welcome email
             try {
@@ -353,7 +362,7 @@ class UsersService {
      * /auth/reset-password:
      *   post:
      *     summary: Reset user password
-     *     description: Verifies the password reset token and updates the user’s password.
+     *     description: Verifies the password reset token and updates the users password.
      *     tags:
      *       - Auth
      *     requestBody:
@@ -389,17 +398,6 @@ class UsersService {
             throw new Error('Error resetting password: ' + error.message);
         }
     }
-    /**
-     * @swagger
-     * /users:
-     *   get:
-     *     summary: Get all users
-     *     tags:
-     *       - Users
-     *     responses:
-     *       200:
-     *         description: List of users
-     */
     /**
      * @swagger
      * /users:
@@ -463,6 +461,106 @@ class UsersService {
     }
     /**
      * @swagger
+     * /users/search:
+     *   get:
+     *     summary: Search users by username or email
+     *     description: Search for users by username or email address. Returns matching users.
+     *     tags: [Users]
+     *     parameters:
+     *       - in: query
+     *         name: q
+     *         required: true
+     *         schema:
+     *           type: string
+     *         description: Search query (username or email)
+     *       - in: query
+     *         name: limit
+     *         schema:
+     *           type: integer
+     *           default: 20
+     *           maximum: 50
+     *         description: Maximum number of results
+     *       - in: query
+     *         name: role
+     *         schema:
+     *           type: string
+     *         description: Filter by role (optional)
+     *     responses:
+     *       200:
+     *         description: List of matching users
+     *         content:
+     *           application/json:
+     *             schema:
+     *               type: object
+     *               properties:
+     *                 success:
+     *                   type: boolean
+     *                 data:
+     *                   type: array
+     *                   items:
+     *                     type: object
+     *                     properties:
+     *                       id:
+     *                         type: string
+     *                       username:
+     *                         type: string
+     *                       email:
+     *                         type: string
+     *                       firstName:
+     *                         type: string
+     *                       lastName:
+     *                         type: string
+     *                       role:
+     *                         type: string
+     *                       avatar:
+     *                         type: string
+     *                 count:
+     *                   type: integer
+     *       400:
+     *         description: Bad request - missing search query
+     */
+    async searchUsers(query, limit = 20, role) {
+        if (!query || query.trim().length === 0) {
+            throw new Error('Search query is required');
+        }
+        const searchTerm = query.trim();
+        const take = Math.min(limit, 50); // Max 50 results
+        const where = {
+            OR: [
+                { username: { contains: searchTerm, mode: 'insensitive' } },
+                { email: { contains: searchTerm, mode: 'insensitive' } },
+            ],
+        };
+        // Optional role filter
+        if (role) {
+            where.role = role;
+        }
+        const users = await user_model_1.prisma.user.findMany({
+            where,
+            take,
+            select: {
+                id: true,
+                username: true,
+                email: true,
+                firstName: true,
+                lastName: true,
+                role: true,
+                avatar: true,
+            },
+            orderBy: [
+                // Prioritize exact matches
+                { username: 'asc' },
+                { email: 'asc' },
+            ],
+        });
+        return {
+            success: true,
+            data: users,
+            count: users.length,
+        };
+    }
+    /**
+     * @swagger
      * /users/{id}:
      *   get:
      *     summary: Get a user by ID
@@ -499,7 +597,7 @@ class UsersService {
                 avatar: true,
                 createdAt: true,
                 updatedAt: true,
-            }
+            },
         });
         if (user) {
             await (0, cache_1.setCache)(cacheKey, user, cache_1.CACHE_TTL.MEDIUM);
@@ -533,7 +631,7 @@ class UsersService {
                 avatar: true,
                 createdAt: true,
                 updatedAt: true,
-            }
+            },
         });
         if (user) {
             await (0, cache_1.setCache)(cacheKey, user, cache_1.CACHE_TTL.MEDIUM);
@@ -549,7 +647,7 @@ class UsersService {
      *       - Users
      */
     async getRoles() {
-        return ['ADMIN', 'Teacher', 'STUDENT'];
+        return ['ADMIN', 'TEACHER', 'STUDENT'];
     }
     /**
      * @swagger

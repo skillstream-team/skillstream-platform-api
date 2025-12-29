@@ -7,19 +7,23 @@ exports.generalRateLimiter = exports.enrollmentRateLimiter = exports.passwordRes
 const express_rate_limit_1 = __importDefault(require("express-rate-limit"));
 const rate_limit_redis_1 = __importDefault(require("rate-limit-redis"));
 const redis_1 = __importDefault(require("../utils/redis"));
-// Use Redis store if available, otherwise fall back to in-memory store
-const rateLimitStore = redis_1.default
-    ? new rate_limit_redis_1.default({
+// Helper function to create a Redis store with a unique prefix
+const createRateLimitStore = (prefix) => {
+    if (!redis_1.default) {
+        return undefined; // Use default in-memory store if Redis is not available
+    }
+    return new rate_limit_redis_1.default({
+        prefix: `rate-limit:${prefix}:`,
         sendCommand: (command, ...args) => {
             if (!redis_1.default) {
                 throw new Error('Redis client is not available');
             }
             return redis_1.default.call(command, ...args);
         },
-    })
-    : undefined; // undefined means use default in-memory store
+    });
+};
 exports.loginRateLimiter = (0, express_rate_limit_1.default)({
-    store: rateLimitStore,
+    store: createRateLimitStore('login'),
     windowMs: 5 * 60 * 1000, // 5 minutes
     max: 20,
     message: 'Too many login attempts, please try again later',
@@ -27,7 +31,7 @@ exports.loginRateLimiter = (0, express_rate_limit_1.default)({
     legacyHeaders: false,
 });
 exports.registrationRateLimiter = (0, express_rate_limit_1.default)({
-    store: rateLimitStore,
+    store: createRateLimitStore('registration'),
     windowMs: 15 * 60 * 1000, // 15 minutes
     max: 5, // 5 registrations per 15 minutes
     message: 'Too many registration attempts, please try again later',
@@ -35,7 +39,7 @@ exports.registrationRateLimiter = (0, express_rate_limit_1.default)({
     legacyHeaders: false,
 });
 exports.passwordResetRateLimiter = (0, express_rate_limit_1.default)({
-    store: rateLimitStore,
+    store: createRateLimitStore('password-reset'),
     windowMs: 60 * 60 * 1000, // 1 hour
     max: 3, // 3 password reset attempts per hour
     message: 'Too many password reset attempts, please try again later',
@@ -43,7 +47,7 @@ exports.passwordResetRateLimiter = (0, express_rate_limit_1.default)({
     legacyHeaders: false,
 });
 exports.enrollmentRateLimiter = (0, express_rate_limit_1.default)({
-    store: rateLimitStore,
+    store: createRateLimitStore('enrollment'),
     windowMs: 1 * 60 * 1000, // 1 minute
     max: 10, // 10 enrollments per minute
     message: 'Too many enrollment requests, please try again later',
@@ -51,7 +55,7 @@ exports.enrollmentRateLimiter = (0, express_rate_limit_1.default)({
     legacyHeaders: false,
 });
 exports.generalRateLimiter = (0, express_rate_limit_1.default)({
-    store: rateLimitStore,
+    store: createRateLimitStore('general'),
     windowMs: 15 * 60 * 1000, // 15 minutes
     max: 100, // 100 requests per 15 minutes per IP
     message: 'Too many requests, please try again later',

@@ -75,6 +75,45 @@ const CourseEnrollmentType = new graphql_1.GraphQLObjectType({
         enrollmentDate: { type: new graphql_1.GraphQLNonNull(graphql_1.GraphQLString) },
     }),
 });
+const ActivityBreakdownType = new graphql_1.GraphQLObjectType({
+    name: 'ActivityBreakdown',
+    fields: () => ({
+        progress: { type: new graphql_1.GraphQLNonNull(graphql_1.GraphQLInt) },
+        activityLogs: { type: new graphql_1.GraphQLNonNull(graphql_1.GraphQLInt) },
+        interactions: { type: new graphql_1.GraphQLNonNull(graphql_1.GraphQLInt) },
+        forumPosts: { type: new graphql_1.GraphQLNonNull(graphql_1.GraphQLInt) },
+        forumReplies: { type: new graphql_1.GraphQLNonNull(graphql_1.GraphQLInt) },
+        videoViews: { type: new graphql_1.GraphQLNonNull(graphql_1.GraphQLInt) },
+    }),
+});
+const ActiveUserType = new graphql_1.GraphQLObjectType({
+    name: 'ActiveUser',
+    fields: () => ({
+        id: { type: new graphql_1.GraphQLNonNull(graphql_1.GraphQLString) },
+        username: { type: new graphql_1.GraphQLNonNull(graphql_1.GraphQLString) },
+        email: { type: new graphql_1.GraphQLNonNull(graphql_1.GraphQLString) },
+        enrollmentDate: { type: new graphql_1.GraphQLNonNull(graphql_1.GraphQLString) },
+        lastAccessed: { type: new graphql_1.GraphQLNonNull(graphql_1.GraphQLString) },
+        totalActivityCount: { type: new graphql_1.GraphQLNonNull(graphql_1.GraphQLInt) },
+        activityBreakdown: { type: new graphql_1.GraphQLNonNull(ActivityBreakdownType) },
+    }),
+});
+const ActiveUsersResponseType = new graphql_1.GraphQLObjectType({
+    name: 'ActiveUsersResponse',
+    fields: () => ({
+        data: { type: new graphql_1.GraphQLList(ActiveUserType) },
+        summary: {
+            type: new graphql_1.GraphQLObjectType({
+                name: 'ActiveUsersSummary',
+                fields: () => ({
+                    totalEnrolled: { type: new graphql_1.GraphQLNonNull(graphql_1.GraphQLInt) },
+                    activeCount: { type: new graphql_1.GraphQLNonNull(graphql_1.GraphQLInt) },
+                    activePercentage: { type: new graphql_1.GraphQLNonNull(graphql_1.GraphQLFloat) },
+                }),
+            }),
+        },
+    }),
+});
 const CourseStatsType = new graphql_1.GraphQLObjectType({
     name: 'CourseStats',
     fields: () => ({
@@ -124,6 +163,37 @@ const enrollmentQueries = {
         args: { courseId: { type: new graphql_1.GraphQLNonNull(graphql_1.GraphQLInt) } },
         resolve: async (_, args) => {
             return await paymentService.getPaymentsByCourse(args.courseId);
+        },
+    },
+    activeUsersInCourse: {
+        type: ActiveUsersResponseType,
+        args: {
+            courseId: { type: new graphql_1.GraphQLNonNull(graphql_1.GraphQLString) },
+            days: { type: graphql_1.GraphQLInt, defaultValue: 7 },
+            page: { type: graphql_1.GraphQLInt, defaultValue: 1 },
+            limit: { type: graphql_1.GraphQLInt, defaultValue: 20 },
+        },
+        resolve: async (_, args) => {
+            const result = await enrollmentService.getActiveUsersInCourse(args.courseId, args.days || 7, args.page || 1, args.limit || 20);
+            return {
+                data: result.data.map((user) => ({
+                    ...user,
+                    enrollmentDate: user.enrollmentDate.toISOString(),
+                    lastAccessed: user.lastAccessed.toISOString(),
+                    activityBreakdown: user.activityBreakdown,
+                })),
+                summary: result.summary,
+            };
+        },
+    },
+    activeUserCount: {
+        type: graphql_1.GraphQLInt,
+        args: {
+            courseId: { type: new graphql_1.GraphQLNonNull(graphql_1.GraphQLString) },
+            days: { type: graphql_1.GraphQLInt, defaultValue: 7 },
+        },
+        resolve: async (_, args) => {
+            return await enrollmentService.getActiveUserCount(args.courseId, args.days || 7);
         },
     },
 };

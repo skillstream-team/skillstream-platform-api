@@ -3,11 +3,16 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.NotificationsService = void 0;
 const prisma_1 = require("../../../utils/prisma");
 const cache_1 = require("../../../utils/cache");
+const push_notifications_service_1 = require("./push-notifications.service");
 class NotificationsService {
+    constructor() {
+        this.pushService = new push_notifications_service_1.PushNotificationsService();
+    }
     /**
      * Create a notification
+     * Optionally sends push notification if user has push notifications enabled
      */
-    async createNotification(data) {
+    async createNotification(data, options) {
         const notification = await prisma_1.prisma.notification.create({
             data: {
                 userId: data.userId,
@@ -20,6 +25,35 @@ class NotificationsService {
         });
         // Invalidate user notifications cache
         await (0, cache_1.deleteCache)(`notifications:${data.userId}:*`);
+        // Send push notification if requested and user has push enabled
+        if (options?.sendPush !== false) {
+            try {
+                // Check if user has push notifications enabled in settings
+                const settings = await prisma_1.prisma.userSettings.findUnique({
+                    where: { userId: data.userId },
+                    select: { pushNotifications: true },
+                });
+                if (settings?.pushNotifications !== false) {
+                    await this.pushService.sendNotification(data.userId, {
+                        title: data.title,
+                        body: data.message,
+                        icon: '/vite.svg',
+                        badge: '/vite.svg',
+                        tag: data.type,
+                        data: {
+                            url: data.link,
+                            type: data.type,
+                            id: notification.id,
+                            ...data.metadata,
+                        },
+                    });
+                }
+            }
+            catch (error) {
+                // Log error but don't fail the notification creation
+                console.error('Failed to send push notification:', error);
+            }
+        }
         return this.mapToDto(notification);
     }
     /**

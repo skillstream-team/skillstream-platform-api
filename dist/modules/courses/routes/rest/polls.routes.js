@@ -45,7 +45,7 @@ const createPollSchema = zod_1.z.object({
     liveStreamId: zod_1.z.string().optional(),
     options: zod_1.z.array(zod_1.z.string().min(1)).min(2).max(10),
 });
-router.post('/', auth_1.requireAuth, (0, roles_1.requireRole)('Teacher'), (0, validation_1.validate)({ body: createPollSchema }), async (req, res) => {
+router.post('/', auth_1.requireAuth, (0, roles_1.requireRole)('TEACHER'), (0, validation_1.validate)({ body: createPollSchema }), async (req, res) => {
     try {
         const userId = req.user?.id;
         if (!userId) {

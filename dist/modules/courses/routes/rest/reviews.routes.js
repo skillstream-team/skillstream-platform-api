@@ -4,6 +4,7 @@ const express_1 = require("express");
 const reviews_service_1 = require("../../services/reviews.service");
 const auth_1 = require("../../../../middleware/auth");
 const roles_1 = require("../../../../middleware/roles");
+const subscription_1 = require("../../../../middleware/subscription");
 const validation_1 = require("../../../../middleware/validation");
 const zod_1 = require("zod");
 const router = (0, express_1.Router)();
@@ -20,7 +21,7 @@ const createReviewSchema = zod_1.z.object({
     title: zod_1.z.string().optional(),
     content: zod_1.z.string().min(10),
 });
-router.post('/courses/:courseId/reviews', auth_1.requireAuth, (0, validation_1.validate)({
+router.post('/courses/:courseId/reviews', auth_1.requireAuth, subscription_1.requireSubscription, (0, validation_1.validate)({
     params: zod_1.z.object({ courseId: zod_1.z.string().min(1) }),
     body: createReviewSchema,
 }), async (req, res) => {
@@ -178,7 +179,7 @@ router.post('/reviews/:reviewId/helpful', auth_1.requireAuth, (0, validation_1.v
  *     summary: Add instructor response to review (Teacher only)
  *     tags: [Reviews]
  */
-router.post('/reviews/:reviewId/instructor-response', auth_1.requireAuth, (0, roles_1.requireRole)('Teacher'), (0, validation_1.validate)({
+router.post('/reviews/:reviewId/instructor-response', auth_1.requireAuth, (0, roles_1.requireRole)('TEACHER'), (0, validation_1.validate)({
     params: zod_1.z.object({ reviewId: zod_1.z.string().min(1) }),
     body: zod_1.z.object({
         response: zod_1.z.string().min(1),

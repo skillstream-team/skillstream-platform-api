@@ -99,6 +99,12 @@ router.post('/lessons/quick', requireAuth, requireRole('TEACHER'), async (req, r
       }
     });
 
+    // Get teacher info for email
+    const teacher = await prisma.user.findUnique({
+      where: { id: quickLesson.teacherId },
+      select: { id: true, username: true, email: true }
+    });
+
     // Send invitation emails to students if price is set
     if (price && price > 0 && invitedStudentIds && invitedStudentIds.length > 0) {
       try {
@@ -115,7 +121,7 @@ router.post('/lessons/quick', requireAuth, requireRole('TEACHER'), async (req, r
             `Invitation to Lesson: ${title}`,
             `
               <h2>You've been invited to a lesson!</h2>
-              <p>${quickLesson.teacher.username} has invited you to attend a lesson.</p>
+              <p>${teacher?.username || 'A teacher'} has invited you to attend a lesson.</p>
               <h3>Lesson Details:</h3>
               <ul>
                 <li><strong>Title:</strong> ${title}</li>

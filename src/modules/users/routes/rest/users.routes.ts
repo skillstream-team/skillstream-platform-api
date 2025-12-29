@@ -347,7 +347,7 @@ router.post('/auth/reset-password',
  */
 const searchUsersSchema = z.object({
   q: z.string().min(1, 'Search query is required'),
-  limit: z.string().optional().transform((val) => val ? parseInt(val, 10) : 20),
+  limit: z.string().optional(),
   role: z.enum(['STUDENT', 'TEACHER', 'ADMIN']).optional(),
 });
 

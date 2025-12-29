@@ -28,6 +28,18 @@ interface EnvConfig {
   SMTP_PASS?: string;
   SMTP_FROM?: string;
   SMTP_SECURE?: string;
+  
+  // Push Notifications (VAPID)
+  VAPID_PUBLIC_KEY?: string;
+  VAPID_PRIVATE_KEY?: string;
+  VAPID_CONTACT_EMAIL?: string;
+  
+  // Course Import APIs
+  UDEMY_CLIENT_ID?: string;
+  UDEMY_CLIENT_SECRET?: string;
+  YOUTUBE_API_KEY?: string;
+  COURSERA_API_KEY?: string;
+  PLURALSIGHT_API_KEY?: string;
 }
 
 const requiredEnvVars = [
@@ -41,6 +53,14 @@ const optionalEnvVars = [
   'KAFKA_BROKERS',
   'FRONTEND_URL',
   'SERVER_URL',
+  'VAPID_PUBLIC_KEY',
+  'VAPID_PRIVATE_KEY',
+  'VAPID_CONTACT_EMAIL',
+  'UDEMY_CLIENT_ID',
+  'UDEMY_CLIENT_SECRET',
+  'YOUTUBE_API_KEY',
+  'COURSERA_API_KEY',
+  'PLURALSIGHT_API_KEY',
 ] as const;
 
 export function validateEnv(): EnvConfig {

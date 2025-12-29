@@ -448,6 +448,112 @@ export class UsersService {
 
   /**
    * @swagger
+   * /users/search:
+   *   get:
+   *     summary: Search users by username or email
+   *     description: Search for users by username or email address. Returns matching users.
+   *     tags: [Users]
+   *     parameters:
+   *       - in: query
+   *         name: q
+   *         required: true
+   *         schema:
+   *           type: string
+   *         description: Search query (username or email)
+   *       - in: query
+   *         name: limit
+   *         schema:
+   *           type: integer
+   *           default: 20
+   *           maximum: 50
+   *         description: Maximum number of results
+   *       - in: query
+   *         name: role
+   *         schema:
+   *           type: string
+   *         description: Filter by role (optional)
+   *     responses:
+   *       200:
+   *         description: List of matching users
+   *         content:
+   *           application/json:
+   *             schema:
+   *               type: object
+   *               properties:
+   *                 success:
+   *                   type: boolean
+   *                 data:
+   *                   type: array
+   *                   items:
+   *                     type: object
+   *                     properties:
+   *                       id:
+   *                         type: string
+   *                       username:
+   *                         type: string
+   *                       email:
+   *                         type: string
+   *                       firstName:
+   *                         type: string
+   *                       lastName:
+   *                         type: string
+   *                       role:
+   *                         type: string
+   *                       avatar:
+   *                         type: string
+   *                 count:
+   *                   type: integer
+   *       400:
+   *         description: Bad request - missing search query
+   */
+  async searchUsers(query: string, limit: number = 20, role?: string) {
+    if (!query || query.trim().length === 0) {
+      throw new Error('Search query is required');
+    }
+
+    const searchTerm = query.trim();
+    const take = Math.min(limit, 50); // Max 50 results
+
+    const where: any = {
+      OR: [
+        { username: { contains: searchTerm, mode: 'insensitive' } },
+        { email: { contains: searchTerm, mode: 'insensitive' } },
+      ],
+    };
+
+    // Optional role filter
+    if (role) {
+      where.role = role;
+    }
+
+    const users = await prisma.user.findMany({
+      where,
+      take,
+      select: {
+        id: true,
+        username: true,
+        email: true,
+        firstName: true,
+        lastName: true,
+        role: true,
+        avatar: true,
+      },
+      orderBy: [
+        // Prioritize exact matches
+        { username: 'asc' },
+        { email: 'asc' },
+      ],
+    });
+
+    return {
+      success: true,
+      data: users,
+      count: users.length,
+    };
+  }
+
+  /**
+   * @swagger
    * /users/{id}:
    *   get:
    *     summary: Get a user by ID

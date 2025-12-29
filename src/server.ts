@@ -21,6 +21,7 @@ import * as Sentry from "@sentry/node";
 import compression from "compression";
 import { generalRateLimiter } from "./middleware/rate-limit";
 import { requestTimeout } from "./middleware/timeout";
+import { ScheduledTasksService } from "./services/scheduled-tasks.service";
 
 // Initialize Sentry FIRST (before anything else that might throw)
 initSentry();
@@ -367,6 +368,10 @@ app.use(errorHandler);
 
         // Start Kafka consumer (non-blocking if not available)
         await startKafka();
+
+        // Start scheduled tasks
+        const scheduledTasks = new ScheduledTasksService();
+        scheduledTasks.start();
 
         server.listen(PORT, () => {
             console.log(`🚀 Server running on port ${PORT}`);

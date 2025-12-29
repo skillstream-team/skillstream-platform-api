@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { requireAuth } from '../../../../middleware/auth';
 import { requireRole } from '../../../../middleware/roles';
 import { prisma } from '../../../../utils/prisma';
+import { emailService } from '../../../users/services/email.service';
 
 const router = Router();
 
@@ -209,6 +210,7 @@ router.post('/lesson-slots/:slotId/bookings', requireAuth, async (req, res) => {
   try {
     const { slotId } = req.params;
     const userId = (req as any).user?.id;
+    const { price, subject, notes } = req.body;
 
     // Check if slot is available
     const slot = await prisma.lessonSlot.findUnique({
@@ -220,14 +222,31 @@ router.post('/lesson-slots/:slotId/bookings', requireAuth, async (req, res) => {
       return res.status(400).json({ error: 'Slot is not available' });
     }
 
-    // Create booking
+    // Validate payment requirement (24 hours before lesson)
+    const lessonTime = slot.startTime;
+    const now = new Date();
+    const minTime = new Date(now.getTime() + 24 * 60 * 60 * 1000); // 24 hours from now
+    
+    if (lessonTime <= minTime) {
+      return res.status(400).json({ 
+        error: 'Bookings with payment must be made at least 24 hours in advance' 
+      });
+    }
+
+    // Calculate payment deadline (24 hours before lesson)
+    const paymentDeadline = new Date(lessonTime.getTime() - 24 * 60 * 60 * 1000);
+
+    // Create booking with payment requirement
     const booking = await prisma.booking.create({
       data: {
         slotId,
         studentId: userId,
         teacherId: slot.teacherId,
-        subject: req.body.subject || slot.subject,
-        notes: req.body.notes,
+        subject: subject || slot.subject,
+        notes: notes,
+        price: price || 0,
+        status: price && price > 0 ? 'pending_payment' : 'confirmed',
+        paymentDueAt: price && price > 0 ? paymentDeadline : undefined,
         joinLink: req.body.joinLink,
         meetingId: req.body.meetingId
       },
@@ -245,9 +264,44 @@ router.post('/lesson-slots/:slotId/bookings', requireAuth, async (req, res) => {
       data: { isBooked: true }
     });
 
+    // Send booking confirmation email
+    try {
+      const student = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { email: true, username: true },
+      });
+
+      if (student && price && price > 0) {
+        await emailService.sendEmail(
+          student.email,
+          'Booking Created - Payment Required',
+          `
+            <h2>Booking Created</h2>
+            <p>Your booking has been created successfully.</p>
+            <h3>Booking Details:</h3>
+            <ul>
+              <li><strong>Subject:</strong> ${booking.subject || 'N/A'}</li>
+              <li><strong>Scheduled:</strong> ${lessonTime.toLocaleString()}</li>
+              <li><strong>Duration:</strong> ${slot.duration} minutes</li>
+              <li><strong>Price:</strong> $${price}</li>
+              <li><strong>Payment Deadline:</strong> ${paymentDeadline.toLocaleString()}</li>
+            </ul>
+            <p><strong>Important:</strong> Payment must be completed at least 24 hours before the lesson time, or your booking will be automatically cancelled.</p>
+            <p>Please complete your payment to confirm your booking.</p>
+          `
+        );
+      }
+    } catch (error) {
+      console.error('Error sending booking confirmation email:', error);
+      // Don't fail the request if email fails
+    }
+
     res.status(201).json({
       success: true,
-      data: booking
+      data: booking,
+      message: price && price > 0 
+        ? 'Booking created. Payment required within 24 hours before the lesson.'
+        : 'Booking created successfully'
     });
   } catch (error) {
     console.error('Error creating booking:', error);

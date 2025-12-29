@@ -575,6 +575,7 @@ export class EnrollmentService {
 
         // Process ActivityLogs
         activityLogs.forEach((log) => {
+            if (!log.userId) return; // Skip if userId is null
             const existing = studentActivity.get(log.userId);
             if (!existing || log.createdAt > existing.lastAccessed) {
                 studentActivity.set(log.userId, {
@@ -821,8 +822,8 @@ export class EnrollmentService {
         // Combine all unique user IDs from all sources
         const activeUserIds = new Set<string>();
         activeProgress.forEach(p => activeUserIds.add(p.studentId));
-        activityLogs.forEach(l => activeUserIds.add(l.userId));
-        userInteractions.forEach(i => activeUserIds.add(i.userId));
+        activityLogs.forEach(l => { if (l.userId) activeUserIds.add(l.userId); });
+        userInteractions.forEach(i => { if (i.userId) activeUserIds.add(i.userId); });
         forumPosts.forEach(p => activeUserIds.add(p.authorId));
         forumReplies.forEach(r => activeUserIds.add(r.authorId));
         videoAnalytics.forEach(a => activeUserIds.add(a.userId));

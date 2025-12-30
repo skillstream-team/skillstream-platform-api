@@ -13,6 +13,7 @@ import bulkOperationsRoutes from './routes/rest/bulk-operations.routes';
 import activityLogRoutes from './routes/rest/activity-log.routes';
 import gamificationRoutes from './routes/rest/gamification.routes';
 import adminManagementRoutes from './routes/rest/admin-management.routes';
+import adminPlatformRoutes from './routes/rest/admin-platform.routes';
 import { usersSchema } from './routes/graphql/users.resolver';
 import express from 'express';
 import { graphqlHTTP } from 'express-graphql';
@@ -33,6 +34,7 @@ export function registerUserModule(app: express.Application) {
   app.use('/api', activityLogRoutes);
   app.use('/api', gamificationRoutes);
   app.use('/api', adminManagementRoutes);
+  app.use('/api', adminPlatformRoutes);
 
   // GraphQL
   app.use('/graphql/users', graphqlHTTP({

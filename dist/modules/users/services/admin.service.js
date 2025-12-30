@@ -18,6 +18,561 @@ class AdminService {
         this.activityLogService = new activity_log_service_1.ActivityLogService();
     }
     // ============================================================
+    // DASHBOARD STATS
+    // ============================================================
+    /**
+     * Get admin dashboard statistics
+     */
+    async getDashboardStats() {
+        const now = new Date();
+        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+        const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+        const [totalUsers, totalTeachers, totalStudents, totalCourses, activeCourses, pendingCourses, allPayments, monthlyPayments, pendingReviews, activeReports, recentSignups, coursesThisMonth,] = await Promise.all([
+            prisma_1.prisma.user.count(),
+            prisma_1.prisma.user.count({ where: { role: 'TEACHER' } }),
+            prisma_1.prisma.user.count({ where: { role: 'STUDENT' } }),
+            prisma_1.prisma.course.count(),
+            prisma_1.prisma.course.count({ where: { isPublished: true } }),
+            prisma_1.prisma.course.count({ where: { isPublished: false } }),
+            prisma_1.prisma.payment.findMany({ where: { status: 'COMPLETED' } }),
+            prisma_1.prisma.payment.findMany({
+                where: { status: 'COMPLETED', createdAt: { gte: startOfMonth } },
+            }),
+            prisma_1.prisma.courseReview.count({ where: { isPublished: false } }),
+            prisma_1.prisma.contentFlag.count({ where: { status: 'PENDING' } }),
+            prisma_1.prisma.user.count({ where: { createdAt: { gte: thirtyDaysAgo } } }),
+            prisma_1.prisma.course.count({ where: { createdAt: { gte: startOfMonth } } }),
+        ]);
+        const totalRevenue = allPayments.reduce((sum, p) => sum + (p.amount || 0), 0);
+        const monthlyRevenue = monthlyPayments.reduce((sum, p) => sum + (p.amount || 0), 0);
+        return {
+            totalUsers,
+            totalTeachers,
+            totalStudents,
+            totalCourses,
+            activeCourses,
+            pendingCourses,
+            totalRevenue,
+            monthlyRevenue,
+            pendingReviews,
+            activeReports,
+            recentSignups,
+            coursesThisMonth,
+        };
+    }
+    // ============================================================
+    // USER MANAGEMENT
+    // ============================================================
+    /**
+     * Get all users with filtering and pagination
+     */
+    async getUsers(options) {
+        const page = options.page || 1;
+        const limit = Math.min(options.limit || 20, 100);
+        const skip = (page - 1) * limit;
+        const where = {};
+        if (options.search) {
+            where.OR = [
+                { username: { contains: options.search, mode: 'insensitive' } },
+                { email: { contains: options.search, mode: 'insensitive' } },
+                { firstName: { contains: options.search, mode: 'insensitive' } },
+                { lastName: { contains: options.search, mode: 'insensitive' } },
+            ];
+        }
+        if (options.role) {
+            where.role = options.role;
+        }
+        if (options.isActive !== undefined) {
+            where.isActive = options.isActive;
+        }
+        const [users, total] = await Promise.all([
+            prisma_1.prisma.user.findMany({
+                where,
+                skip,
+                take: limit,
+                orderBy: { createdAt: 'desc' },
+                select: {
+                    id: true,
+                    username: true,
+                    email: true,
+                    role: true,
+                    firstName: true,
+                    lastName: true,
+                    avatar: true,
+                    isActive: true,
+                    isVerified: true,
+                    createdAt: true,
+                    updatedAt: true,
+                },
+            }),
+            prisma_1.prisma.user.count({ where }),
+        ]);
+        return {
+            users,
+            pagination: {
+                page,
+                limit,
+                total,
+                totalPages: Math.ceil(total / limit),
+                hasNext: page * limit < total,
+                hasPrev: page > 1,
+            },
+        };
+    }
+    /**
+     * Get user by ID
+     */
+    async getUserById(userId) {
+        const user = await prisma_1.prisma.user.findUnique({
+            where: { id: userId },
+            select: {
+                id: true,
+                username: true,
+                email: true,
+                role: true,
+                firstName: true,
+                lastName: true,
+                avatar: true,
+                isActive: true,
+                isVerified: true,
+                createdAt: true,
+                updatedAt: true,
+            },
+        });
+        if (!user) {
+            throw new Error('User not found');
+        }
+        return user;
+    }
+    /**
+     * Update user
+     */
+    async updateUser(userId, data) {
+        const updateData = {};
+        if (data.role)
+            updateData.role = data.role;
+        if (data.isActive !== undefined)
+            updateData.isActive = data.isActive;
+        if (data.isVerified !== undefined)
+            updateData.isVerified = data.isVerified;
+        const user = await prisma_1.prisma.user.update({
+            where: { id: userId },
+            data: updateData,
+            select: {
+                id: true,
+                username: true,
+                email: true,
+                role: true,
+                firstName: true,
+                lastName: true,
+                avatar: true,
+                isActive: true,
+                isVerified: true,
+                createdAt: true,
+                updatedAt: true,
+            },
+        });
+        // Log activity
+        try {
+            await this.activityLogService.logActivity({
+                userId,
+                action: 'USER_UPDATED',
+                entity: 'USER',
+                entityId: userId,
+                metadata: { changes: data },
+            });
+        }
+        catch (error) {
+            console.error('Failed to log activity:', error);
+        }
+        return user;
+    }
+    /**
+     * Delete user
+     */
+    async deleteUser(userId) {
+        // Check if user exists
+        const user = await prisma_1.prisma.user.findUnique({
+            where: { id: userId },
+        });
+        if (!user) {
+            throw new Error('User not found');
+        }
+        // Soft delete preferred - set isActive to false
+        await prisma_1.prisma.user.update({
+            where: { id: userId },
+            data: { isActive: false },
+        });
+        // Log activity
+        try {
+            await this.activityLogService.logActivity({
+                userId,
+                action: 'USER_DELETED',
+                entity: 'USER',
+                entityId: userId,
+            });
+        }
+        catch (error) {
+            console.error('Failed to log activity:', error);
+        }
+        return { success: true };
+    }
+    // ============================================================
+    // COURSE MODERATION
+    // ============================================================
+    /**
+     * Get pending courses
+     */
+    async getPendingCourses(options) {
+        const page = options.page || 1;
+        const limit = Math.min(options.limit || 20, 100);
+        const skip = (page - 1) * limit;
+        const [courses, total] = await Promise.all([
+            prisma_1.prisma.course.findMany({
+                where: { isPublished: false },
+                skip,
+                take: limit,
+                orderBy: { createdAt: 'desc' },
+                include: {
+                    instructor: {
+                        select: {
+                            id: true,
+                            username: true,
+                            email: true,
+                            firstName: true,
+                            lastName: true,
+                        },
+                    },
+                },
+            }),
+            prisma_1.prisma.course.count({ where: { isPublished: false } }),
+        ]);
+        return {
+            courses,
+            pagination: {
+                page,
+                limit,
+                total,
+                totalPages: Math.ceil(total / limit),
+                hasNext: page * limit < total,
+                hasPrev: page > 1,
+            },
+        };
+    }
+    /**
+     * Moderate course (approve/reject)
+     */
+    async moderateCourse(courseId, status, rejectionReason, adminId) {
+        const course = await prisma_1.prisma.course.findUnique({
+            where: { id: courseId },
+        });
+        if (!course) {
+            throw new Error('Course not found');
+        }
+        const updateData = { status };
+        if (status === 'REJECTED' && rejectionReason) {
+            updateData.rejectionReason = rejectionReason;
+        }
+        if (status === 'APPROVED') {
+            updateData.isPublished = true;
+        }
+        const updatedCourse = await prisma_1.prisma.course.update({
+            where: { id: courseId },
+            data: updateData,
+            include: {
+                instructor: {
+                    select: {
+                        id: true,
+                        username: true,
+                        email: true,
+                    },
+                },
+            },
+        });
+        // Log activity
+        if (adminId) {
+            try {
+                await this.activityLogService.logActivity({
+                    userId: adminId,
+                    action: `COURSE_${status}`,
+                    entity: 'COURSE',
+                    entityId: courseId,
+                    metadata: { rejectionReason },
+                });
+            }
+            catch (error) {
+                console.error('Failed to log activity:', error);
+            }
+        }
+        return updatedCourse;
+    }
+    // ============================================================
+    // REVIEWS MANAGEMENT
+    // ============================================================
+    /**
+     * Get all reviews with filtering and pagination
+     */
+    async getAllReviews(options) {
+        const page = options.page || 1;
+        const limit = Math.min(options.limit || 20, 100);
+        const skip = (page - 1) * limit;
+        const where = {};
+        if (options.courseId) {
+            where.courseId = options.courseId;
+        }
+        if (options.userId) {
+            where.studentId = options.userId;
+        }
+        if (options.rating) {
+            where.rating = options.rating;
+        }
+        // Map status to isPublished
+        if (options.status) {
+            const status = options.status.toUpperCase();
+            if (status === 'APPROVED' || status === 'PUBLISHED') {
+                where.isPublished = true;
+            }
+            else if (status === 'REJECTED' || status === 'HIDDEN' || status === 'DELETED' || status === 'PENDING') {
+                where.isPublished = false;
+            }
+        }
+        const [reviews, total] = await Promise.all([
+            prisma_1.prisma.courseReview.findMany({
+                where,
+                skip,
+                take: limit,
+                orderBy: { createdAt: 'desc' },
+                include: {
+                    student: {
+                        select: {
+                            id: true,
+                            username: true,
+                            email: true,
+                            firstName: true,
+                            lastName: true,
+                            avatar: true,
+                        },
+                    },
+                    course: {
+                        select: {
+                            id: true,
+                            title: true,
+                            instructor: {
+                                select: {
+                                    id: true,
+                                    username: true,
+                                },
+                            },
+                        },
+                    },
+                },
+            }),
+            prisma_1.prisma.courseReview.count({ where }),
+        ]);
+        return {
+            reviews,
+            pagination: {
+                page,
+                limit,
+                total,
+                totalPages: Math.ceil(total / limit),
+                hasNext: page * limit < total,
+                hasPrev: page > 1,
+            },
+        };
+    }
+    /**
+     * Moderate review (approve/reject/hide/delete)
+     */
+    async moderateReview(reviewId, action, reason, adminId) {
+        const review = await prisma_1.prisma.courseReview.findUnique({
+            where: { id: reviewId },
+        });
+        if (!review) {
+            throw new Error('Review not found');
+        }
+        let updateData = {};
+        // Store moderation info in a metadata-like structure if needed
+        // Since Review model doesn't have status/rejectionReason, we use isPublished
+        if (action === 'approve') {
+            updateData.isPublished = true;
+        }
+        else if (action === 'reject') {
+            updateData.isPublished = false;
+            // Note: Review model doesn't have rejectionReason field
+            // Could store in a separate moderation table or use metadata if available
+        }
+        else if (action === 'hide') {
+            updateData.isPublished = false;
+        }
+        else if (action === 'delete') {
+            // Soft delete - unpublish
+            updateData.isPublished = false;
+        }
+        const updatedReview = await prisma_1.prisma.courseReview.update({
+            where: { id: reviewId },
+            data: updateData,
+            include: {
+                student: {
+                    select: {
+                        id: true,
+                        username: true,
+                        email: true,
+                    },
+                },
+                course: {
+                    select: {
+                        id: true,
+                        title: true,
+                    },
+                },
+            },
+        });
+        // Log activity
+        if (adminId) {
+            try {
+                await this.activityLogService.logActivity({
+                    userId: adminId,
+                    action: `REVIEW_${action.toUpperCase()}`,
+                    entity: 'REVIEW',
+                    entityId: reviewId,
+                    metadata: { reason },
+                });
+            }
+            catch (error) {
+                console.error('Failed to log activity:', error);
+            }
+        }
+        return updatedReview;
+    }
+    // ============================================================
+    // CERTIFICATES MANAGEMENT
+    // ============================================================
+    /**
+     * Get all certificates with filtering and pagination
+     */
+    async getAllCertificates(options) {
+        const page = options.page || 1;
+        const limit = Math.min(options.limit || 20, 100);
+        const skip = (page - 1) * limit;
+        const where = {};
+        if (options.userId) {
+            where.studentId = options.userId;
+        }
+        if (options.courseId) {
+            where.courseId = options.courseId;
+        }
+        if (options.startDate || options.endDate) {
+            where.issuedAt = {};
+            if (options.startDate)
+                where.issuedAt.gte = options.startDate;
+            if (options.endDate)
+                where.issuedAt.lte = options.endDate;
+        }
+        where.isActive = true; // Only show active (non-revoked) by default
+        const [certificates, total] = await Promise.all([
+            prisma_1.prisma.certificate.findMany({
+                where,
+                skip,
+                take: limit,
+                orderBy: { issuedAt: 'desc' },
+                include: {
+                    student: {
+                        select: {
+                            id: true,
+                            username: true,
+                            email: true,
+                            firstName: true,
+                            lastName: true,
+                        },
+                    },
+                    course: {
+                        select: {
+                            id: true,
+                            title: true,
+                            instructor: {
+                                select: {
+                                    id: true,
+                                    username: true,
+                                },
+                            },
+                        },
+                    },
+                },
+            }),
+            prisma_1.prisma.certificate.count({ where }),
+        ]);
+        return {
+            certificates,
+            pagination: {
+                page,
+                limit,
+                total,
+                totalPages: Math.ceil(total / limit),
+                hasNext: page * limit < total,
+                hasPrev: page > 1,
+            },
+        };
+    }
+    /**
+     * Revoke certificate
+     */
+    async revokeCertificate(certificateId, reason, adminId) {
+        const certificate = await prisma_1.prisma.certificate.findUnique({
+            where: { id: certificateId },
+        });
+        if (!certificate) {
+            throw new Error('Certificate not found');
+        }
+        if (!certificate.isActive) {
+            throw new Error('Certificate is already revoked');
+        }
+        // Store revocation info in metadata
+        const metadata = certificate.metadata || {};
+        metadata.revoked = true;
+        metadata.revokedAt = new Date().toISOString();
+        metadata.revocationReason = reason;
+        metadata.revokedBy = adminId;
+        const updatedCertificate = await prisma_1.prisma.certificate.update({
+            where: { id: certificateId },
+            data: {
+                isActive: false,
+                metadata: metadata,
+            },
+            include: {
+                student: {
+                    select: {
+                        id: true,
+                        username: true,
+                        email: true,
+                    },
+                },
+                course: {
+                    select: {
+                        id: true,
+                        title: true,
+                    },
+                },
+            },
+        });
+        // Log activity
+        if (adminId) {
+            try {
+                await this.activityLogService.logActivity({
+                    userId: adminId,
+                    action: 'CERTIFICATE_REVOKED',
+                    entity: 'CERTIFICATE',
+                    entityId: certificateId,
+                    metadata: { reason },
+                });
+            }
+            catch (error) {
+                console.error('Failed to log activity:', error);
+            }
+        }
+        return updatedCertificate;
+    }
+    // ============================================================
     // PAYOUT MANAGEMENT
     // ============================================================
     /**

@@ -2,6 +2,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.RealtimeMessagingService = void 0;
 const messaging_service_1 = require("./messaging.service");
+const logger_1 = require("../../../utils/logger");
 class RealtimeMessagingService {
     constructor(io) {
         this.userSockets = new Map(); // userId -> Set of socketIds
@@ -33,7 +34,7 @@ class RealtimeMessagingService {
             }
         });
         this.io.on('connection', (socket) => {
-            console.log(`User connected to messaging: ${socket.id}`);
+            logger_1.logger.info('User connected to messaging', { socketId: socket.id });
             // User joins their personal room
             socket.on('join_user', async (data) => {
                 try {
@@ -53,13 +54,14 @@ class RealtimeMessagingService {
                         userId,
                         limit: 100,
                     });
-                    conversations.data.forEach((conv) => {
+                    conversations.conversations.forEach((conv) => {
                         socket.join(`conversation-${conv.id}`);
                     });
-                    console.log(`User ${userId} joined messaging rooms`);
+                    logger_1.logger.info('User joined messaging rooms', { userId });
                 }
                 catch (error) {
-                    console.error('Error joining user room:', error);
+                    const errorUserId = data.userId || socket.data.userId;
+                    logger_1.logger.error('Error joining user room', error, { userId: errorUserId });
                 }
             });
             // Join a specific conversation room
@@ -69,10 +71,12 @@ class RealtimeMessagingService {
                     // Verify user is a participant
                     await this.messagingService.getConversationById(conversationId, userId);
                     socket.join(`conversation-${conversationId}`);
-                    console.log(`User ${userId} joined conversation ${conversationId}`);
+                    logger_1.logger.info('User joined conversation', { userId, conversationId });
                 }
                 catch (error) {
-                    console.error('Error joining conversation:', error);
+                    const errorUserId = data.userId;
+                    const errorConversationId = data.conversationId;
+                    logger_1.logger.error('Error joining conversation', error, { userId: errorUserId, conversationId: errorConversationId });
                     socket.emit('error', { message: 'Failed to join conversation' });
                 }
             });
@@ -80,7 +84,7 @@ class RealtimeMessagingService {
             socket.on('leave_conversation', (data) => {
                 const { conversationId } = data;
                 socket.leave(`conversation-${conversationId}`);
-                console.log(`User left conversation ${conversationId}`);
+                logger_1.logger.debug('User left conversation', { conversationId });
             });
             // Send a message
             socket.on('send_message', async (data) => {
@@ -103,10 +107,18 @@ class RealtimeMessagingService {
                         type: 'message_sent',
                         data: message,
                     });
-                    console.log(`Message sent in conversation ${message.conversationId}`);
+                    logger_1.logger.info('Message sent via Socket.IO', {
+                        conversationId: message.conversationId,
+                        messageId: message.id,
+                        userId,
+                    });
                 }
                 catch (error) {
-                    console.error('Error sending message:', error);
+                    const errorUserId = this.getUserIdFromSocket(socket);
+                    logger_1.logger.error('Error sending message via Socket.IO', error, {
+                        userId: errorUserId || undefined,
+                        conversationId: data.conversationId,
+                    });
                     socket.emit('error', {
                         message: error instanceof Error ? error.message : 'Failed to send message',
                     });
@@ -142,7 +154,12 @@ class RealtimeMessagingService {
                     });
                 }
                 catch (error) {
-                    console.error('Error marking messages as read:', error);
+                    const errorUserId = data.userId;
+                    const errorConversationId = data.conversationId;
+                    logger_1.logger.error('Error marking messages as read via Socket.IO', error, {
+                        userId: errorUserId,
+                        conversationId: errorConversationId,
+                    });
                     socket.emit('error', {
                         message: error instanceof Error ? error.message : 'Failed to mark as read',
                     });
@@ -169,7 +186,12 @@ class RealtimeMessagingService {
                     });
                 }
                 catch (error) {
-                    console.error('Error marking message as read:', error);
+                    const errorUserId = this.getUserIdFromSocket(socket);
+                    const errorMessageId = data.messageId;
+                    logger_1.logger.error('Error marking message as read via Socket.IO', error, {
+                        userId: errorUserId || undefined,
+                        messageId: errorMessageId,
+                    });
                     socket.emit('error', {
                         message: error instanceof Error ? error.message : 'Failed to mark message as read',
                     });
@@ -197,7 +219,14 @@ class RealtimeMessagingService {
                     });
                 }
                 catch (error) {
-                    console.error('Error adding reaction:', error);
+                    const errorUserId = this.getUserIdFromSocket(socket);
+                    const errorMessageId = data.messageId;
+                    const errorEmoji = data.emoji;
+                    logger_1.logger.error('Error adding reaction via Socket.IO', error, {
+                        userId: errorUserId || undefined,
+                        messageId: errorMessageId,
+                        emoji: errorEmoji,
+                    });
                     socket.emit('error', {
                         message: error instanceof Error ? error.message : 'Failed to add reaction',
                     });
@@ -225,7 +254,14 @@ class RealtimeMessagingService {
                     });
                 }
                 catch (error) {
-                    console.error('Error removing reaction:', error);
+                    const errorUserId = this.getUserIdFromSocket(socket);
+                    const errorMessageId = data.messageId;
+                    const errorEmoji = data.emoji;
+                    logger_1.logger.error('Error removing reaction via Socket.IO', error, {
+                        userId: errorUserId || undefined,
+                        messageId: errorMessageId,
+                        emoji: errorEmoji,
+                    });
                     socket.emit('error', {
                         message: error instanceof Error ? error.message : 'Failed to remove reaction',
                     });
@@ -233,7 +269,7 @@ class RealtimeMessagingService {
             });
             // Handle disconnection
             socket.on('disconnect', () => {
-                console.log(`User disconnected from messaging: ${socket.id}`);
+                logger_1.logger.info('User disconnected from messaging', { socketId: socket.id });
                 // Remove socket from user tracking
                 for (const [userId, sockets] of this.userSockets.entries()) {
                     if (sockets.has(socket.id)) {

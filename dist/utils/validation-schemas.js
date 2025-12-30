@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.updateCalendarEventSchema = exports.createCalendarEventSchema = exports.refreshTokenSchema = exports.resetPasswordSchema = exports.forgotPasswordSchema = exports.updateProgressSchema = exports.updateAssignmentSchema = exports.updateQuizSchema = exports.submitQuizAttemptSchema = exports.startQuizAttemptSchema = exports.createQuizQuestionSchema = exports.courseIdParamSchema = exports.idParamSchema = exports.createConversationSchema = exports.createMessageSchema = exports.createProgressSchema = exports.createAssignmentSchema = exports.activateSubscriptionSchema = exports.createSubscriptionSchema = exports.createQuizSchema = exports.createModuleSchema = exports.createEnrollmentSchema = exports.changePasswordSchema = exports.updateUserSchema = exports.loginSchema = exports.createUserSchema = exports.updateCourseSchema = exports.createCourseSchema = exports.paginationSchema = void 0;
+exports.updateCalendarEventSchema = exports.createCalendarEventSchema = exports.resendVerificationSchema = exports.verifyEmailSchema = exports.refreshTokenSchema = exports.resetPasswordSchema = exports.forgotPasswordSchema = exports.updateProgressSchema = exports.updateAssignmentSchema = exports.updateQuizSchema = exports.submitQuizAttemptSchema = exports.startQuizAttemptSchema = exports.createQuizQuestionSchema = exports.courseIdParamSchema = exports.idParamSchema = exports.createConversationSchema = exports.createMessageSchema = exports.createProgressSchema = exports.createAssignmentSchema = exports.activateSubscriptionSchema = exports.createSubscriptionSchema = exports.createQuizSchema = exports.createModuleSchema = exports.createEnrollmentSchema = exports.changePasswordSchema = exports.updateUserSchema = exports.loginSchema = exports.createUserSchema = exports.updateCourseSchema = exports.createCourseSchema = exports.paginationSchema = void 0;
 const zod_1 = require("zod");
 /**
  * Common validation schemas
@@ -137,6 +137,16 @@ exports.createMessageSchema = zod_1.z.object({
     content: zod_1.z.string().min(1).max(10000),
     type: zod_1.z.enum(['text', 'image', 'file', 'system']).default('text').optional(),
     replyToId: zod_1.z.string().optional(),
+    attachments: zod_1.z.array(zod_1.z.object({
+        filename: zod_1.z.string(),
+        url: zod_1.z.string(),
+        size: zod_1.z.number().optional(),
+        mimeType: zod_1.z.string().optional(),
+    })).optional(),
+    metadata: zod_1.z.record(zod_1.z.any()).optional(),
+}).refine((data) => data.conversationId || data.receiverId, {
+    message: "Either conversationId or receiverId must be provided",
+    path: ["conversationId"], // This will show the error on conversationId field
 });
 exports.createConversationSchema = zod_1.z.object({
     type: zod_1.z.enum(['direct', 'group']),
@@ -213,6 +223,14 @@ exports.resetPasswordSchema = zod_1.z.object({
 // Refresh token schema
 exports.refreshTokenSchema = zod_1.z.object({
     token: zod_1.z.string().min(1),
+});
+// Email verification schema
+exports.verifyEmailSchema = zod_1.z.object({
+    token: zod_1.z.string().min(1),
+});
+// Resend verification email schema
+exports.resendVerificationSchema = zod_1.z.object({
+    email: zod_1.z.string().email(),
 });
 // Calendar event schemas
 exports.createCalendarEventSchema = zod_1.z.object({

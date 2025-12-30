@@ -150,7 +150,20 @@ export const createMessageSchema = z.object({
   content: z.string().min(1).max(10000),
   type: z.enum(['text', 'image', 'file', 'system']).default('text').optional(),
   replyToId: z.string().optional(),
-});
+  attachments: z.array(z.object({
+    filename: z.string(),
+    url: z.string(),
+    size: z.number().optional(),
+    mimeType: z.string().optional(),
+  })).optional(),
+  metadata: z.record(z.any()).optional(),
+}).refine(
+  (data) => data.conversationId || data.receiverId,
+  {
+    message: "Either conversationId or receiverId must be provided",
+    path: ["conversationId"], // This will show the error on conversationId field
+  }
+);
 
 export const createConversationSchema = z.object({
   type: z.enum(['direct', 'group']),
@@ -238,6 +251,16 @@ export const resetPasswordSchema = z.object({
 // Refresh token schema
 export const refreshTokenSchema = z.object({
   token: z.string().min(1),
+});
+
+// Email verification schema
+export const verifyEmailSchema = z.object({
+  token: z.string().min(1),
+});
+
+// Resend verification email schema
+export const resendVerificationSchema = z.object({
+  email: z.string().email(),
 });
 
 // Calendar event schemas

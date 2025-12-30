@@ -1,5 +1,6 @@
 // src/modules/messaging/services/messaging.service.ts
 import { prisma } from '../../../utils/prisma';
+import { logger } from '../../../utils/logger';
 import {
   CreateMessageDto,
   UpdateMessageDto,
@@ -636,8 +637,9 @@ export class MessagingService {
         conversationId = conversation.id;
       }
 
-      // Verify user is a participant
-      const participant = await prisma.conversationParticipant.findFirst({
+      // Verify user is a participant, auto-add if missing
+      // Use upsert to handle race conditions atomically
+      let participant = await prisma.conversationParticipant.findFirst({
         where: {
           conversationId,
           userId: senderId,
@@ -646,7 +648,64 @@ export class MessagingService {
       });
 
       if (!participant) {
-        throw new Error('You are not a participant in this conversation');
+        logger.debug('User not found as active participant, attempting to add/rejoin', {
+          userId: senderId,
+          conversationId,
+        });
+
+        // Verify conversation exists
+        const conversation = await prisma.conversation.findUnique({
+          where: { id: conversationId },
+        });
+
+        if (!conversation) {
+          logger.error('Conversation not found', undefined, { conversationId, userId: senderId });
+          throw new Error('Conversation not found');
+        }
+
+        // Use upsert to handle race conditions
+        try {
+          participant = await prisma.conversationParticipant.upsert({
+            where: {
+              conversationId_userId: {
+                conversationId,
+                userId: senderId,
+              },
+            },
+            update: {
+              leftAt: null, // Rejoin if they left
+              role: 'member',
+            },
+            create: {
+              conversationId,
+              userId: senderId,
+              role: 'member',
+            },
+          });
+          logger.info('User added/rejoined conversation', {
+            userId: senderId,
+            conversationId,
+            action: participant.leftAt ? 'rejoined' : 'added',
+          });
+        } catch (upsertError: any) {
+          // If upsert fails, try to find the participant again (may have been created by concurrent request)
+          participant = await prisma.conversationParticipant.findFirst({
+            where: {
+              conversationId,
+              userId: senderId,
+              leftAt: null,
+            },
+          });
+
+          if (!participant) {
+            logger.error('Failed to add participant', upsertError, {
+              userId: senderId,
+              conversationId,
+              errorCode: upsertError.code,
+            });
+            throw new Error('Failed to add user as participant. Please try again.');
+          }
+        }
       }
 
       // Determine receiver for direct messages
@@ -746,8 +805,8 @@ export class MessagingService {
     };
   }> {
     try {
-      // Verify user is a participant
-      const participant = await prisma.conversationParticipant.findFirst({
+      // Verify user is a participant, auto-add if missing (same logic as sendMessage)
+      let participant = await prisma.conversationParticipant.findFirst({
         where: {
           conversationId,
           userId,
@@ -756,7 +815,61 @@ export class MessagingService {
       });
 
       if (!participant) {
-        throw new Error('You are not a participant in this conversation');
+        logger.debug('User not found as active participant in getMessages, attempting to add/rejoin', {
+          userId,
+          conversationId,
+        });
+
+        const conversation = await prisma.conversation.findUnique({
+          where: { id: conversationId },
+        });
+
+        if (!conversation) {
+          throw new Error('Conversation not found');
+        }
+
+        // Use upsert to handle race conditions
+        try {
+          participant = await prisma.conversationParticipant.upsert({
+            where: {
+              conversationId_userId: {
+                conversationId,
+                userId,
+              },
+            },
+            update: {
+              leftAt: null,
+              role: 'member',
+            },
+            create: {
+              conversationId,
+              userId,
+              role: 'member',
+            },
+          });
+          logger.info('User added/rejoined conversation in getMessages', {
+            userId,
+            conversationId,
+          });
+        } catch (upsertError: any) {
+          // If upsert fails, try to find the participant again
+          participant = await prisma.conversationParticipant.findFirst({
+            where: {
+              conversationId,
+              userId,
+              leftAt: null,
+            },
+          });
+
+          if (!participant) {
+            logger.error('Failed to add participant in getMessages', upsertError, {
+              userId,
+              conversationId,
+              errorCode: upsertError.code,
+            });
+            throw new Error('Failed to add user as participant. Please try again.');
+          }
+        }
       }
 
       const where: any = {

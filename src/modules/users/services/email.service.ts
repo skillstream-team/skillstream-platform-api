@@ -438,6 +438,52 @@ export class EmailService {
         `;
         await this.sendEmail(to, subject, html, true);
     }
+
+    // Email verification
+    async sendVerificationEmail(to: string, username: string, verificationLink: string, firstName?: string) {
+        const name = firstName || username;
+        const subject = 'Verify your SkillStream email address';
+        const html = `
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta charset="utf-8">
+                <style>
+                    body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+                    .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+                    .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
+                    .content { background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px; }
+                    .button { display: inline-block; background: #667eea; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; margin: 20px 0; }
+                    .footer { text-align: center; margin-top: 30px; color: #777; font-size: 12px; }
+                    .code { background: #e9ecef; padding: 10px; border-radius: 5px; font-family: monospace; word-break: break-all; margin: 20px 0; }
+                </style>
+            </head>
+            <body>
+                <div class="container">
+                    <div class="header">
+                        <h1>Verify Your Email</h1>
+                    </div>
+                    <div class="content">
+                        <p>Hi ${name},</p>
+                        <p>Thank you for signing up for SkillStream! Please verify your email address to complete your registration and unlock all features.</p>
+                        <p style="text-align: center;">
+                            <a href="${verificationLink}" class="button">Verify Email Address</a>
+                        </p>
+                        <p>Or copy and paste this link into your browser:</p>
+                        <div class="code">${verificationLink}</div>
+                        <p><strong>This link will expire in 24 hours.</strong></p>
+                        <p>If you didn't create an account with SkillStream, please ignore this email.</p>
+                        <p>Best regards,<br><strong>The SkillStream Team</strong></p>
+                    </div>
+                    <div class="footer">
+                        <p>This email was sent from SkillStream. If you didn't create an account, please ignore this email.</p>
+                    </div>
+                </div>
+            </body>
+            </html>
+        `;
+        await this.sendFromTeam(to, subject, html);
+    }
 }
 
 export const emailService = new EmailService();

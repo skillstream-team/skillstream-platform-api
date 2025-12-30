@@ -2,12 +2,493 @@ import { Router } from 'express';
 import { AdminService } from '../../services/admin.service';
 import { requireAuth } from '../../../../middleware/auth';
 import { validate } from '../../../../middleware/validation';
+import { logger } from '../../../../utils/logger';
 import { z } from 'zod';
 import multer from 'multer';
 
 const router = Router();
 const adminService = new AdminService();
 const upload = multer({ storage: multer.memoryStorage() });
+
+// ============================================================
+// ADMIN DASHBOARD STATS
+// ============================================================
+
+/**
+ * @swagger
+ * /api/admin/stats:
+ *   get:
+ *     summary: Get admin dashboard statistics (Admin only)
+ *     tags: [Admin]
+ */
+router.get('/admin/stats',
+  requireAuth,
+  async (req, res) => {
+    // Check admin role
+    if ((req as any).user?.role !== 'ADMIN') {
+      return res.status(403).json({ error: 'Forbidden: Admin role required' });
+    }
+
+    try {
+      const stats = await adminService.getDashboardStats();
+      res.json({
+        success: true,
+        ...stats,
+      });
+    } catch (error) {
+      logger.error('Error getting admin stats', error, {
+        userId: (req as any).user?.id,
+      });
+      res.status(500).json({
+        error: (error as Error).message || 'Failed to get admin stats',
+      });
+    }
+  }
+);
+
+// ============================================================
+// USER MANAGEMENT (Admin)
+// ============================================================
+
+/**
+ * @swagger
+ * /api/admin/users:
+ *   get:
+ *     summary: Get all users with filtering (Admin only)
+ *     tags: [Admin]
+ */
+router.get('/admin/users',
+  requireAuth,
+  async (req, res) => {
+    // Check admin role
+    if ((req as any).user?.role !== 'ADMIN') {
+      return res.status(403).json({ error: 'Forbidden: Admin role required' });
+    }
+
+    try {
+      const page = req.query.page ? parseInt(req.query.page as string, 10) : 1;
+      const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : 20;
+      const search = req.query.search as string | undefined;
+      const role = req.query.role as string | undefined;
+      const isActive = req.query.isActive === 'true' ? true : req.query.isActive === 'false' ? false : undefined;
+
+      const result = await adminService.getUsers({
+        page,
+        limit,
+        search,
+        role,
+        isActive,
+      });
+
+      res.json({
+        success: true,
+        users: result.users || [],
+        pagination: result.pagination,
+      });
+    } catch (error) {
+      logger.error('Error getting users', error, {
+        userId: (req as any).user?.id,
+      });
+      res.status(500).json({
+        error: (error as Error).message || 'Failed to get users',
+      });
+    }
+  }
+);
+
+/**
+ * @swagger
+ * /api/admin/users/:id:
+ *   get:
+ *     summary: Get user by ID (Admin only)
+ *     tags: [Admin]
+ */
+router.get('/admin/users/:id',
+  requireAuth,
+  async (req, res) => {
+    // Check admin role
+    if ((req as any).user?.role !== 'ADMIN') {
+      return res.status(403).json({ error: 'Forbidden: Admin role required' });
+    }
+
+    try {
+      const user = await adminService.getUserById(req.params.id);
+      res.json({
+        success: true,
+        data: user,
+      });
+    } catch (error) {
+      logger.error('Error getting user', error, {
+        userId: (req as any).user?.id,
+        targetUserId: req.params.id,
+      });
+      const statusCode = (error as Error).message.includes('not found') ? 404 : 500;
+      res.status(statusCode).json({
+        error: (error as Error).message || 'Failed to get user',
+      });
+    }
+  }
+);
+
+/**
+ * @swagger
+ * /api/admin/users/:id:
+ *   put:
+ *     summary: Update user (Admin only)
+ *     tags: [Admin]
+ */
+const updateUserSchema = z.object({
+  role: z.enum(['STUDENT', 'TEACHER', 'ADMIN']).optional(),
+  isActive: z.boolean().optional(),
+  isVerified: z.boolean().optional(),
+});
+
+router.put('/admin/users/:id',
+  requireAuth,
+  validate({
+    params: z.object({ id: z.string().min(1) }),
+    body: updateUserSchema,
+  }),
+  async (req, res) => {
+    // Check admin role
+    if ((req as any).user?.role !== 'ADMIN') {
+      return res.status(403).json({ error: 'Forbidden: Admin role required' });
+    }
+
+    try {
+      const user = await adminService.updateUser(req.params.id, req.body);
+      res.json({
+        success: true,
+        data: user,
+      });
+    } catch (error) {
+      logger.error('Error updating user', error, {
+        userId: (req as any).user?.id,
+        targetUserId: req.params.id,
+      });
+      const statusCode = (error as Error).message.includes('not found') ? 404 : 400;
+      res.status(statusCode).json({
+        error: (error as Error).message || 'Failed to update user',
+      });
+    }
+  }
+);
+
+/**
+ * @swagger
+ * /api/admin/users/:id:
+ *   delete:
+ *     summary: Delete user (Admin only)
+ *     tags: [Admin]
+ */
+router.delete('/admin/users/:id',
+  requireAuth,
+  validate({
+    params: z.object({ id: z.string().min(1) }),
+  }),
+  async (req, res) => {
+    // Check admin role
+    if ((req as any).user?.role !== 'ADMIN') {
+      return res.status(403).json({ error: 'Forbidden: Admin role required' });
+    }
+
+    try {
+      await adminService.deleteUser(req.params.id);
+      res.json({
+        success: true,
+        message: 'User deleted successfully',
+      });
+    } catch (error) {
+      logger.error('Error deleting user', error, { userId: (req as any).user?.id });
+      const statusCode = (error as Error).message.includes('not found') ? 404 : 400;
+      res.status(statusCode).json({
+        error: (error as Error).message || 'Failed to delete user',
+      });
+    }
+  }
+);
+
+// ============================================================
+// COURSE MODERATION (Admin)
+// ============================================================
+
+/**
+ * @swagger
+ * /api/admin/courses/pending:
+ *   get:
+ *     summary: Get pending courses (Admin only)
+ *     tags: [Admin]
+ */
+router.get('/admin/courses/pending',
+  requireAuth,
+  async (req, res) => {
+    // Check admin role
+    if ((req as any).user?.role !== 'ADMIN') {
+      return res.status(403).json({ error: 'Forbidden: Admin role required' });
+    }
+
+    try {
+      const page = req.query.page ? parseInt(req.query.page as string, 10) : 1;
+      const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : 20;
+
+      const result = await adminService.getPendingCourses({
+        page,
+        limit,
+      });
+
+      res.json({
+        success: true,
+        courses: result.courses || [],
+        pagination: result.pagination,
+      });
+    } catch (error) {
+      logger.error('Error getting pending courses', error, { userId: (req as any).user?.id });
+      res.status(500).json({
+        error: (error as Error).message || 'Failed to get pending courses',
+      });
+    }
+  }
+);
+
+/**
+ * @swagger
+ * /api/admin/courses/:id/moderate:
+ *   post:
+ *     summary: Moderate course (approve/reject) (Admin only)
+ *     tags: [Admin]
+ */
+const moderateCourseSchema = z.object({
+  status: z.enum(['APPROVED', 'REJECTED', 'PENDING']),
+  rejectionReason: z.string().optional(),
+});
+
+router.post('/admin/courses/:id/moderate',
+  requireAuth,
+  validate({
+    params: z.object({ id: z.string().min(1) }),
+    body: moderateCourseSchema,
+  }),
+  async (req, res) => {
+    // Check admin role
+    if ((req as any).user?.role !== 'ADMIN') {
+      return res.status(403).json({ error: 'Forbidden: Admin role required' });
+    }
+
+    try {
+      const adminId = (req as any).user.id;
+      const course = await adminService.moderateCourse(
+        req.params.id,
+        req.body.status,
+        req.body.rejectionReason,
+        adminId
+      );
+
+      res.json({
+        success: true,
+        data: course,
+      });
+    } catch (error) {
+      logger.error('Error moderating course', error, { userId: (req as any).user?.id });
+      const statusCode = (error as Error).message.includes('not found') ? 404 : 400;
+      res.status(statusCode).json({
+        error: (error as Error).message || 'Failed to moderate course',
+      });
+    }
+  }
+);
+
+// ============================================================
+// REVIEWS MANAGEMENT (Admin)
+// ============================================================
+
+/**
+ * @swagger
+ * /api/admin/reviews:
+ *   get:
+ *     summary: Get all reviews with filtering (Admin only)
+ *     tags: [Admin]
+ */
+router.get('/admin/reviews',
+  requireAuth,
+  async (req, res) => {
+    // Check admin role
+    if ((req as any).user?.role !== 'ADMIN') {
+      return res.status(403).json({ error: 'Forbidden: Admin role required' });
+    }
+
+    try {
+      const page = req.query.page ? parseInt(req.query.page as string, 10) : 1;
+      const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : 20;
+      const courseId = req.query.courseId as string | undefined;
+      const userId = req.query.userId as string | undefined;
+      const rating = req.query.rating ? parseInt(req.query.rating as string, 10) : undefined;
+      const status = req.query.status as string | undefined;
+
+      const result = await adminService.getAllReviews({
+        page,
+        limit,
+        courseId,
+        userId,
+        rating,
+        status,
+      });
+
+      res.json({
+        success: true,
+        reviews: result.reviews || [],
+        pagination: result.pagination,
+      });
+    } catch (error) {
+      logger.error('Error getting reviews', error, { userId: (req as any).user?.id });
+      res.status(500).json({
+        error: (error as Error).message || 'Failed to get reviews',
+      });
+    }
+  }
+);
+
+/**
+ * @swagger
+ * /api/admin/reviews/:id/moderate:
+ *   post:
+ *     summary: Moderate review (Admin only)
+ *     tags: [Admin]
+ */
+const moderateReviewSchema = z.object({
+  action: z.enum(['approve', 'reject', 'hide', 'delete']),
+  reason: z.string().optional(),
+});
+
+router.post('/admin/reviews/:id/moderate',
+  requireAuth,
+  validate({
+    params: z.object({ id: z.string().min(1) }),
+    body: moderateReviewSchema,
+  }),
+  async (req, res) => {
+    // Check admin role
+    if ((req as any).user?.role !== 'ADMIN') {
+      return res.status(403).json({ error: 'Forbidden: Admin role required' });
+    }
+
+    try {
+      const adminId = (req as any).user.id;
+      const review = await adminService.moderateReview(
+        req.params.id,
+        req.body.action,
+        req.body.reason,
+        adminId
+      );
+
+      res.json({
+        success: true,
+        data: review,
+      });
+    } catch (error) {
+      logger.error('Error moderating review', error, { userId: (req as any).user?.id });
+      const statusCode = (error as Error).message.includes('not found') ? 404 : 400;
+      res.status(statusCode).json({
+        error: (error as Error).message || 'Failed to moderate review',
+      });
+    }
+  }
+);
+
+// ============================================================
+// CERTIFICATES MANAGEMENT (Admin)
+// ============================================================
+
+/**
+ * @swagger
+ * /api/admin/certificates:
+ *   get:
+ *     summary: Get all certificates with filtering (Admin only)
+ *     tags: [Admin]
+ */
+router.get('/admin/certificates',
+  requireAuth,
+  async (req, res) => {
+    // Check admin role
+    if ((req as any).user?.role !== 'ADMIN') {
+      return res.status(403).json({ error: 'Forbidden: Admin role required' });
+    }
+
+    try {
+      const page = req.query.page ? parseInt(req.query.page as string, 10) : 1;
+      const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : 20;
+      const userId = req.query.userId as string | undefined;
+      const courseId = req.query.courseId as string | undefined;
+      const startDate = req.query.startDate ? new Date(req.query.startDate as string) : undefined;
+      const endDate = req.query.endDate ? new Date(req.query.endDate as string) : undefined;
+
+      const result = await adminService.getAllCertificates({
+        page,
+        limit,
+        userId,
+        courseId,
+        startDate,
+        endDate,
+      });
+
+      res.json({
+        success: true,
+        certificates: result.certificates || [],
+        pagination: result.pagination,
+      });
+    } catch (error) {
+      logger.error('Error getting certificates', error, { userId: (req as any).user?.id });
+      res.status(500).json({
+        error: (error as Error).message || 'Failed to get certificates',
+      });
+    }
+  }
+);
+
+/**
+ * @swagger
+ * /api/admin/certificates/:id/revoke:
+ *   post:
+ *     summary: Revoke certificate (Admin only)
+ *     tags: [Admin]
+ */
+const revokeCertificateSchema = z.object({
+  reason: z.string().optional(),
+});
+
+router.post('/admin/certificates/:id/revoke',
+  requireAuth,
+  validate({
+    params: z.object({ id: z.string().min(1) }),
+    body: revokeCertificateSchema,
+  }),
+  async (req, res) => {
+    // Check admin role
+    if ((req as any).user?.role !== 'ADMIN') {
+      return res.status(403).json({ error: 'Forbidden: Admin role required' });
+    }
+
+    try {
+      const adminId = (req as any).user.id;
+      const certificate = await adminService.revokeCertificate(
+        req.params.id,
+        req.body.reason,
+        adminId
+      );
+
+      res.json({
+        success: true,
+        data: certificate,
+        message: 'Certificate revoked successfully',
+      });
+    } catch (error) {
+      logger.error('Error revoking certificate', error, { userId: (req as any).user?.id });
+      const statusCode = (error as Error).message.includes('not found') ? 404 : 400;
+      res.status(statusCode).json({
+        error: (error as Error).message || 'Failed to revoke certificate',
+      });
+    }
+  }
+);
 
 // ============================================================
 // PAYOUT MANAGEMENT
@@ -48,7 +529,7 @@ router.get('/admin/payouts',
         data: result,
       });
     } catch (error) {
-      console.error('Error getting payouts:', error);
+      logger.error('Error getting payouts', error, { userId: (req as any).user?.id });
       res.status(500).json({
         error: (error as Error).message || 'Failed to get payouts',
       });
@@ -100,7 +581,7 @@ router.post('/admin/payouts/:payoutId/approve',
         message: 'Payout approved successfully',
       });
     } catch (error) {
-      console.error('Error approving payout:', error);
+      logger.error('Error approving payout', error, { userId: (req as any).user?.id });
       const statusCode = (error as Error).message.includes('not found') ? 404 : 400;
       res.status(statusCode).json({
         error: (error as Error).message || 'Failed to approve payout',
@@ -153,7 +634,7 @@ router.post('/admin/payouts/:payoutId/reject',
         message: 'Payout rejected successfully',
       });
     } catch (error) {
-      console.error('Error rejecting payout:', error);
+      logger.error('Error rejecting payout', error, { userId: (req as any).user?.id });
       const statusCode = (error as Error).message.includes('not found') ? 404 : 400;
       res.status(statusCode).json({
         error: (error as Error).message || 'Failed to reject payout',
@@ -205,10 +686,13 @@ router.post('/admin/users/bulk',
 
       res.json({
         success: true,
-        data: result,
+        message: 'Bulk update completed',
+        updated: result.updated,
+        failed: result.failed,
+        errors: result.errors,
       });
     } catch (error) {
-      console.error('Error bulk updating users:', error);
+      logger.error('Error bulk updating users', error, { userId: (req as any).user?.id });
       res.status(500).json({
         error: (error as Error).message || 'Failed to bulk update users',
       });
@@ -255,10 +739,13 @@ router.post('/admin/courses/bulk',
 
       res.json({
         success: true,
-        data: result,
+        message: 'Bulk moderation completed',
+        updated: result.updated,
+        failed: result.failed,
+        errors: result.errors,
       });
     } catch (error) {
-      console.error('Error bulk updating courses:', error);
+      logger.error('Error bulk updating courses', error, { userId: (req as any).user?.id });
       res.status(500).json({
         error: (error as Error).message || 'Failed to bulk update courses',
       });
@@ -304,7 +791,7 @@ router.post('/admin/broadcasts',
         data: result,
       });
     } catch (error) {
-      console.error('Error sending broadcast:', error);
+      logger.error('Error sending broadcast', error, { userId: (req as any).user?.id });
       res.status(500).json({
         error: (error as Error).message || 'Failed to send broadcast',
       });
@@ -345,7 +832,7 @@ router.get('/admin/broadcasts',
         data: result,
       });
     } catch (error) {
-      console.error('Error getting broadcasts:', error);
+      logger.error('Error getting broadcasts', error, { userId: (req as any).user?.id });
       res.status(500).json({
         error: (error as Error).message || 'Failed to get broadcasts',
       });
@@ -394,7 +881,7 @@ router.get('/admin/logs',
         data: result,
       });
     } catch (error) {
-      console.error('Error getting activity logs:', error);
+      logger.error('Error getting activity logs', error, { userId: (req as any).user?.id });
       res.status(500).json({
         error: (error as Error).message || 'Failed to get activity logs',
       });
@@ -437,7 +924,7 @@ router.post('/admin/users/import',
         data: result,
       });
     } catch (error) {
-      console.error('Error importing users:', error);
+      logger.error('Error importing users', error, { userId: (req as any).user?.id });
       res.status(500).json({
         error: (error as Error).message || 'Failed to import users',
       });
@@ -470,7 +957,7 @@ router.get('/admin/users/export',
       res.setHeader('Content-Disposition', 'attachment; filename=users-export.csv');
       res.send(csvData);
     } catch (error) {
-      console.error('Error exporting users:', error);
+      logger.error('Error exporting users', error, { userId: (req as any).user?.id });
       res.status(500).json({
         error: (error as Error).message || 'Failed to export users',
       });
@@ -505,7 +992,7 @@ router.get('/admin/certificate-templates',
         data: { templates },
       });
     } catch (error) {
-      console.error('Error getting certificate templates:', error);
+      logger.error('Error getting certificate templates', error, { userId: (req as any).user?.id });
       res.status(500).json({
         error: (error as Error).message || 'Failed to get certificate templates',
       });
@@ -544,7 +1031,7 @@ router.post('/admin/certificate-templates',
         data: template,
       });
     } catch (error) {
-      console.error('Error creating certificate template:', error);
+      logger.error('Error creating certificate template', error, { userId: (req as any).user?.id });
       res.status(500).json({
         error: (error as Error).message || 'Failed to create certificate template',
       });
@@ -588,7 +1075,7 @@ router.put('/admin/certificate-templates/:id',
         data: template,
       });
     } catch (error) {
-      console.error('Error updating certificate template:', error);
+      logger.error('Error updating certificate template', error, { userId: (req as any).user?.id });
       const statusCode = (error as Error).message.includes('not found') ? 404 : 500;
       res.status(statusCode).json({
         error: (error as Error).message || 'Failed to update certificate template',
@@ -624,7 +1111,7 @@ router.delete('/admin/certificate-templates/:id',
         data: result,
       });
     } catch (error) {
-      console.error('Error deleting certificate template:', error);
+      logger.error('Error deleting certificate template', error, { userId: (req as any).user?.id });
       const statusCode = (error as Error).message.includes('not found') ? 404 : 400;
       res.status(statusCode).json({
         error: (error as Error).message || 'Failed to delete certificate template',
@@ -668,7 +1155,7 @@ router.get('/admin/banners',
         data: result,
       });
     } catch (error) {
-      console.error('Error getting banners:', error);
+      logger.error('Error getting banners', error, { userId: (req as any).user?.id });
       res.status(500).json({
         error: (error as Error).message || 'Failed to get banners',
       });
@@ -719,7 +1206,7 @@ router.post('/admin/banners',
         data: banner,
       });
     } catch (error) {
-      console.error('Error creating banner:', error);
+      logger.error('Error creating banner', error, { userId: (req as any).user?.id });
       res.status(500).json({
         error: (error as Error).message || 'Failed to create banner',
       });
@@ -774,7 +1261,7 @@ router.put('/admin/banners/:id',
         data: banner,
       });
     } catch (error) {
-      console.error('Error updating banner:', error);
+      logger.error('Error updating banner', error, { userId: (req as any).user?.id });
       const statusCode = (error as Error).message.includes('not found') ? 404 : 500;
       res.status(statusCode).json({
         error: (error as Error).message || 'Failed to update banner',
@@ -810,7 +1297,7 @@ router.delete('/admin/banners/:id',
         data: result,
       });
     } catch (error) {
-      console.error('Error deleting banner:', error);
+      logger.error('Error deleting banner', error, { userId: (req as any).user?.id });
       const statusCode = (error as Error).message.includes('not found') ? 404 : 500;
       res.status(statusCode).json({
         error: (error as Error).message || 'Failed to delete banner',

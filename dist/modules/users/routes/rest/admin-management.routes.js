@@ -7,11 +7,409 @@ const express_1 = require("express");
 const admin_service_1 = require("../../services/admin.service");
 const auth_1 = require("../../../../middleware/auth");
 const validation_1 = require("../../../../middleware/validation");
+const logger_1 = require("../../../../utils/logger");
 const zod_1 = require("zod");
 const multer_1 = __importDefault(require("multer"));
 const router = (0, express_1.Router)();
 const adminService = new admin_service_1.AdminService();
 const upload = (0, multer_1.default)({ storage: multer_1.default.memoryStorage() });
+// ============================================================
+// ADMIN DASHBOARD STATS
+// ============================================================
+/**
+ * @swagger
+ * /api/admin/stats:
+ *   get:
+ *     summary: Get admin dashboard statistics (Admin only)
+ *     tags: [Admin]
+ */
+router.get('/admin/stats', auth_1.requireAuth, async (req, res) => {
+    // Check admin role
+    if (req.user?.role !== 'ADMIN') {
+        return res.status(403).json({ error: 'Forbidden: Admin role required' });
+    }
+    try {
+        const stats = await adminService.getDashboardStats();
+        res.json({
+            success: true,
+            ...stats,
+        });
+    }
+    catch (error) {
+        logger_1.logger.error('Error getting admin stats', error, {
+            userId: req.user?.id,
+        });
+        res.status(500).json({
+            error: error.message || 'Failed to get admin stats',
+        });
+    }
+});
+// ============================================================
+// USER MANAGEMENT (Admin)
+// ============================================================
+/**
+ * @swagger
+ * /api/admin/users:
+ *   get:
+ *     summary: Get all users with filtering (Admin only)
+ *     tags: [Admin]
+ */
+router.get('/admin/users', auth_1.requireAuth, async (req, res) => {
+    // Check admin role
+    if (req.user?.role !== 'ADMIN') {
+        return res.status(403).json({ error: 'Forbidden: Admin role required' });
+    }
+    try {
+        const page = req.query.page ? parseInt(req.query.page, 10) : 1;
+        const limit = req.query.limit ? parseInt(req.query.limit, 10) : 20;
+        const search = req.query.search;
+        const role = req.query.role;
+        const isActive = req.query.isActive === 'true' ? true : req.query.isActive === 'false' ? false : undefined;
+        const result = await adminService.getUsers({
+            page,
+            limit,
+            search,
+            role,
+            isActive,
+        });
+        res.json({
+            success: true,
+            users: result.users || [],
+            pagination: result.pagination,
+        });
+    }
+    catch (error) {
+        logger_1.logger.error('Error getting users', error, {
+            userId: req.user?.id,
+        });
+        res.status(500).json({
+            error: error.message || 'Failed to get users',
+        });
+    }
+});
+/**
+ * @swagger
+ * /api/admin/users/:id:
+ *   get:
+ *     summary: Get user by ID (Admin only)
+ *     tags: [Admin]
+ */
+router.get('/admin/users/:id', auth_1.requireAuth, async (req, res) => {
+    // Check admin role
+    if (req.user?.role !== 'ADMIN') {
+        return res.status(403).json({ error: 'Forbidden: Admin role required' });
+    }
+    try {
+        const user = await adminService.getUserById(req.params.id);
+        res.json({
+            success: true,
+            data: user,
+        });
+    }
+    catch (error) {
+        logger_1.logger.error('Error getting user', error, {
+            userId: req.user?.id,
+            targetUserId: req.params.id,
+        });
+        const statusCode = error.message.includes('not found') ? 404 : 500;
+        res.status(statusCode).json({
+            error: error.message || 'Failed to get user',
+        });
+    }
+});
+/**
+ * @swagger
+ * /api/admin/users/:id:
+ *   put:
+ *     summary: Update user (Admin only)
+ *     tags: [Admin]
+ */
+const updateUserSchema = zod_1.z.object({
+    role: zod_1.z.enum(['STUDENT', 'TEACHER', 'ADMIN']).optional(),
+    isActive: zod_1.z.boolean().optional(),
+    isVerified: zod_1.z.boolean().optional(),
+});
+router.put('/admin/users/:id', auth_1.requireAuth, (0, validation_1.validate)({
+    params: zod_1.z.object({ id: zod_1.z.string().min(1) }),
+    body: updateUserSchema,
+}), async (req, res) => {
+    // Check admin role
+    if (req.user?.role !== 'ADMIN') {
+        return res.status(403).json({ error: 'Forbidden: Admin role required' });
+    }
+    try {
+        const user = await adminService.updateUser(req.params.id, req.body);
+        res.json({
+            success: true,
+            data: user,
+        });
+    }
+    catch (error) {
+        logger_1.logger.error('Error updating user', error, {
+            userId: req.user?.id,
+            targetUserId: req.params.id,
+        });
+        const statusCode = error.message.includes('not found') ? 404 : 400;
+        res.status(statusCode).json({
+            error: error.message || 'Failed to update user',
+        });
+    }
+});
+/**
+ * @swagger
+ * /api/admin/users/:id:
+ *   delete:
+ *     summary: Delete user (Admin only)
+ *     tags: [Admin]
+ */
+router.delete('/admin/users/:id', auth_1.requireAuth, (0, validation_1.validate)({
+    params: zod_1.z.object({ id: zod_1.z.string().min(1) }),
+}), async (req, res) => {
+    // Check admin role
+    if (req.user?.role !== 'ADMIN') {
+        return res.status(403).json({ error: 'Forbidden: Admin role required' });
+    }
+    try {
+        await adminService.deleteUser(req.params.id);
+        res.json({
+            success: true,
+            message: 'User deleted successfully',
+        });
+    }
+    catch (error) {
+        logger_1.logger.error('Error deleting user', error, { userId: req.user?.id });
+        const statusCode = error.message.includes('not found') ? 404 : 400;
+        res.status(statusCode).json({
+            error: error.message || 'Failed to delete user',
+        });
+    }
+});
+// ============================================================
+// COURSE MODERATION (Admin)
+// ============================================================
+/**
+ * @swagger
+ * /api/admin/courses/pending:
+ *   get:
+ *     summary: Get pending courses (Admin only)
+ *     tags: [Admin]
+ */
+router.get('/admin/courses/pending', auth_1.requireAuth, async (req, res) => {
+    // Check admin role
+    if (req.user?.role !== 'ADMIN') {
+        return res.status(403).json({ error: 'Forbidden: Admin role required' });
+    }
+    try {
+        const page = req.query.page ? parseInt(req.query.page, 10) : 1;
+        const limit = req.query.limit ? parseInt(req.query.limit, 10) : 20;
+        const result = await adminService.getPendingCourses({
+            page,
+            limit,
+        });
+        res.json({
+            success: true,
+            courses: result.courses || [],
+            pagination: result.pagination,
+        });
+    }
+    catch (error) {
+        logger_1.logger.error('Error getting pending courses', error, { userId: req.user?.id });
+        res.status(500).json({
+            error: error.message || 'Failed to get pending courses',
+        });
+    }
+});
+/**
+ * @swagger
+ * /api/admin/courses/:id/moderate:
+ *   post:
+ *     summary: Moderate course (approve/reject) (Admin only)
+ *     tags: [Admin]
+ */
+const moderateCourseSchema = zod_1.z.object({
+    status: zod_1.z.enum(['APPROVED', 'REJECTED', 'PENDING']),
+    rejectionReason: zod_1.z.string().optional(),
+});
+router.post('/admin/courses/:id/moderate', auth_1.requireAuth, (0, validation_1.validate)({
+    params: zod_1.z.object({ id: zod_1.z.string().min(1) }),
+    body: moderateCourseSchema,
+}), async (req, res) => {
+    // Check admin role
+    if (req.user?.role !== 'ADMIN') {
+        return res.status(403).json({ error: 'Forbidden: Admin role required' });
+    }
+    try {
+        const adminId = req.user.id;
+        const course = await adminService.moderateCourse(req.params.id, req.body.status, req.body.rejectionReason, adminId);
+        res.json({
+            success: true,
+            data: course,
+        });
+    }
+    catch (error) {
+        logger_1.logger.error('Error moderating course', error, { userId: req.user?.id });
+        const statusCode = error.message.includes('not found') ? 404 : 400;
+        res.status(statusCode).json({
+            error: error.message || 'Failed to moderate course',
+        });
+    }
+});
+// ============================================================
+// REVIEWS MANAGEMENT (Admin)
+// ============================================================
+/**
+ * @swagger
+ * /api/admin/reviews:
+ *   get:
+ *     summary: Get all reviews with filtering (Admin only)
+ *     tags: [Admin]
+ */
+router.get('/admin/reviews', auth_1.requireAuth, async (req, res) => {
+    // Check admin role
+    if (req.user?.role !== 'ADMIN') {
+        return res.status(403).json({ error: 'Forbidden: Admin role required' });
+    }
+    try {
+        const page = req.query.page ? parseInt(req.query.page, 10) : 1;
+        const limit = req.query.limit ? parseInt(req.query.limit, 10) : 20;
+        const courseId = req.query.courseId;
+        const userId = req.query.userId;
+        const rating = req.query.rating ? parseInt(req.query.rating, 10) : undefined;
+        const status = req.query.status;
+        const result = await adminService.getAllReviews({
+            page,
+            limit,
+            courseId,
+            userId,
+            rating,
+            status,
+        });
+        res.json({
+            success: true,
+            reviews: result.reviews || [],
+            pagination: result.pagination,
+        });
+    }
+    catch (error) {
+        logger_1.logger.error('Error getting reviews', error, { userId: req.user?.id });
+        res.status(500).json({
+            error: error.message || 'Failed to get reviews',
+        });
+    }
+});
+/**
+ * @swagger
+ * /api/admin/reviews/:id/moderate:
+ *   post:
+ *     summary: Moderate review (Admin only)
+ *     tags: [Admin]
+ */
+const moderateReviewSchema = zod_1.z.object({
+    action: zod_1.z.enum(['approve', 'reject', 'hide', 'delete']),
+    reason: zod_1.z.string().optional(),
+});
+router.post('/admin/reviews/:id/moderate', auth_1.requireAuth, (0, validation_1.validate)({
+    params: zod_1.z.object({ id: zod_1.z.string().min(1) }),
+    body: moderateReviewSchema,
+}), async (req, res) => {
+    // Check admin role
+    if (req.user?.role !== 'ADMIN') {
+        return res.status(403).json({ error: 'Forbidden: Admin role required' });
+    }
+    try {
+        const adminId = req.user.id;
+        const review = await adminService.moderateReview(req.params.id, req.body.action, req.body.reason, adminId);
+        res.json({
+            success: true,
+            data: review,
+        });
+    }
+    catch (error) {
+        logger_1.logger.error('Error moderating review', error, { userId: req.user?.id });
+        const statusCode = error.message.includes('not found') ? 404 : 400;
+        res.status(statusCode).json({
+            error: error.message || 'Failed to moderate review',
+        });
+    }
+});
+// ============================================================
+// CERTIFICATES MANAGEMENT (Admin)
+// ============================================================
+/**
+ * @swagger
+ * /api/admin/certificates:
+ *   get:
+ *     summary: Get all certificates with filtering (Admin only)
+ *     tags: [Admin]
+ */
+router.get('/admin/certificates', auth_1.requireAuth, async (req, res) => {
+    // Check admin role
+    if (req.user?.role !== 'ADMIN') {
+        return res.status(403).json({ error: 'Forbidden: Admin role required' });
+    }
+    try {
+        const page = req.query.page ? parseInt(req.query.page, 10) : 1;
+        const limit = req.query.limit ? parseInt(req.query.limit, 10) : 20;
+        const userId = req.query.userId;
+        const courseId = req.query.courseId;
+        const startDate = req.query.startDate ? new Date(req.query.startDate) : undefined;
+        const endDate = req.query.endDate ? new Date(req.query.endDate) : undefined;
+        const result = await adminService.getAllCertificates({
+            page,
+            limit,
+            userId,
+            courseId,
+            startDate,
+            endDate,
+        });
+        res.json({
+            success: true,
+            certificates: result.certificates || [],
+            pagination: result.pagination,
+        });
+    }
+    catch (error) {
+        logger_1.logger.error('Error getting certificates', error, { userId: req.user?.id });
+        res.status(500).json({
+            error: error.message || 'Failed to get certificates',
+        });
+    }
+});
+/**
+ * @swagger
+ * /api/admin/certificates/:id/revoke:
+ *   post:
+ *     summary: Revoke certificate (Admin only)
+ *     tags: [Admin]
+ */
+const revokeCertificateSchema = zod_1.z.object({
+    reason: zod_1.z.string().optional(),
+});
+router.post('/admin/certificates/:id/revoke', auth_1.requireAuth, (0, validation_1.validate)({
+    params: zod_1.z.object({ id: zod_1.z.string().min(1) }),
+    body: revokeCertificateSchema,
+}), async (req, res) => {
+    // Check admin role
+    if (req.user?.role !== 'ADMIN') {
+        return res.status(403).json({ error: 'Forbidden: Admin role required' });
+    }
+    try {
+        const adminId = req.user.id;
+        const certificate = await adminService.revokeCertificate(req.params.id, req.body.reason, adminId);
+        res.json({
+            success: true,
+            data: certificate,
+            message: 'Certificate revoked successfully',
+        });
+    }
+    catch (error) {
+        logger_1.logger.error('Error revoking certificate', error, { userId: req.user?.id });
+        const statusCode = error.message.includes('not found') ? 404 : 400;
+        res.status(statusCode).json({
+            error: error.message || 'Failed to revoke certificate',
+        });
+    }
+});
 // ============================================================
 // PAYOUT MANAGEMENT
 // ============================================================
@@ -46,7 +444,7 @@ router.get('/admin/payouts', auth_1.requireAuth, async (req, res) => {
         });
     }
     catch (error) {
-        console.error('Error getting payouts:', error);
+        logger_1.logger.error('Error getting payouts', error, { userId: req.user?.id });
         res.status(500).json({
             error: error.message || 'Failed to get payouts',
         });
@@ -85,7 +483,7 @@ router.post('/admin/payouts/:payoutId/approve', auth_1.requireAuth, (0, validati
         });
     }
     catch (error) {
-        console.error('Error approving payout:', error);
+        logger_1.logger.error('Error approving payout', error, { userId: req.user?.id });
         const statusCode = error.message.includes('not found') ? 404 : 400;
         res.status(statusCode).json({
             error: error.message || 'Failed to approve payout',
@@ -125,7 +523,7 @@ router.post('/admin/payouts/:payoutId/reject', auth_1.requireAuth, (0, validatio
         });
     }
     catch (error) {
-        console.error('Error rejecting payout:', error);
+        logger_1.logger.error('Error rejecting payout', error, { userId: req.user?.id });
         const statusCode = error.message.includes('not found') ? 404 : 400;
         res.status(statusCode).json({
             error: error.message || 'Failed to reject payout',
@@ -162,11 +560,14 @@ router.post('/admin/users/bulk', auth_1.requireAuth, (0, validation_1.validate)(
         });
         res.json({
             success: true,
-            data: result,
+            message: 'Bulk update completed',
+            updated: result.updated,
+            failed: result.failed,
+            errors: result.errors,
         });
     }
     catch (error) {
-        console.error('Error bulk updating users:', error);
+        logger_1.logger.error('Error bulk updating users', error, { userId: req.user?.id });
         res.status(500).json({
             error: error.message || 'Failed to bulk update users',
         });
@@ -198,11 +599,14 @@ router.post('/admin/courses/bulk', auth_1.requireAuth, (0, validation_1.validate
         });
         res.json({
             success: true,
-            data: result,
+            message: 'Bulk moderation completed',
+            updated: result.updated,
+            failed: result.failed,
+            errors: result.errors,
         });
     }
     catch (error) {
-        console.error('Error bulk updating courses:', error);
+        logger_1.logger.error('Error bulk updating courses', error, { userId: req.user?.id });
         res.status(500).json({
             error: error.message || 'Failed to bulk update courses',
         });
@@ -240,7 +644,7 @@ router.post('/admin/broadcasts', auth_1.requireAuth, (0, validation_1.validate)(
         });
     }
     catch (error) {
-        console.error('Error sending broadcast:', error);
+        logger_1.logger.error('Error sending broadcast', error, { userId: req.user?.id });
         res.status(500).json({
             error: error.message || 'Failed to send broadcast',
         });
@@ -275,7 +679,7 @@ router.get('/admin/broadcasts', auth_1.requireAuth, async (req, res) => {
         });
     }
     catch (error) {
-        console.error('Error getting broadcasts:', error);
+        logger_1.logger.error('Error getting broadcasts', error, { userId: req.user?.id });
         res.status(500).json({
             error: error.message || 'Failed to get broadcasts',
         });
@@ -317,7 +721,7 @@ router.get('/admin/logs', auth_1.requireAuth, async (req, res) => {
         });
     }
     catch (error) {
-        console.error('Error getting activity logs:', error);
+        logger_1.logger.error('Error getting activity logs', error, { userId: req.user?.id });
         res.status(500).json({
             error: error.message || 'Failed to get activity logs',
         });
@@ -351,7 +755,7 @@ router.post('/admin/users/import', auth_1.requireAuth, upload.single('file'), as
         });
     }
     catch (error) {
-        console.error('Error importing users:', error);
+        logger_1.logger.error('Error importing users', error, { userId: req.user?.id });
         res.status(500).json({
             error: error.message || 'Failed to import users',
         });
@@ -378,7 +782,7 @@ router.get('/admin/users/export', auth_1.requireAuth, async (req, res) => {
         res.send(csvData);
     }
     catch (error) {
-        console.error('Error exporting users:', error);
+        logger_1.logger.error('Error exporting users', error, { userId: req.user?.id });
         res.status(500).json({
             error: error.message || 'Failed to export users',
         });
@@ -407,7 +811,7 @@ router.get('/admin/certificate-templates', auth_1.requireAuth, async (req, res) 
         });
     }
     catch (error) {
-        console.error('Error getting certificate templates:', error);
+        logger_1.logger.error('Error getting certificate templates', error, { userId: req.user?.id });
         res.status(500).json({
             error: error.message || 'Failed to get certificate templates',
         });
@@ -439,7 +843,7 @@ router.post('/admin/certificate-templates', auth_1.requireAuth, (0, validation_1
         });
     }
     catch (error) {
-        console.error('Error creating certificate template:', error);
+        logger_1.logger.error('Error creating certificate template', error, { userId: req.user?.id });
         res.status(500).json({
             error: error.message || 'Failed to create certificate template',
         });
@@ -476,7 +880,7 @@ router.put('/admin/certificate-templates/:id', auth_1.requireAuth, (0, validatio
         });
     }
     catch (error) {
-        console.error('Error updating certificate template:', error);
+        logger_1.logger.error('Error updating certificate template', error, { userId: req.user?.id });
         const statusCode = error.message.includes('not found') ? 404 : 500;
         res.status(statusCode).json({
             error: error.message || 'Failed to update certificate template',
@@ -506,7 +910,7 @@ router.delete('/admin/certificate-templates/:id', auth_1.requireAuth, (0, valida
         });
     }
     catch (error) {
-        console.error('Error deleting certificate template:', error);
+        logger_1.logger.error('Error deleting certificate template', error, { userId: req.user?.id });
         const statusCode = error.message.includes('not found') ? 404 : 400;
         res.status(statusCode).json({
             error: error.message || 'Failed to delete certificate template',
@@ -543,7 +947,7 @@ router.get('/admin/banners', auth_1.requireAuth, async (req, res) => {
         });
     }
     catch (error) {
-        console.error('Error getting banners:', error);
+        logger_1.logger.error('Error getting banners', error, { userId: req.user?.id });
         res.status(500).json({
             error: error.message || 'Failed to get banners',
         });
@@ -586,7 +990,7 @@ router.post('/admin/banners', auth_1.requireAuth, (0, validation_1.validate)({ b
         });
     }
     catch (error) {
-        console.error('Error creating banner:', error);
+        logger_1.logger.error('Error creating banner', error, { userId: req.user?.id });
         res.status(500).json({
             error: error.message || 'Failed to create banner',
         });
@@ -633,7 +1037,7 @@ router.put('/admin/banners/:id', auth_1.requireAuth, (0, validation_1.validate)(
         });
     }
     catch (error) {
-        console.error('Error updating banner:', error);
+        logger_1.logger.error('Error updating banner', error, { userId: req.user?.id });
         const statusCode = error.message.includes('not found') ? 404 : 500;
         res.status(statusCode).json({
             error: error.message || 'Failed to update banner',
@@ -663,7 +1067,7 @@ router.delete('/admin/banners/:id', auth_1.requireAuth, (0, validation_1.validat
         });
     }
     catch (error) {
-        console.error('Error deleting banner:', error);
+        logger_1.logger.error('Error deleting banner', error, { userId: req.user?.id });
         const statusCode = error.message.includes('not found') ? 404 : 500;
         res.status(statusCode).json({
             error: error.message || 'Failed to delete banner',

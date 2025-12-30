@@ -68,6 +68,7 @@ export class OAuthService {
               firstName: googleUser.given_name,
               lastName: googleUser.family_name,
               avatar: googleUser.picture,
+              isVerified: true, // Verify email when linking OAuth account
             }
           });
         } else {
@@ -97,6 +98,7 @@ export class OAuthService {
             avatar: googleUser.picture,
             role: 'STUDENT', // Default role
             password: null, // No password for OAuth users
+            isVerified: true, // OAuth users are automatically verified
           }
         });
 
@@ -164,6 +166,7 @@ export class OAuthService {
               firstName,
               lastName,
               avatar: linkedInUser.profilePicture?.displayImage,
+              isVerified: true, // Verify email when linking OAuth account
             }
           });
         } else {
@@ -195,6 +198,7 @@ export class OAuthService {
             avatar: linkedInUser.profilePicture?.displayImage,
             role: 'STUDENT', // Default role
             password: null, // No password for OAuth users
+            isVerified: true, // OAuth users are automatically verified
           }
         });
 

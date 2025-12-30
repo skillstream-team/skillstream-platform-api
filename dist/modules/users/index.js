@@ -19,6 +19,7 @@ const bulk_operations_routes_1 = __importDefault(require("./routes/rest/bulk-ope
 const activity_log_routes_1 = __importDefault(require("./routes/rest/activity-log.routes"));
 const gamification_routes_1 = __importDefault(require("./routes/rest/gamification.routes"));
 const admin_management_routes_1 = __importDefault(require("./routes/rest/admin-management.routes"));
+const admin_platform_routes_1 = __importDefault(require("./routes/rest/admin-platform.routes"));
 const users_resolver_1 = require("./routes/graphql/users.resolver");
 const express_graphql_1 = require("express-graphql");
 function registerUserModule(app) {
@@ -37,6 +38,7 @@ function registerUserModule(app) {
     app.use('/api', activity_log_routes_1.default);
     app.use('/api', gamification_routes_1.default);
     app.use('/api', admin_management_routes_1.default);
+    app.use('/api', admin_platform_routes_1.default);
     // GraphQL
     app.use('/graphql/users', (0, express_graphql_1.graphqlHTTP)({
         schema: users_resolver_1.usersSchema,

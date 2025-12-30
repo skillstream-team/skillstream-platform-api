@@ -14,7 +14,7 @@ const enrollmentService = new EnrollmentService();
 
 /**
  * @swagger
- * /api/courses/course:
+ * /api/courses:
  *   post:
  *     summary: Create a new course
  *     description: Create a new course. Only teachers can create courses.
@@ -59,7 +59,8 @@ const enrollmentService = new EnrollmentService();
  *       403:
  *         description: Forbidden - Teacher role required
  */
-router.post('/course', 
+router.post('/', 
+  requireAuth,
   requireRole('TEACHER'),
   validate({ body: createCourseSchema }),
   async (req, res) => {
@@ -124,6 +125,7 @@ router.post('/course',
  *         description: Forbidden - Teacher role required
  */
 router.post('/:id/modules', 
+    requireAuth,
     requireRole('TEACHER'),
     validate({ params: courseIdParamSchema, body: createModuleSchema }),
     async (req, res) => {
@@ -194,7 +196,10 @@ router.post('/:id/modules',
  *       403:
  *         description: Forbidden - Teacher role required
  */
-router.post('/:id/modules/:moduleId/lessons', requireRole('TEACHER'), async (req,res) => {
+router.post('/:id/modules/:moduleId/lessons', 
+  requireAuth,
+  requireRole('TEACHER'), 
+  async (req,res) => {
     try{
         const lesson = await service.addLessonToModule(req.params.moduleId, req.body);
         res.json(lesson);
@@ -271,7 +276,10 @@ router.post('/:id/modules/:moduleId/lessons', requireRole('TEACHER'), async (req
  *       403:
  *         description: Forbidden - Teacher role required
  */
-router.post('/:id/lessons/:lessonId/quiz', requireRole('TEACHER'), async (req,res) => {
+router.post('/:id/lessons/:lessonId/quiz', 
+  requireAuth,
+  requireRole('TEACHER'), 
+  async (req,res) => {
     try{
         const quiz = await service.addQuizToLesson(req.params.lessonId, req.body);
         res.json(quiz);
@@ -690,6 +698,7 @@ router.get('/:id',
  *         description: Course not found
  */
 router.put('/:id', 
+  requireAuth,
   requireRole('TEACHER'),
   validate({ params: courseIdParamSchema, body: updateCourseSchema }),
   async (req, res) => {
@@ -737,6 +746,7 @@ router.put('/:id',
  *         description: Course not found
  */
 router.delete('/:id', 
+  requireAuth,
   requireRole('TEACHER'),
   validate({ params: courseIdParamSchema }),
   async (req, res) => {

@@ -54,6 +54,11 @@ if (!RESET_TOKEN_SECRET) {
     throw new Error('RESET_TOKEN_SECRET is not defined in your environment variables');
 }
 const RESET_TOKEN_EXPIRY = '15m'; // 15 Minutes
+const VERIFICATION_TOKEN_SECRET = process.env.VERIFICATION_TOKEN_SECRET || process.env.RESET_TOKEN_SECRET;
+if (!VERIFICATION_TOKEN_SECRET) {
+    throw new Error('VERIFICATION_TOKEN_SECRET or RESET_TOKEN_SECRET is not defined in your environment variables');
+}
+const VERIFICATION_TOKEN_EXPIRY = '24h'; // 24 Hours
 class UsersService {
     /**
      * @swagger
@@ -159,14 +164,18 @@ class UsersService {
                     // Don't fail user creation if referral fails
                 }
             }
-            // Send welcome email
+            // Send verification email
             try {
-                await email_service_1.emailService.sendWelcomeEmail(user.email, user.username);
+                const verificationToken = jsonwebtoken_1.default.sign({ userId: user.id, email: user.email }, VERIFICATION_TOKEN_SECRET, { expiresIn: VERIFICATION_TOKEN_EXPIRY });
+                const verificationLink = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/verify-email?token=${verificationToken}`;
+                await email_service_1.emailService.sendVerificationEmail(user.email, user.username, verificationLink, user.firstName || undefined);
             }
             catch (error) {
-                console.error('Error sending welcome email:', error);
+                console.error('Error sending verification email:', error);
                 // Don't fail user creation if email fails
             }
+            // Send welcome email (after verification)
+            // Note: Welcome email will be sent after email verification
             // Generate JWT token
             const { password: _, ...userWithoutPassword } = user;
             const token = (0, jwt_1.generateToken)({ id: user.id, role: user.role });
@@ -396,6 +405,117 @@ class UsersService {
         }
         catch (error) {
             throw new Error('Error resetting password: ' + error.message);
+        }
+    }
+    /**
+     * @swagger
+     * /auth/verify-email:
+     *   post:
+     *     summary: Verify user email address
+     *     description: Verifies the email verification token and marks the user's email as verified.
+     *     tags:
+     *       - Authentication
+     *     requestBody:
+     *       required: true
+     *       content:
+     *         application/json:
+     *           schema:
+     *             type: object
+     *             required:
+     *               - token
+     *             properties:
+     *               token:
+     *                 type: string
+     *                 description: Email verification token
+     *     responses:
+     *       200:
+     *         description: Email verified successfully
+     *       400:
+     *         description: Invalid or expired token
+     */
+    async verifyEmail(token) {
+        try {
+            const decoded = jsonwebtoken_1.default.verify(token, VERIFICATION_TOKEN_SECRET);
+            const user = await user_model_1.prisma.user.findUnique({ where: { id: decoded.userId } });
+            if (!user) {
+                throw new Error('User not found');
+            }
+            if (user.isVerified) {
+                return { message: 'Email is already verified', user };
+            }
+            // Verify that the token email matches the user's email
+            if (user.email !== decoded.email) {
+                throw new Error('Invalid verification token');
+            }
+            // Update user to verified
+            const updatedUser = await user_model_1.prisma.user.update({
+                where: { id: decoded.userId },
+                data: { isVerified: true },
+            });
+            // Send welcome email after verification
+            try {
+                await email_service_1.emailService.sendWelcomeEmail(updatedUser.email, updatedUser.username, updatedUser.firstName || undefined);
+            }
+            catch (error) {
+                console.error('Error sending welcome email:', error);
+                // Don't fail verification if welcome email fails
+            }
+            const { password: _, ...userWithoutPassword } = updatedUser;
+            return {
+                message: 'Email verified successfully',
+                user: userWithoutPassword
+            };
+        }
+        catch (error) {
+            if (error instanceof jsonwebtoken_1.default.JsonWebTokenError) {
+                throw new Error('Invalid or expired verification token');
+            }
+            throw new Error('Error verifying email: ' + error.message);
+        }
+    }
+    /**
+     * @swagger
+     * /auth/resend-verification:
+     *   post:
+     *     summary: Resend email verification
+     *     description: Sends a new email verification link to the user's email address.
+     *     tags:
+     *       - Authentication
+     *     requestBody:
+     *       required: true
+     *       content:
+     *         application/json:
+     *           schema:
+     *             type: object
+     *             required:
+     *               - email
+     *             properties:
+     *               email:
+     *                 type: string
+     *                 format: email
+     *                 description: User's email address
+     *     responses:
+     *       200:
+     *         description: Verification email sent successfully
+     *       400:
+     *         description: User not found or already verified
+     */
+    async resendVerificationEmail(email) {
+        try {
+            const user = await user_model_1.prisma.user.findUnique({ where: { email } });
+            if (!user) {
+                throw new Error('User not found');
+            }
+            if (user.isVerified) {
+                throw new Error('Email is already verified');
+            }
+            const verificationToken = jsonwebtoken_1.default.sign({ userId: user.id, email: user.email }, VERIFICATION_TOKEN_SECRET, { expiresIn: VERIFICATION_TOKEN_EXPIRY });
+            const verificationLink = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/verify-email?token=${verificationToken}`;
+            await email_service_1.emailService.sendVerificationEmail(user.email, user.username, verificationLink, user.firstName || undefined);
+            return { message: 'Verification email sent successfully' };
+        }
+        catch (error) {
+            throw new Error('Error sending verification email: ' + error.message);
         }
     }
     /**

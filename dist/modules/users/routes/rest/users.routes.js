@@ -262,6 +262,104 @@ router.post('/auth/reset-password', rate_limit_1.passwordResetRateLimiter, (0, v
 });
 /**
  * @swagger
+ * /api/users/auth/verify-email:
+ *   post:
+ *     summary: Verify email address
+ *     description: Verify user's email address using the verification token sent via email.
+ *     tags: [Authentication]
+ *     security: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - token
+ *             properties:
+ *               token:
+ *                 type: string
+ *                 example: verification_token_123
+ *     responses:
+ *       200:
+ *         description: Email verified successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: Email verified successfully
+ *                 user:
+ *                   type: object
+ *                   description: Updated user object with isVerified set to true
+ *       400:
+ *         description: Invalid or expired token
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ */
+router.post('/auth/verify-email', (0, validation_1.validate)({ body: validation_schemas_1.verifyEmailSchema }), async (req, res) => {
+    try {
+        const result = await service.verifyEmail(req.body.token);
+        res.json(result);
+    }
+    catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+/**
+ * @swagger
+ * /api/users/auth/resend-verification:
+ *   post:
+ *     summary: Resend verification email
+ *     description: Resend email verification link to user's email address.
+ *     tags: [Authentication]
+ *     security: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - email
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 format: email
+ *                 example: user@example.com
+ *     responses:
+ *       200:
+ *         description: Verification email sent successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: Verification email sent successfully
+ *       400:
+ *         description: User not found or already verified
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ */
+router.post('/auth/resend-verification', (0, validation_1.validate)({ body: validation_schemas_1.resendVerificationSchema }), async (req, res) => {
+    try {
+        const result = await service.resendVerificationEmail(req.body.email);
+        res.json(result);
+    }
+    catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+/**
+ * @swagger
  * /api/users/search:
  *   get:
  *     summary: Search users by username or email
@@ -328,7 +426,7 @@ router.post('/auth/reset-password', rate_limit_1.passwordResetRateLimiter, (0, v
  */
 const searchUsersSchema = zod_1.z.object({
     q: zod_1.z.string().min(1, 'Search query is required'),
-    limit: zod_1.z.string().optional().transform((val) => val ? parseInt(val, 10) : 20),
+    limit: zod_1.z.string().optional(),
     role: zod_1.z.enum(['STUDENT', 'TEACHER', 'ADMIN']).optional(),
 });
 router.get('/search', auth_1.requireAuth, rate_limit_1.generalRateLimiter, (0, validation_1.validate)({ query: searchUsersSchema }), async (req, res) => {

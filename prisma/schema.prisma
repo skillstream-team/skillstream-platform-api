@@ -906,6 +906,8 @@ model ForumPost {
   isPinned     Boolean     @default(false)
   isLocked     Boolean     @default(false)
   isResolved   Boolean     @default(false)
+  isHidden     Boolean     @default(false)
+  deletedAt    DateTime?
   bestAnswerId String?     @unique @db.ObjectId
   bestAnswer   ForumReply? @relation("PostBestAnswer", fields: [bestAnswerId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   upvoteCount  Int         @default(0)
@@ -922,6 +924,7 @@ model ForumPost {
   @@index([courseId, isPinned, createdAt])
   @@index([authorId, createdAt])
   @@index([isResolved, createdAt])
+  @@index([isHidden, deletedAt])
 }
 
 model ForumReply {
@@ -1886,8 +1889,12 @@ model InstructorQA {
   course   Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
   studentId String   @db.ObjectId
   student   User     @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  lessonId  String?  @db.ObjectId
   question  String
   isAnswered Boolean @default(false)
+  isResolved Boolean @default(false)
+  isHidden   Boolean @default(false)
+  deletedAt  DateTime?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -1895,6 +1902,7 @@ model InstructorQA {
 
   @@index([courseId, isAnswered])
   @@index([studentId])
+  @@index([isHidden, deletedAt])
 }
 
 model InstructorQAAnswer {
@@ -2051,4 +2059,19 @@ model Broadcast {
 
   @@index([createdBy, createdAt])
   @@index([targetAudience, createdAt])
+}
+
+model EmailTemplate {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  name      String
+  subject   String
+  body      String   // HTML template body
+  variables String[] // Available variables like ["{{userName}}", "{{courseName}}"]
+  type      String   // "WELCOME", "COURSE_ENROLLMENT", "PAYMENT_RECEIPT", etc.
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([type])
+  @@index([isActive, type])
 }

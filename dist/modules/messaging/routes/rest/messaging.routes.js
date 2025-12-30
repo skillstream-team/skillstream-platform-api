@@ -7,6 +7,8 @@ const file_upload_service_1 = require("../../services/file-upload.service");
 const auth_1 = require("../../../../middleware/auth");
 const validation_1 = require("../../../../middleware/validation");
 const validation_schemas_1 = require("../../../../utils/validation-schemas");
+const rate_limit_1 = require("../../../../middleware/rate-limit");
+const logger_1 = require("../../../../utils/logger");
 const router = (0, express_1.Router)();
 const messagingService = new messaging_service_1.MessagingService();
 const fileUploadService = new file_upload_service_1.MessagingFileUploadService();
@@ -62,7 +64,9 @@ router.post('/conversations', auth_1.requireAuth, (0, validation_1.validate)({ b
         });
     }
     catch (error) {
-        console.error('Error creating conversation:', error);
+        logger_1.logger.error('Error creating conversation', error, {
+            userId: req.user?.id,
+        });
         res.status(400).json({
             error: error instanceof Error ? error.message : 'Failed to create conversation',
         });
@@ -126,7 +130,9 @@ router.get('/conversations', auth_1.requireAuth, async (req, res) => {
         });
     }
     catch (error) {
-        console.error('Error fetching conversations:', error);
+        logger_1.logger.error('Error fetching conversations', error, {
+            userId: req.user?.id,
+        });
         res.status(500).json({
             error: error instanceof Error ? error.message : 'Failed to fetch conversations',
         });
@@ -162,7 +168,7 @@ router.get('/conversations/:conversationId', auth_1.requireAuth, async (req, res
         if (!userId) {
             return res.status(401).json({ error: 'User not authenticated' });
         }
-        if (!conversationId) {
+        if (!conversationId || conversationId === 'undefined' || conversationId === 'null') {
             return res.status(400).json({ error: 'Invalid conversation ID' });
         }
         const conversation = await messagingService.getConversationById(conversationId, userId);
@@ -172,7 +178,10 @@ router.get('/conversations/:conversationId', auth_1.requireAuth, async (req, res
         });
     }
     catch (error) {
-        console.error('Error fetching conversation:', error);
+        logger_1.logger.error('Error fetching conversation', error, {
+            userId: req.user?.id,
+            conversationId: req.params.conversationId,
+        });
         if (error instanceof Error && error.message.includes('not found')) {
             res.status(404).json({ error: error.message });
         }
@@ -236,7 +245,10 @@ router.put('/conversations/:conversationId', auth_1.requireAuth, async (req, res
         });
     }
     catch (error) {
-        console.error('Error updating conversation:', error);
+        logger_1.logger.error('Error updating conversation', error, {
+            userId: req.user?.id,
+            conversationId: req.params.conversationId,
+        });
         if (error instanceof Error && error.message.includes('permission')) {
             res.status(403).json({ error: error.message });
         }
@@ -309,7 +321,10 @@ router.post('/conversations/:conversationId/participants', auth_1.requireAuth, a
         });
     }
     catch (error) {
-        console.error('Error adding participants:', error);
+        logger_1.logger.error('Error adding participants', error, {
+            userId: req.user?.id,
+            conversationId: req.params.conversationId,
+        });
         if (error instanceof Error && error.message.includes('permission')) {
             res.status(403).json({ error: error.message });
         }
@@ -369,7 +384,11 @@ router.delete('/conversations/:conversationId/participants/:participantId', auth
         });
     }
     catch (error) {
-        console.error('Error removing participant:', error);
+        logger_1.logger.error('Error removing participant', error, {
+            userId: req.user?.id,
+            conversationId: req.params.conversationId,
+            participantId: req.params.participantId,
+        });
         if (error instanceof Error && error.message.includes('permission')) {
             res.status(403).json({ error: error.message });
         }
@@ -435,12 +454,18 @@ router.delete('/conversations/:conversationId/participants/:participantId', auth
  *       500:
  *         description: Server error
  */
-router.post('/messages', auth_1.requireAuth, (0, validation_1.validate)({ body: validation_schemas_1.createMessageSchema }), async (req, res) => {
+router.post('/messages', auth_1.requireAuth, rate_limit_1.messagingRateLimiter, (0, validation_1.validate)({ body: validation_schemas_1.createMessageSchema }), async (req, res) => {
     try {
         const userId = req.user?.id;
         if (!userId) {
             return res.status(401).json({ error: 'User not authenticated' });
         }
+        logger_1.logger.debug('Sending message', {
+            userId,
+            conversationId: req.body.conversationId,
+            receiverId: req.body.receiverId,
+            contentLength: req.body.content?.length,
+        });
         const message = await messagingService.sendMessage(userId, req.body);
         res.status(201).json({
             success: true,
@@ -448,7 +473,10 @@ router.post('/messages', auth_1.requireAuth, (0, validation_1.validate)({ body: 
         });
     }
     catch (error) {
-        console.error('Error sending message:', error);
+        logger_1.logger.error('Error sending message', error, {
+            userId: req.user?.id,
+            conversationId: req.body.conversationId,
+        });
         res.status(400).json({
             error: error instanceof Error ? error.message : 'Failed to send message',
         });
@@ -506,7 +534,7 @@ router.get('/conversations/:conversationId/messages', auth_1.requireAuth, async 
         if (!userId) {
             return res.status(401).json({ error: 'User not authenticated' });
         }
-        if (!conversationId) {
+        if (!conversationId || conversationId === 'undefined' || conversationId === 'null') {
             return res.status(400).json({ error: 'Invalid conversation ID' });
         }
         const result = await messagingService.getMessages(conversationId, userId, {
@@ -524,7 +552,10 @@ router.get('/conversations/:conversationId/messages', auth_1.requireAuth, async 
         });
     }
     catch (error) {
-        console.error('Error fetching messages:', error);
+        logger_1.logger.error('Error fetching messages', error, {
+            userId: req.user?.id,
+            conversationId: req.params.conversationId,
+        });
         res.status(500).json({
             error: error instanceof Error ? error.message : 'Failed to fetch messages',
         });
@@ -583,7 +614,10 @@ router.put('/messages/:messageId', auth_1.requireAuth, async (req, res) => {
         });
     }
     catch (error) {
-        console.error('Error updating message:', error);
+        logger_1.logger.error('Error updating message', error, {
+            userId: req.user?.id,
+            messageId: req.params.messageId,
+        });
         if (error instanceof Error && error.message.includes('not found')) {
             res.status(404).json({ error: error.message });
         }
@@ -639,7 +673,10 @@ router.delete('/messages/:messageId', auth_1.requireAuth, async (req, res) => {
         });
     }
     catch (error) {
-        console.error('Error deleting message:', error);
+        logger_1.logger.error('Error deleting message', error, {
+            userId: req.user?.id,
+            messageId: req.params.messageId,
+        });
         if (error instanceof Error && error.message.includes('not found')) {
             res.status(404).json({ error: error.message });
         }
@@ -681,17 +718,20 @@ router.post('/conversations/:conversationId/read', auth_1.requireAuth, async (re
         if (!userId) {
             return res.status(401).json({ error: 'User not authenticated' });
         }
-        if (!conversationId) {
+        if (!conversationId || conversationId === 'undefined' || conversationId === 'null') {
             return res.status(400).json({ error: 'Invalid conversation ID' });
         }
-        await messagingService.markMessagesAsRead(conversationId, userId);
+        const result = await messagingService.markMessagesAsRead(conversationId, userId);
         res.json({
             success: true,
-            message: 'Messages marked as read successfully',
+            markedCount: result.markedCount,
         });
     }
     catch (error) {
-        console.error('Error marking messages as read:', error);
+        logger_1.logger.error('Error marking messages as read', error, {
+            userId: req.user?.id,
+            conversationId: req.params.conversationId,
+        });
         res.status(500).json({
             error: error instanceof Error ? error.message : 'Failed to mark messages as read',
         });
@@ -762,7 +802,9 @@ router.post('/upload', auth_1.requireAuth, async (req, res) => {
         });
     }
     catch (error) {
-        console.error('Error uploading file:', error);
+        logger_1.logger.error('Error uploading file', error, {
+            userId: req.user?.id,
+        });
         res.status(500).json({
             error: error instanceof Error ? error.message : 'Failed to upload file',
         });
@@ -823,7 +865,9 @@ router.get('/messages/search', auth_1.requireAuth, async (req, res) => {
         });
     }
     catch (error) {
-        console.error('Error searching messages:', error);
+        logger_1.logger.error('Error searching messages', error, {
+            userId: req.user?.id,
+        });
         res.status(500).json({
             error: error instanceof Error ? error.message : 'Failed to search messages',
         });
@@ -881,7 +925,10 @@ router.post('/messages/:messageId/reactions', auth_1.requireAuth, async (req, re
         });
     }
     catch (error) {
-        console.error('Error adding reaction:', error);
+        logger_1.logger.error('Error adding reaction', error, {
+            userId: req.user?.id,
+            messageId: req.params.messageId,
+        });
         res.status(400).json({
             error: error instanceof Error ? error.message : 'Failed to add reaction',
         });
@@ -938,7 +985,10 @@ router.delete('/messages/:messageId/reactions', auth_1.requireAuth, async (req, 
         });
     }
     catch (error) {
-        console.error('Error removing reaction:', error);
+        logger_1.logger.error('Error removing reaction', error, {
+            userId: req.user?.id,
+            messageId: req.params.messageId,
+        });
         res.status(400).json({
             error: error instanceof Error ? error.message : 'Failed to remove reaction',
         });
@@ -983,7 +1033,10 @@ router.post('/messages/:messageId/read', auth_1.requireAuth, async (req, res) =>
         });
     }
     catch (error) {
-        console.error('Error marking message as read:', error);
+        logger_1.logger.error('Error marking message as read', error, {
+            userId: req.user?.id,
+            messageId: req.params.messageId,
+        });
         res.status(400).json({
             error: error instanceof Error ? error.message : 'Failed to mark message as read',
         });

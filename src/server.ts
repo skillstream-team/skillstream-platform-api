@@ -22,9 +22,18 @@ import compression from "compression";
 import { generalRateLimiter } from "./middleware/rate-limit";
 import { requestTimeout } from "./middleware/timeout";
 import { ScheduledTasksService } from "./services/scheduled-tasks.service";
+import { initializeFirebase } from "./utils/firebase";
 
 // Initialize Sentry FIRST (before anything else that might throw)
 initSentry();
+
+// Initialize Firebase
+try {
+  initializeFirebase();
+  console.log("✅ Firebase initialized");
+} catch (error) {
+  console.warn("⚠️  Firebase initialization failed (messaging may not work):", error);
+}
 
 // Validate environment variables on startup
 try {

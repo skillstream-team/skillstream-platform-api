@@ -1,6 +1,7 @@
 // src/modules/messaging/services/realtime-messaging.service.ts
 import { Server as SocketIOServer } from 'socket.io';
 import { MessagingService } from './messaging.service';
+import { logger } from '../../../utils/logger';
 
 export class RealtimeMessagingService {
   private io: SocketIOServer;
@@ -37,7 +38,7 @@ export class RealtimeMessagingService {
     });
 
     this.io.on('connection', (socket) => {
-      console.log(`User connected to messaging: ${socket.id}`);
+      logger.info('User connected to messaging', { socketId: socket.id });
 
       // User joins their personal room
       socket.on('join_user', async (data: { userId?: string }) => {
@@ -65,9 +66,10 @@ export class RealtimeMessagingService {
             socket.join(`conversation-${conv.id}`);
           });
 
-          console.log(`User ${userId} joined messaging rooms`);
+          logger.info('User joined messaging rooms', { userId });
         } catch (error) {
-          console.error('Error joining user room:', error);
+          const errorUserId = data.userId || socket.data.userId;
+          logger.error('Error joining user room', error, { userId: errorUserId });
         }
       });
 
@@ -80,9 +82,11 @@ export class RealtimeMessagingService {
           await this.messagingService.getConversationById(conversationId, userId);
 
           socket.join(`conversation-${conversationId}`);
-          console.log(`User ${userId} joined conversation ${conversationId}`);
+          logger.info('User joined conversation', { userId, conversationId });
         } catch (error) {
-          console.error('Error joining conversation:', error);
+          const errorUserId = data.userId;
+          const errorConversationId = data.conversationId;
+          logger.error('Error joining conversation', error, { userId: errorUserId, conversationId: errorConversationId });
           socket.emit('error', { message: 'Failed to join conversation' });
         }
       });
@@ -91,7 +95,7 @@ export class RealtimeMessagingService {
       socket.on('leave_conversation', (data: { conversationId: string }) => {
         const { conversationId } = data;
         socket.leave(`conversation-${conversationId}`);
-        console.log(`User left conversation ${conversationId}`);
+        logger.debug('User left conversation', { conversationId });
       });
 
       // Send a message
@@ -126,9 +130,17 @@ export class RealtimeMessagingService {
             data: message,
           });
 
-          console.log(`Message sent in conversation ${message.conversationId}`);
+          logger.info('Message sent via Socket.IO', {
+            conversationId: message.conversationId,
+            messageId: message.id,
+            userId,
+          });
         } catch (error) {
-          console.error('Error sending message:', error);
+          const errorUserId = this.getUserIdFromSocket(socket);
+          logger.error('Error sending message via Socket.IO', error, {
+            userId: errorUserId || undefined,
+            conversationId: data.conversationId,
+          });
           socket.emit('error', {
             message: error instanceof Error ? error.message : 'Failed to send message',
           });
@@ -167,7 +179,12 @@ export class RealtimeMessagingService {
             readAt: new Date(),
           });
         } catch (error) {
-          console.error('Error marking messages as read:', error);
+          const errorUserId = data.userId;
+          const errorConversationId = data.conversationId;
+          logger.error('Error marking messages as read via Socket.IO', error, {
+            userId: errorUserId,
+            conversationId: errorConversationId,
+          });
           socket.emit('error', {
             message: error instanceof Error ? error.message : 'Failed to mark as read',
           });
@@ -196,7 +213,12 @@ export class RealtimeMessagingService {
             },
           });
         } catch (error) {
-          console.error('Error marking message as read:', error);
+          const errorUserId = this.getUserIdFromSocket(socket);
+          const errorMessageId = data.messageId;
+          logger.error('Error marking message as read via Socket.IO', error, {
+            userId: errorUserId || undefined,
+            messageId: errorMessageId,
+          });
           socket.emit('error', {
             message: error instanceof Error ? error.message : 'Failed to mark message as read',
           });
@@ -226,7 +248,14 @@ export class RealtimeMessagingService {
             },
           });
         } catch (error) {
-          console.error('Error adding reaction:', error);
+          const errorUserId = this.getUserIdFromSocket(socket);
+          const errorMessageId = data.messageId;
+          const errorEmoji = data.emoji;
+          logger.error('Error adding reaction via Socket.IO', error, {
+            userId: errorUserId || undefined,
+            messageId: errorMessageId,
+            emoji: errorEmoji,
+          });
           socket.emit('error', {
             message: error instanceof Error ? error.message : 'Failed to add reaction',
           });
@@ -256,7 +285,14 @@ export class RealtimeMessagingService {
             },
           });
         } catch (error) {
-          console.error('Error removing reaction:', error);
+          const errorUserId = this.getUserIdFromSocket(socket);
+          const errorMessageId = data.messageId;
+          const errorEmoji = data.emoji;
+          logger.error('Error removing reaction via Socket.IO', error, {
+            userId: errorUserId || undefined,
+            messageId: errorMessageId,
+            emoji: errorEmoji,
+          });
           socket.emit('error', {
             message: error instanceof Error ? error.message : 'Failed to remove reaction',
           });
@@ -265,7 +301,7 @@ export class RealtimeMessagingService {
 
       // Handle disconnection
       socket.on('disconnect', () => {
-        console.log(`User disconnected from messaging: ${socket.id}`);
+        logger.info('User disconnected from messaging', { socketId: socket.id });
 
         // Remove socket from user tracking
         for (const [userId, sockets] of this.userSockets.entries()) {

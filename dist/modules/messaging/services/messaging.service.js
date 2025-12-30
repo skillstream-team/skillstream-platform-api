@@ -3,6 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.MessagingService = void 0;
 // src/modules/messaging/services/messaging.service.ts
 const prisma_1 = require("../../../utils/prisma");
+const logger_1 = require("../../../utils/logger");
 class MessagingService {
     // ===========================================
     // CONVERSATION MANAGEMENT
@@ -101,6 +102,9 @@ class MessagingService {
                                     id: true,
                                     username: true,
                                     email: true,
+                                    firstName: true,
+                                    lastName: true,
+                                    avatar: true,
                                 },
                             },
                         },
@@ -110,6 +114,9 @@ class MessagingService {
                             id: true,
                             username: true,
                             email: true,
+                            firstName: true,
+                            lastName: true,
+                            avatar: true,
                         },
                     },
                     messages: {
@@ -123,6 +130,9 @@ class MessagingService {
                                     id: true,
                                     username: true,
                                     email: true,
+                                    firstName: true,
+                                    lastName: true,
+                                    avatar: true,
                                 },
                             },
                             receiver: {
@@ -130,6 +140,9 @@ class MessagingService {
                                     id: true,
                                     username: true,
                                     email: true,
+                                    firstName: true,
+                                    lastName: true,
+                                    avatar: true,
                                 },
                             },
                         },
@@ -240,7 +253,7 @@ class MessagingService {
                 };
             }));
             return {
-                data: conversationsWithUnread.map((conv) => this.mapConversationToDto(conv)),
+                conversations: conversationsWithUnread.map((conv) => this.mapConversationToDto(conv)),
                 pagination: {
                     page,
                     limit,
@@ -278,6 +291,9 @@ class MessagingService {
                                     id: true,
                                     username: true,
                                     email: true,
+                                    firstName: true,
+                                    lastName: true,
+                                    avatar: true,
                                 },
                             },
                         },
@@ -287,6 +303,9 @@ class MessagingService {
                             id: true,
                             username: true,
                             email: true,
+                            firstName: true,
+                            lastName: true,
+                            avatar: true,
                         },
                     },
                     messages: {
@@ -300,6 +319,9 @@ class MessagingService {
                                     id: true,
                                     username: true,
                                     email: true,
+                                    firstName: true,
+                                    lastName: true,
+                                    avatar: true,
                                 },
                             },
                             receiver: {
@@ -307,6 +329,9 @@ class MessagingService {
                                     id: true,
                                     username: true,
                                     email: true,
+                                    firstName: true,
+                                    lastName: true,
+                                    avatar: true,
                                 },
                             },
                         },
@@ -373,6 +398,9 @@ class MessagingService {
                                     id: true,
                                     username: true,
                                     email: true,
+                                    firstName: true,
+                                    lastName: true,
+                                    avatar: true,
                                 },
                             },
                         },
@@ -382,6 +410,9 @@ class MessagingService {
                             id: true,
                             username: true,
                             email: true,
+                            firstName: true,
+                            lastName: true,
+                            avatar: true,
                         },
                     },
                     messages: {
@@ -395,6 +426,9 @@ class MessagingService {
                                     id: true,
                                     username: true,
                                     email: true,
+                                    firstName: true,
+                                    lastName: true,
+                                    avatar: true,
                                 },
                             },
                             receiver: {
@@ -402,6 +436,9 @@ class MessagingService {
                                     id: true,
                                     username: true,
                                     email: true,
+                                    firstName: true,
+                                    lastName: true,
+                                    avatar: true,
                                 },
                             },
                         },
@@ -515,8 +552,9 @@ class MessagingService {
                 });
                 conversationId = conversation.id;
             }
-            // Verify user is a participant
-            const participant = await prisma_1.prisma.conversationParticipant.findFirst({
+            // Verify user is a participant, auto-add if missing
+            // Use upsert to handle race conditions atomically
+            let participant = await prisma_1.prisma.conversationParticipant.findFirst({
                 where: {
                     conversationId,
                     userId: senderId,
@@ -524,7 +562,61 @@ class MessagingService {
                 },
             });
             if (!participant) {
-                throw new Error('You are not a participant in this conversation');
+                logger_1.logger.debug('User not found as active participant, attempting to add/rejoin', {
+                    userId: senderId,
+                    conversationId,
+                });
+                // Verify conversation exists
+                const conversation = await prisma_1.prisma.conversation.findUnique({
+                    where: { id: conversationId },
+                });
+                if (!conversation) {
+                    logger_1.logger.error('Conversation not found', undefined, { conversationId, userId: senderId });
+                    throw new Error('Conversation not found');
+                }
+                // Use upsert to handle race conditions
+                try {
+                    participant = await prisma_1.prisma.conversationParticipant.upsert({
+                        where: {
+                            conversationId_userId: {
+                                conversationId,
+                                userId: senderId,
+                            },
+                        },
+                        update: {
+                            leftAt: null, // Rejoin if they left
+                            role: 'member',
+                        },
+                        create: {
+                            conversationId,
+                            userId: senderId,
+                            role: 'member',
+                        },
+                    });
+                    logger_1.logger.info('User added/rejoined conversation', {
+                        userId: senderId,
+                        conversationId,
+                        action: participant.leftAt ? 'rejoined' : 'added',
+                    });
+                }
+                catch (upsertError) {
+                    // If upsert fails, try to find the participant again (may have been created by concurrent request)
+                    participant = await prisma_1.prisma.conversationParticipant.findFirst({
+                        where: {
+                            conversationId,
+                            userId: senderId,
+                            leftAt: null,
+                        },
+                    });
+                    if (!participant) {
+                        logger_1.logger.error('Failed to add participant', upsertError, {
+                            userId: senderId,
+                            conversationId,
+                            errorCode: upsertError.code,
+                        });
+                        throw new Error('Failed to add user as participant. Please try again.');
+                    }
+                }
             }
             // Determine receiver for direct messages
             let receiverId = data.receiverId;
@@ -578,6 +670,9 @@ class MessagingService {
                                     id: true,
                                     username: true,
                                     email: true,
+                                    firstName: true,
+                                    lastName: true,
+                                    avatar: true,
                                 },
                             },
                         },
@@ -600,8 +695,8 @@ class MessagingService {
      */
     async getMessages(conversationId, userId, filters) {
         try {
-            // Verify user is a participant
-            const participant = await prisma_1.prisma.conversationParticipant.findFirst({
+            // Verify user is a participant, auto-add if missing (same logic as sendMessage)
+            let participant = await prisma_1.prisma.conversationParticipant.findFirst({
                 where: {
                     conversationId,
                     userId,
@@ -609,7 +704,58 @@ class MessagingService {
                 },
             });
             if (!participant) {
-                throw new Error('You are not a participant in this conversation');
+                logger_1.logger.debug('User not found as active participant in getMessages, attempting to add/rejoin', {
+                    userId,
+                    conversationId,
+                });
+                const conversation = await prisma_1.prisma.conversation.findUnique({
+                    where: { id: conversationId },
+                });
+                if (!conversation) {
+                    throw new Error('Conversation not found');
+                }
+                // Use upsert to handle race conditions
+                try {
+                    participant = await prisma_1.prisma.conversationParticipant.upsert({
+                        where: {
+                            conversationId_userId: {
+                                conversationId,
+                                userId,
+                            },
+                        },
+                        update: {
+                            leftAt: null,
+                            role: 'member',
+                        },
+                        create: {
+                            conversationId,
+                            userId,
+                            role: 'member',
+                        },
+                    });
+                    logger_1.logger.info('User added/rejoined conversation in getMessages', {
+                        userId,
+                        conversationId,
+                    });
+                }
+                catch (upsertError) {
+                    // If upsert fails, try to find the participant again
+                    participant = await prisma_1.prisma.conversationParticipant.findFirst({
+                        where: {
+                            conversationId,
+                            userId,
+                            leftAt: null,
+                        },
+                    });
+                    if (!participant) {
+                        logger_1.logger.error('Failed to add participant in getMessages', upsertError, {
+                            userId,
+                            conversationId,
+                            errorCode: upsertError.code,
+                        });
+                        throw new Error('Failed to add user as participant. Please try again.');
+                    }
+                }
             }
             const where = {
                 conversationId,
@@ -684,7 +830,7 @@ class MessagingService {
                 prisma_1.prisma.message.count({ where }),
             ]);
             return {
-                data: messages.reverse().map((msg) => this.mapMessageToDto(msg)),
+                messages: messages.reverse().map((msg) => this.mapMessageToDto(msg)),
                 pagination: {
                     page,
                     limit,
@@ -744,6 +890,9 @@ class MessagingService {
                                     id: true,
                                     username: true,
                                     email: true,
+                                    firstName: true,
+                                    lastName: true,
+                                    avatar: true,
                                 },
                             },
                         },
@@ -801,7 +950,7 @@ class MessagingService {
                 throw new Error('You are not a participant in this conversation');
             }
             // Mark all unread messages as read
-            await prisma_1.prisma.message.updateMany({
+            const result = await prisma_1.prisma.message.updateMany({
                 where: {
                     conversationId,
                     receiverId: userId,
@@ -821,6 +970,7 @@ class MessagingService {
                     lastReadAt: new Date(),
                 },
             });
+            return { markedCount: result.count };
         }
         catch (error) {
             throw new Error(`Failed to mark messages as read: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -894,6 +1044,9 @@ class MessagingService {
                                     id: true,
                                     username: true,
                                     email: true,
+                                    firstName: true,
+                                    lastName: true,
+                                    avatar: true,
                                 },
                             },
                         },
@@ -1138,13 +1291,36 @@ class MessagingService {
     // HELPER METHODS
     // ===========================================
     mapMessageToDto(message) {
+        // Sender is required, so provide fallback if missing
+        const sender = message.sender || {
+            id: message.senderId,
+            username: 'Unknown',
+            email: '',
+            firstName: null,
+            lastName: null,
+            avatar: null,
+        };
         return {
             id: message.id,
             conversationId: message.conversationId,
             senderId: message.senderId,
-            sender: message.sender,
+            sender: {
+                id: sender.id,
+                username: sender.username,
+                email: sender.email,
+                firstName: sender.firstName || null,
+                lastName: sender.lastName || null,
+                avatar: sender.avatar || null,
+            },
             receiverId: message.receiverId || undefined,
-            receiver: message.receiver || undefined,
+            receiver: message.receiver ? {
+                id: message.receiver.id,
+                username: message.receiver.username,
+                email: message.receiver.email,
+                firstName: message.receiver.firstName || null,
+                lastName: message.receiver.lastName || null,
+                avatar: message.receiver.avatar || null,
+            } : undefined,
             content: message.content,
             type: message.type,
             attachments: message.attachments || undefined,
@@ -1179,6 +1355,7 @@ class MessagingService {
         };
     }
     mapConversationToDto(conversation) {
+        const activeParticipants = (conversation.participants || []).filter((p) => !p.leftAt);
         return {
             id: conversation.id,
             type: conversation.type,
@@ -1186,16 +1363,21 @@ class MessagingService {
             description: conversation.description || undefined,
             createdBy: conversation.createdBy,
             creator: conversation.creator,
-            participants: (conversation.participants || [])
-                .filter((p) => !p.leftAt)
-                .map((p) => ({
-                id: p.id,
+            participantIds: activeParticipants.map((p) => p.userId),
+            participants: activeParticipants.map((p) => ({
+                id: p.user?.id || p.userId,
                 userId: p.userId,
-                user: p.user,
+                username: p.user?.username || '',
+                email: p.user?.email || '',
+                firstName: p.user?.firstName || null,
+                lastName: p.user?.lastName || null,
+                avatar: p.user?.avatar || null,
                 role: p.role,
                 joinedAt: p.joinedAt,
                 lastReadAt: p.lastReadAt || undefined,
                 isMuted: p.isMuted,
+                // Keep nested user for backward compatibility
+                user: p.user,
             })),
             lastMessage: conversation.messages && conversation.messages.length > 0
                 ? this.mapMessageToDto(conversation.messages[0])

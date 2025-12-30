@@ -1,15 +1,14 @@
 // src/modules/messaging/index.ts
 import express from 'express';
-import restRoutes from './routes/rest/messaging.routes';
-import { Server as SocketIOServer } from 'socket.io';
+import messagingRoutes from './routes/rest/messaging.routes';
 import { RealtimeMessagingService } from './services/realtime-messaging.service';
 
 let realtimeService: RealtimeMessagingService | null = null;
 
-export function registerMessagingModule(app: express.Application, io?: SocketIOServer) {
+export function registerMessagingModule(app: express.Application, io?: any) {
   // REST routes
-  app.use('/api/messaging', restRoutes);
-
+  app.use('/api/messaging', messagingRoutes);
+  
   // Socket.IO real-time messaging
   if (io) {
     realtimeService = new RealtimeMessagingService(io);

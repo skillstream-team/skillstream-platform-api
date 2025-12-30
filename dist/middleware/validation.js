@@ -17,7 +17,37 @@ function validate(schema) {
             }
             // Validate query
             if (schema.query) {
-                req.query = schema.query.parse(req.query);
+                const parsedQuery = schema.query.parse(req.query);
+                // req.query can be a getter-only property in Express
+                // Try to delete and redefine it, or merge properties if that fails
+                try {
+                    // Try to delete the property if it exists on the instance
+                    if (req.hasOwnProperty('query')) {
+                        delete req.query;
+                    }
+                    // Define a new writable property
+                    Object.defineProperty(req, 'query', {
+                        value: parsedQuery,
+                        writable: true,
+                        enumerable: true,
+                        configurable: true,
+                    });
+                }
+                catch (e) {
+                    // If that fails, the property is on the prototype and not configurable
+                    // Merge properties individually into the existing query object
+                    const query = req.query;
+                    for (const key in parsedQuery) {
+                        if (parsedQuery.hasOwnProperty(key)) {
+                            try {
+                                query[key] = parsedQuery[key];
+                            }
+                            catch (err) {
+                                // Property is read-only, skip it
+                            }
+                        }
+                    }
+                }
             }
             // Validate params
             if (schema.params) {

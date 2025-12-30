@@ -3,7 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.generalRateLimiter = exports.enrollmentRateLimiter = exports.passwordResetRateLimiter = exports.registrationRateLimiter = exports.loginRateLimiter = void 0;
+exports.messagingRateLimiter = exports.generalRateLimiter = exports.enrollmentRateLimiter = exports.passwordResetRateLimiter = exports.registrationRateLimiter = exports.loginRateLimiter = void 0;
 const express_rate_limit_1 = __importDefault(require("express-rate-limit"));
 const rate_limit_redis_1 = __importDefault(require("rate-limit-redis"));
 const redis_1 = __importDefault(require("../utils/redis"));
@@ -61,4 +61,17 @@ exports.generalRateLimiter = (0, express_rate_limit_1.default)({
     message: 'Too many requests, please try again later',
     standardHeaders: true,
     legacyHeaders: false,
+});
+// Rate limiter for messaging endpoints
+exports.messagingRateLimiter = (0, express_rate_limit_1.default)({
+    store: createRateLimitStore('messaging'),
+    windowMs: 1 * 60 * 1000, // 1 minute
+    max: 30, // 30 messages per minute per user
+    message: 'Too many messages sent, please slow down',
+    standardHeaders: true,
+    legacyHeaders: false,
+    keyGenerator: (req) => {
+        // Rate limit by user ID if authenticated, otherwise by IP
+        return req.user?.id || req.ip || 'unknown';
+    },
 });

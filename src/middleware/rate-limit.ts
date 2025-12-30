@@ -63,3 +63,17 @@ export const generalRateLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
 });
+
+// Rate limiter for messaging endpoints
+export const messagingRateLimiter = rateLimit({
+  store: createRateLimitStore('messaging'),
+  windowMs: 1 * 60 * 1000, // 1 minute
+  max: 30, // 30 messages per minute per user
+  message: 'Too many messages sent, please slow down',
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => {
+    // Rate limit by user ID if authenticated, otherwise by IP
+    return (req as any).user?.id || req.ip || 'unknown';
+  },
+});

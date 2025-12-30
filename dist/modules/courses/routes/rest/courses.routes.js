@@ -14,7 +14,7 @@ const service = new service_1.CoursesService();
 const enrollmentService = new enrollment_service_1.EnrollmentService();
 /**
  * @swagger
- * /api/courses/course:
+ * /api/courses:
  *   post:
  *     summary: Create a new course
  *     description: Create a new course. Only teachers can create courses.
@@ -59,7 +59,7 @@ const enrollmentService = new enrollment_service_1.EnrollmentService();
  *       403:
  *         description: Forbidden - Teacher role required
  */
-router.post('/course', (0, roles_1.requireRole)('TEACHER'), (0, validation_1.validate)({ body: validation_schemas_1.createCourseSchema }), async (req, res) => {
+router.post('/', auth_1.requireAuth, (0, roles_1.requireRole)('TEACHER'), (0, validation_1.validate)({ body: validation_schemas_1.createCourseSchema }), async (req, res) => {
     try {
         const course = await service.createCourse(req.body);
         res.json(course);
@@ -119,7 +119,7 @@ router.post('/course', (0, roles_1.requireRole)('TEACHER'), (0, validation_1.val
  *       403:
  *         description: Forbidden - Teacher role required
  */
-router.post('/:id/modules', (0, roles_1.requireRole)('TEACHER'), (0, validation_1.validate)({ params: validation_schemas_1.courseIdParamSchema, body: validation_schemas_1.createModuleSchema }), async (req, res) => {
+router.post('/:id/modules', auth_1.requireAuth, (0, roles_1.requireRole)('TEACHER'), (0, validation_1.validate)({ params: validation_schemas_1.courseIdParamSchema, body: validation_schemas_1.createModuleSchema }), async (req, res) => {
     try {
         const courseModule = await service.addModuleToCourse(req.params.id, req.body);
         res.json(courseModule);
@@ -186,7 +186,7 @@ router.post('/:id/modules', (0, roles_1.requireRole)('TEACHER'), (0, validation_
  *       403:
  *         description: Forbidden - Teacher role required
  */
-router.post('/:id/modules/:moduleId/lessons', (0, roles_1.requireRole)('TEACHER'), async (req, res) => {
+router.post('/:id/modules/:moduleId/lessons', auth_1.requireAuth, (0, roles_1.requireRole)('TEACHER'), async (req, res) => {
     try {
         const lesson = await service.addLessonToModule(req.params.moduleId, req.body);
         res.json(lesson);
@@ -263,7 +263,7 @@ router.post('/:id/modules/:moduleId/lessons', (0, roles_1.requireRole)('TEACHER'
  *       403:
  *         description: Forbidden - Teacher role required
  */
-router.post('/:id/lessons/:lessonId/quiz', (0, roles_1.requireRole)('TEACHER'), async (req, res) => {
+router.post('/:id/lessons/:lessonId/quiz', auth_1.requireAuth, (0, roles_1.requireRole)('TEACHER'), async (req, res) => {
     try {
         const quiz = await service.addQuizToLesson(req.params.lessonId, req.body);
         res.json(quiz);
@@ -656,7 +656,7 @@ router.get('/:id', auth_1.requireAuth, subscription_1.requireSubscription, (0, v
  *       404:
  *         description: Course not found
  */
-router.put('/:id', (0, roles_1.requireRole)('TEACHER'), (0, validation_1.validate)({ params: validation_schemas_1.courseIdParamSchema, body: validation_schemas_1.updateCourseSchema }), async (req, res) => {
+router.put('/:id', auth_1.requireAuth, (0, roles_1.requireRole)('TEACHER'), (0, validation_1.validate)({ params: validation_schemas_1.courseIdParamSchema, body: validation_schemas_1.updateCourseSchema }), async (req, res) => {
     try {
         const course = await service.updateCourse(req.params.id, req.body);
         res.json(course);
@@ -699,7 +699,7 @@ router.put('/:id', (0, roles_1.requireRole)('TEACHER'), (0, validation_1.validat
  *       404:
  *         description: Course not found
  */
-router.delete('/:id', (0, roles_1.requireRole)('TEACHER'), (0, validation_1.validate)({ params: validation_schemas_1.courseIdParamSchema }), async (req, res) => {
+router.delete('/:id', auth_1.requireAuth, (0, roles_1.requireRole)('TEACHER'), (0, validation_1.validate)({ params: validation_schemas_1.courseIdParamSchema }), async (req, res) => {
     try {
         await service.deleteCourse(req.params.id);
         res.json({ success: true });

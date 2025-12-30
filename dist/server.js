@@ -61,8 +61,17 @@ const compression_1 = __importDefault(require("compression"));
 const rate_limit_1 = require("./middleware/rate-limit");
 const timeout_1 = require("./middleware/timeout");
 const scheduled_tasks_service_1 = require("./services/scheduled-tasks.service");
+const firebase_1 = require("./utils/firebase");
 // Initialize Sentry FIRST (before anything else that might throw)
 (0, sentry_1.initSentry)();
+// Initialize Firebase
+try {
+    (0, firebase_1.initializeFirebase)();
+    console.log("✅ Firebase initialized");
+}
+catch (error) {
+    console.warn("⚠️  Firebase initialization failed (messaging may not work):", error);
+}
 // Validate environment variables on startup
 try {
     (0, env_1.validateEnv)();

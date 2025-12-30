@@ -4,7 +4,7 @@ import { UsersService } from '../../services/users.service';
 // Import loginRateLimiter middleware
 import { loginRateLimiter, registrationRateLimiter, passwordResetRateLimiter, generalRateLimiter } from '../../../../middleware/rate-limit';
 import { validate } from '../../../../middleware/validation';
-import { loginSchema, createUserSchema, forgotPasswordSchema, resetPasswordSchema, refreshTokenSchema } from '../../../../utils/validation-schemas';
+import { loginSchema, createUserSchema, forgotPasswordSchema, resetPasswordSchema, refreshTokenSchema, verifyEmailSchema, resendVerificationSchema } from '../../../../utils/validation-schemas';
 import { requireAuth } from '../../../../middleware/auth';
 import { z } from 'zod';
 
@@ -276,6 +276,110 @@ router.post('/auth/reset-password',
   } catch (error) {
     res.status(400).json({ error: (error as Error).message });
   }
+  }
+);
+
+/**
+ * @swagger
+ * /api/users/auth/verify-email:
+ *   post:
+ *     summary: Verify email address
+ *     description: Verify user's email address using the verification token sent via email.
+ *     tags: [Authentication]
+ *     security: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - token
+ *             properties:
+ *               token:
+ *                 type: string
+ *                 example: verification_token_123
+ *     responses:
+ *       200:
+ *         description: Email verified successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: Email verified successfully
+ *                 user:
+ *                   type: object
+ *                   description: Updated user object with isVerified set to true
+ *       400:
+ *         description: Invalid or expired token
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ */
+router.post('/auth/verify-email',
+  validate({ body: verifyEmailSchema }),
+  async (req, res) => {
+    try {
+      const result = await service.verifyEmail(req.body.token);
+      res.json(result);
+    } catch (error) {
+      res.status(400).json({ error: (error as Error).message });
+    }
+  }
+);
+
+/**
+ * @swagger
+ * /api/users/auth/resend-verification:
+ *   post:
+ *     summary: Resend verification email
+ *     description: Resend email verification link to user's email address.
+ *     tags: [Authentication]
+ *     security: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - email
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 format: email
+ *                 example: user@example.com
+ *     responses:
+ *       200:
+ *         description: Verification email sent successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: Verification email sent successfully
+ *       400:
+ *         description: User not found or already verified
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ */
+router.post('/auth/resend-verification',
+  validate({ body: resendVerificationSchema }),
+  async (req, res) => {
+    try {
+      const result = await service.resendVerificationEmail(req.body.email);
+      res.json(result);
+    } catch (error) {
+      res.status(400).json({ error: (error as Error).message });
+    }
   }
 );
 

@@ -834,7 +834,12 @@ export class CoursesService {
         // Invalidate course cache to ensure fresh data on next fetch
         await deleteCache(cacheKeys.course(data.courseId));
         
-        return lesson;
+        // Extract description from content for the response
+        const lessonContent = lesson.content as any;
+        return {
+            ...lesson,
+            description: lessonContent?.description || '',
+        };
     }
 
     /**

@@ -728,7 +728,12 @@ class CoursesService {
         });
         // Invalidate course cache to ensure fresh data on next fetch
         await (0, cache_1.deleteCache)(cache_1.cacheKeys.course(data.courseId));
-        return lesson;
+        // Extract description from content for the response
+        const lessonContent = lesson.content;
+        return {
+            ...lesson,
+            description: lessonContent?.description || '',
+        };
     }
     /**
      * @swagger

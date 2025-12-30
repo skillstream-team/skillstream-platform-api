@@ -1,4 +1,37 @@
 "use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
 const auth_1 = require("../../../../middleware/auth");
@@ -128,6 +161,61 @@ router.post('/lessons/quick', auth_1.requireAuth, (0, roles_1.requireRole)('TEAC
 });
 /**
  * @swagger
+ * /api/lessons/{id}:
+ *   get:
+ *     summary: Get a single lesson by ID
+ *     tags: [Lessons]
+ */
+router.get('/lessons/:id', auth_1.requireAuth, async (req, res) => {
+    try {
+        const { id } = req.params;
+        console.log('GET /api/lessons/:id called with id:', id);
+        const lesson = await prisma_1.prisma.lesson.findUnique({
+            where: { id },
+            select: {
+                id: true,
+                courseId: true,
+                title: true,
+                content: true,
+                order: true,
+                scheduledAt: true,
+                teacherId: true,
+                duration: true,
+                joinLink: true,
+                meetingId: true,
+                status: true,
+                isPreview: true,
+                createdAt: true,
+                updatedAt: true,
+                quizzes: {
+                    select: {
+                        id: true,
+                        title: true,
+                        description: true,
+                    },
+                },
+            },
+        });
+        if (!lesson) {
+            return res.status(404).json({ error: 'Lesson not found' });
+        }
+        // Extract description and moduleId from content if they exist
+        const content = lesson.content;
+        const description = content?.description || '';
+        const moduleId = content?.moduleId || '';
+        res.json({
+            ...lesson,
+            description,
+            moduleId,
+        });
+    }
+    catch (error) {
+        console.error('Error fetching lesson:', error);
+        res.status(500).json({ error: 'Failed to fetch lesson' });
+    }
+});
+/**
+ * @swagger
  * /api/lessons:
  *   get:
  *     summary: Get lessons (for teacher or student)
@@ -213,6 +301,36 @@ router.get('/lessons', auth_1.requireAuth, subscription_1.requireSubscription, a
     catch (error) {
         console.error('Error fetching lessons:', error);
         res.status(500).json({ error: 'Failed to fetch lessons' });
+    }
+});
+/**
+ * @swagger
+ * /api/lessons/{id}:
+ *   delete:
+ *     summary: Delete a lesson
+ *     tags: [Lessons]
+ */
+router.delete('/lessons/:id', auth_1.requireAuth, (0, roles_1.requireRole)('TEACHER'), async (req, res) => {
+    try {
+        const { id } = req.params;
+        // Get lesson to find courseId for cache invalidation
+        const lesson = await prisma_1.prisma.lesson.findUnique({
+            where: { id },
+            select: { courseId: true },
+        });
+        if (!lesson) {
+            return res.status(404).json({ error: 'Lesson not found' });
+        }
+        await prisma_1.prisma.lesson.delete({ where: { id } });
+        // Invalidate cache
+        const { deleteCache } = await Promise.resolve().then(() => __importStar(require('../../../../utils/cache')));
+        const { cacheKeys } = await Promise.resolve().then(() => __importStar(require('../../../../utils/cache')));
+        await deleteCache(cacheKeys.course(lesson.courseId));
+        res.json({ success: true, message: 'Lesson deleted successfully' });
+    }
+    catch (error) {
+        console.error('Error deleting lesson:', error);
+        res.status(500).json({ error: 'Failed to delete lesson' });
     }
 });
 exports.default = router;

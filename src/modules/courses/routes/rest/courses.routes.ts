@@ -252,6 +252,33 @@ router.put('/:id/modules/:moduleId',
 
 /**
  * @swagger
+ * /api/courses/{id}/modules/{moduleId}:
+ *   delete:
+ *     summary: Delete a module
+ *     description: Delete a module from a course. Only teachers can delete modules.
+ *     tags: [Courses]
+ *     security:
+ *       - bearerAuth: []
+ */
+router.delete('/:id/modules/:moduleId',
+    requireAuth,
+    requireRole('TEACHER'),
+    validate({ params: courseIdParamSchema }),
+    async (req, res) => {
+        try {
+            await service.deleteModule(req.params.moduleId);
+            const { deleteCache } = await import('../../../../utils/cache');
+            const { cacheKeys } = await import('../../../../utils/cache');
+            await deleteCache(cacheKeys.course(req.params.id));
+            res.json({ success: true, message: 'Module deleted successfully' });
+        } catch (err) {
+            res.status(400).json({ error: (err as Error).message });
+        }
+    }
+);
+
+/**
+ * @swagger
  * /api/courses/{id}/modules/{moduleId}/lessons:
  *   post:
  *     summary: Add lesson to module

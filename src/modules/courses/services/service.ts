@@ -665,8 +665,18 @@ export class CoursesService {
         isPublished?: boolean;
         createdBy: string;
     }) {
+        // Default to published if not specified
+        const isPublished = data.isPublished !== undefined ? data.isPublished : true;
+        
         const module = await prisma.courseModule.create({
-            data: { ...data, courseId, content: data.content ?? {}, description: data.description ?? '' },
+            data: { 
+                ...data, 
+                courseId, 
+                content: data.content ?? {}, 
+                description: data.description ?? '',
+                isPublished,
+                publishedAt: isPublished ? new Date() : null,
+            },
         });
         
         // Invalidate course cache to ensure fresh data on next fetch
@@ -703,17 +713,6 @@ export class CoursesService {
      */
     async updateModule(moduleId: string, data: Prisma.CourseModuleUpdateInput) {
         return prisma.courseModule.update({ where: { id: moduleId }, data });
-    }
-
-    /**
-     * @swagger
-     * /modules/{moduleId}:
-     *   delete:
-     *     summary: Delete a module
-     *     tags: [Modules]
-     */
-    async deleteModule(moduleId: string) {
-        return prisma.courseModule.delete({ where: { id: moduleId } });
     }
 
     /**
@@ -788,10 +787,49 @@ export class CoursesService {
         if (!module) {
             throw new Error('Module not found or does not belong to this course');
         }
-        return prisma.courseModule.update({
+        const updated = await prisma.courseModule.update({
             where: { id: moduleId },
             data,
         });
+        await deleteCache(cacheKeys.course(courseId));
+        return updated;
+    }
+
+    async deleteModule(moduleId: string) {
+        // Get module to find courseId for cache invalidation
+        const module = await prisma.courseModule.findUnique({
+            where: { id: moduleId },
+            select: { courseId: true },
+        });
+        
+        if (!module) {
+            throw new Error('Module not found');
+        }
+        
+        // Delete all lessons in this module first
+        // Query all lessons and filter by moduleId in content JSON
+        const allLessons = await prisma.lesson.findMany({
+            where: {
+                courseId: module.courseId,
+            },
+        });
+        
+        // Filter lessons where content.moduleId matches
+        const lessonsToDelete = allLessons.filter((lesson: any) => {
+            const content = lesson.content as any;
+            return content?.moduleId === moduleId;
+        });
+        
+        // Delete lessons
+        for (const lesson of lessonsToDelete) {
+            await prisma.lesson.delete({ where: { id: lesson.id } });
+        }
+        
+        // Delete the module
+        await prisma.courseModule.delete({ where: { id: moduleId } });
+        
+        // Invalidate cache
+        await deleteCache(cacheKeys.course(module.courseId));
     }
 
     // ============================================================
@@ -817,18 +855,29 @@ export class CoursesService {
         // Store moduleId and description in content JSON since Lesson model doesn't have these fields
         const content = (data.content as any) || {};
         content.moduleId = moduleId;
-        if (data.description) {
+        if (data.description !== undefined && data.description !== null) {
             content.description = data.description;
         }
         
-        // Remove description from data since it's not a field in the Lesson model
-        const { description, ...lessonData } = data;
+        // Explicitly build the lesson data without description field
+        // Only include fields that exist in the Lesson Prisma model
+        const lessonData: any = {
+            title: data.title,
+            order: data.order,
+            courseId: data.courseId,
+            content: content as Prisma.InputJsonValue,
+        };
+        
+        // Add optional fields only if they exist
+        if (data.duration !== undefined) {
+            lessonData.duration = data.duration;
+        }
+        if (data.isPreview !== undefined) {
+            lessonData.isPreview = data.isPreview;
+        }
         
         const lesson = await prisma.lesson.create({ 
-            data: {
-                ...lessonData,
-                content: content as Prisma.InputJsonValue,
-            }
+            data: lessonData
         });
         
         // Invalidate course cache to ensure fresh data on next fetch

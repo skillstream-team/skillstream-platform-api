@@ -154,6 +154,65 @@ router.post('/lessons/quick', requireAuth, requireRole('TEACHER'), async (req, r
 
 /**
  * @swagger
+ * /api/lessons/{id}:
+ *   get:
+ *     summary: Get a single lesson by ID
+ *     tags: [Lessons]
+ */
+router.get('/lessons/:id', requireAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    console.log('GET /api/lessons/:id called with id:', id);
+    
+    const lesson = await prisma.lesson.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        courseId: true,
+        title: true,
+        content: true,
+        order: true,
+        scheduledAt: true,
+        teacherId: true,
+        duration: true,
+        joinLink: true,
+        meetingId: true,
+        status: true,
+        isPreview: true,
+        createdAt: true,
+        updatedAt: true,
+        quizzes: {
+          select: {
+            id: true,
+            title: true,
+            description: true,
+          },
+        },
+      },
+    });
+
+    if (!lesson) {
+      return res.status(404).json({ error: 'Lesson not found' });
+    }
+
+    // Extract description and moduleId from content if they exist
+    const content = lesson.content as any;
+    const description = content?.description || '';
+    const moduleId = content?.moduleId || '';
+
+    res.json({
+      ...lesson,
+      description,
+      moduleId,
+    });
+  } catch (error) {
+    console.error('Error fetching lesson:', error);
+    res.status(500).json({ error: 'Failed to fetch lesson' });
+  }
+});
+
+/**
+ * @swagger
  * /api/lessons:
  *   get:
  *     summary: Get lessons (for teacher or student)
@@ -243,6 +302,41 @@ router.get('/lessons', requireAuth, requireSubscription, async (req, res) => {
   } catch (error) {
     console.error('Error fetching lessons:', error);
     res.status(500).json({ error: 'Failed to fetch lessons' });
+  }
+});
+
+/**
+ * @swagger
+ * /api/lessons/{id}:
+ *   delete:
+ *     summary: Delete a lesson
+ *     tags: [Lessons]
+ */
+router.delete('/lessons/:id', requireAuth, requireRole('TEACHER'), async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Get lesson to find courseId for cache invalidation
+    const lesson = await prisma.lesson.findUnique({
+      where: { id },
+      select: { courseId: true },
+    });
+
+    if (!lesson) {
+      return res.status(404).json({ error: 'Lesson not found' });
+    }
+
+    await prisma.lesson.delete({ where: { id } });
+    
+    // Invalidate cache
+    const { deleteCache } = await import('../../../../utils/cache');
+    const { cacheKeys } = await import('../../../../utils/cache');
+    await deleteCache(cacheKeys.course(lesson.courseId));
+    
+    res.json({ success: true, message: 'Lesson deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting lesson:', error);
+    res.status(500).json({ error: 'Failed to delete lesson' });
   }
 });
 

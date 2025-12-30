@@ -15,8 +15,8 @@ export const createCourseSchema = z.object({
   title: z.string().min(1).max(200),
   description: z.string().max(5000).optional(),
   price: z.number().min(0),
-  order: z.number().int().min(0),
-  createdBy: z.string().min(1),
+  order: z.number().int().min(0).nullish(), // Auto-generated if not provided
+  createdBy: z.string().min(1).nullish(), // Auto-set from authenticated user
   instructorId: z.string().min(1),
   thumbnailUrl: z.string().url().optional().or(z.literal('')),
   categoryId: z.string().optional(),

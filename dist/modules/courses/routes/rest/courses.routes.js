@@ -61,11 +61,29 @@ const enrollmentService = new enrollment_service_1.EnrollmentService();
  */
 router.post('/', auth_1.requireAuth, (0, roles_1.requireRole)('TEACHER'), (0, validation_1.validate)({ body: validation_schemas_1.createCourseSchema }), async (req, res) => {
     try {
-        const course = await service.createCourse(req.body);
+        const userId = req.user.id;
+        const payload = {
+            ...req.body,
+            // Auto-set createdBy from authenticated user (handle null/undefined)
+            createdBy: req.body.createdBy ?? userId,
+            // Auto-set instructorId from authenticated user if not provided
+            instructorId: req.body.instructorId || userId,
+        };
+        // Auto-generate order if not provided (get max order + 1 for this instructor)
+        if (payload.order == null) {
+            const maxOrderCourse = await prisma_1.prisma.course.findFirst({
+                where: { instructorId: payload.instructorId },
+                orderBy: { order: 'desc' },
+                select: { order: true },
+            });
+            payload.order = (maxOrderCourse?.order ?? -1) + 1;
+        }
+        const course = await service.createCourse(payload);
         res.json(course);
     }
     catch (err) {
-        res.status(400).json({ error: err.message });
+        const error = err;
+        res.status(400).json({ error: error.message });
     }
 });
 /**

@@ -15,8 +15,8 @@ exports.createCourseSchema = zod_1.z.object({
     title: zod_1.z.string().min(1).max(200),
     description: zod_1.z.string().max(5000).optional(),
     price: zod_1.z.number().min(0),
-    order: zod_1.z.number().int().min(0),
-    createdBy: zod_1.z.string().min(1),
+    order: zod_1.z.number().int().min(0).nullish(), // Auto-generated if not provided
+    createdBy: zod_1.z.string().min(1).nullish(), // Auto-set from authenticated user
     instructorId: zod_1.z.string().min(1),
     thumbnailUrl: zod_1.z.string().url().optional().or(zod_1.z.literal('')),
     categoryId: zod_1.z.string().optional(),

@@ -70,7 +70,18 @@ const calendar_resolver_1 = require("./routes/graphql/calendar.resolver");
 Object.defineProperty(exports, "calendarSchema", { enumerable: true, get: function () { return calendar_resolver_1.calendarSchema; } });
 function registerCoursesModule(app) {
     // REST routes
+    // Register main courses router FIRST to handle base routes like POST /, GET /, etc.
+    // This ensures POST /api/courses matches before parameterized routes
     app.use('/api/courses', courses_routes_1.default);
+    // Register specific course sub-routes AFTER the main router
+    // These have parameterized routes like /:courseId/tags which won't conflict
+    app.use('/api/courses/wishlist', wishlist_routes_1.default);
+    app.use('/api/courses', prerequisites_routes_1.default);
+    app.use('/api/courses', tags_routes_1.default); // Course-specific tag routes
+    app.use('/api/courses', instructor_qa_routes_1.default);
+    app.use('/api/courses', share_routes_1.default);
+    app.use('/api/courses', comparison_routes_1.default);
+    app.use('/api/courses', course_import_routes_1.default);
     app.use('/api', progress_routes_1.default);
     app.use('/api', announcements_routes_1.default);
     app.use('/api', recommendations_user_routes_1.default);
@@ -94,19 +105,12 @@ function registerCoursesModule(app) {
     app.use('/api', collaboration_routes_1.default);
     app.use('/api', teacher_earnings_routes_1.default);
     app.use('/api/categories', categories_routes_1.default);
-    app.use('/api/courses/wishlist', wishlist_routes_1.default);
-    app.use('/api/courses', prerequisites_routes_1.default);
     app.use('/api/dashboard', dashboard_routes_1.default);
     app.use('/api/bundles', bundles_routes_1.default);
     app.use('/api/coupons', coupons_routes_1.default);
     app.use('/api/learning-paths', learning_paths_routes_1.default);
-    app.use('/api/courses', tags_routes_1.default); // Course-specific tag routes
     app.use('/api/tags', tags_platform_routes_1.default); // Platform-wide tag routes
-    app.use('/api/courses', instructor_qa_routes_1.default);
     app.use('/api/referrals', referral_routes_1.default);
-    app.use('/api/courses', share_routes_1.default);
-    app.use('/api/courses', comparison_routes_1.default);
-    app.use('/api/courses', course_import_routes_1.default);
     app.use('/api', lesson_payment_routes_1.default);
     // GraphQL endpoints
     app.use('/graphql/courses', (0, express_graphql_1.graphqlHTTP)({

@@ -1365,18 +1365,28 @@ export class MessagingService {
   // ===========================================
 
   private mapMessageToDto(message: any): MessageResponseDto {
+    // Sender is required, so provide fallback if missing
+    const sender = message.sender || {
+      id: message.senderId,
+      username: 'Unknown',
+      email: '',
+      firstName: null,
+      lastName: null,
+      avatar: null,
+    };
+
     return {
       id: message.id,
       conversationId: message.conversationId,
       senderId: message.senderId,
-      sender: message.sender ? {
-        id: message.sender.id,
-        username: message.sender.username,
-        email: message.sender.email,
-        firstName: message.sender.firstName || null,
-        lastName: message.sender.lastName || null,
-        avatar: message.sender.avatar || null,
-      } : undefined,
+      sender: {
+        id: sender.id,
+        username: sender.username,
+        email: sender.email,
+        firstName: sender.firstName || null,
+        lastName: sender.lastName || null,
+        avatar: sender.avatar || null,
+      },
       receiverId: message.receiverId || undefined,
       receiver: message.receiver ? {
         id: message.receiver.id,

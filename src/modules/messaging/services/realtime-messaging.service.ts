@@ -61,7 +61,7 @@ export class RealtimeMessagingService {
             limit: 100,
           });
 
-          conversations.data.forEach((conv: any) => {
+          conversations.conversations.forEach((conv: any) => {
             socket.join(`conversation-${conv.id}`);
           });
 

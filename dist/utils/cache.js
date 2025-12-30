@@ -81,7 +81,21 @@ async function deleteCachePattern(pattern) {
  */
 exports.cacheKeys = {
     course: (id) => `course:${id}`,
-    courseList: (page, limit) => `courses:list:${page}:${limit}`,
+    courseList: (page, limit, filters) => {
+        const filterParts = [];
+        if (filters?.instructorId)
+            filterParts.push(`instructor:${filters.instructorId}`);
+        if (filters?.categoryId)
+            filterParts.push(`category:${filters.categoryId}`);
+        if (filters?.difficulty)
+            filterParts.push(`difficulty:${filters.difficulty}`);
+        if (filters?.search)
+            filterParts.push(`search:${filters.search}`);
+        if (filters?.sortBy)
+            filterParts.push(`sort:${filters.sortBy}:${filters.sortOrder || 'desc'}`);
+        const filterStr = filterParts.length > 0 ? `:${filterParts.join(':')}` : '';
+        return `courses:list:${page}:${limit}${filterStr}`;
+    },
     user: (id) => `user:${id}`,
     userProfile: (id) => `user:profile:${id}`,
     enrollments: (courseId, page, limit) => `enrollments:${courseId}:${page}:${limit}`,

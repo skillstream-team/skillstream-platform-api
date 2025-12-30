@@ -137,10 +137,93 @@ router.post('/', auth_1.requireAuth, (0, roles_1.requireRole)('TEACHER'), (0, va
  *       403:
  *         description: Forbidden - Teacher role required
  */
+/**
+ * @swagger
+ * /api/courses/{id}/modules:
+ *   get:
+ *     summary: Get all modules with lessons for a course
+ *     description: Get all modules and their associated lessons for a course
+ *     tags: [Courses]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Course ID
+ *     responses:
+ *       200:
+ *         description: Modules with lessons retrieved successfully
+ *       404:
+ *         description: Course not found
+ */
+router.get('/:id/modules', auth_1.requireAuth, (0, validation_1.validate)({ params: validation_schemas_1.courseIdParamSchema }), async (req, res) => {
+    try {
+        const modules = await service.getCourseModulesWithLessons(req.params.id);
+        res.json(modules);
+    }
+    catch (err) {
+        res.status(400).json({ error: err.message });
+    }
+});
 router.post('/:id/modules', auth_1.requireAuth, (0, roles_1.requireRole)('TEACHER'), (0, validation_1.validate)({ params: validation_schemas_1.courseIdParamSchema, body: validation_schemas_1.createModuleSchema }), async (req, res) => {
     try {
         const courseModule = await service.addModuleToCourse(req.params.id, req.body);
         res.json(courseModule);
+    }
+    catch (err) {
+        res.status(400).json({ error: err.message });
+    }
+});
+/**
+ * @swagger
+ * /api/courses/{id}/modules/{moduleId}:
+ *   put:
+ *     summary: Update a module
+ *     description: Update module details. Only teachers can update.
+ *     tags: [Courses]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Course ID
+ *       - in: path
+ *         name: moduleId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Module ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               title:
+ *                 type: string
+ *               description:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Module updated successfully
+ *       400:
+ *         description: Bad request
+ *       403:
+ *         description: Forbidden - Teacher role required
+ *       404:
+ *         description: Module not found
+ */
+router.put('/:id/modules/:moduleId', auth_1.requireAuth, (0, roles_1.requireRole)('TEACHER'), (0, validation_1.validate)({ params: validation_schemas_1.courseIdParamSchema }), async (req, res) => {
+    try {
+        const module = await service.updateModuleInCourse(req.params.id, req.params.moduleId, req.body);
+        res.json(module);
     }
     catch (err) {
         res.status(400).json({ error: err.message });

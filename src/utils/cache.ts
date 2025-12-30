@@ -73,7 +73,23 @@ export async function deleteCachePattern(pattern: string): Promise<void> {
  */
 export const cacheKeys = {
   course: (id: string) => `course:${id}`,
-  courseList: (page: number, limit: number) => `courses:list:${page}:${limit}`,
+  courseList: (page: number, limit: number, filters?: {
+    instructorId?: string;
+    categoryId?: string;
+    difficulty?: string;
+    search?: string;
+    sortBy?: string;
+    sortOrder?: string;
+  }) => {
+    const filterParts: string[] = [];
+    if (filters?.instructorId) filterParts.push(`instructor:${filters.instructorId}`);
+    if (filters?.categoryId) filterParts.push(`category:${filters.categoryId}`);
+    if (filters?.difficulty) filterParts.push(`difficulty:${filters.difficulty}`);
+    if (filters?.search) filterParts.push(`search:${filters.search}`);
+    if (filters?.sortBy) filterParts.push(`sort:${filters.sortBy}:${filters.sortOrder || 'desc'}`);
+    const filterStr = filterParts.length > 0 ? `:${filterParts.join(':')}` : '';
+    return `courses:list:${page}:${limit}${filterStr}`;
+  },
   user: (id: string) => `user:${id}`,
   userProfile: (id: string) => `user:profile:${id}`,
   enrollments: (courseId: string, page: number, limit: number) => `enrollments:${courseId}:${page}:${limit}`,

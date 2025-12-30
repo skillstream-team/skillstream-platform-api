@@ -195,7 +195,15 @@ export class CoursesService {
         sortBy: string = 'createdAt',
         sortOrder: 'asc' | 'desc' = 'desc'
     ) {
-        const cacheKey = cacheKeys.courseList(page, limit);
+        // Generate cache key with filters to ensure different queries don't share cache
+        const cacheKey = cacheKeys.courseList(page, limit, {
+            instructorId,
+            categoryId,
+            difficulty,
+            search,
+            sortBy,
+            sortOrder,
+        });
         
         // Try cache first
         const cached = await getCache(cacheKey);
@@ -421,7 +429,7 @@ export class CoursesService {
         }));
 
         const result = {
-            data: coursesWithTags,
+            courses: coursesWithTags,
             pagination: {
                 page,
                 limit: take,
@@ -703,6 +711,79 @@ export class CoursesService {
         return prisma.courseModule.delete({ where: { id: moduleId } });
     }
 
+    /**
+     * Get all modules with lessons for a course
+     */
+    async getCourseModulesWithLessons(courseId: string) {
+        const modules = await prisma.courseModule.findMany({
+            where: { courseId },
+            include: {
+                quizzes: {
+                    include: {
+                        creator: {
+                            select: { id: true, username: true, email: true }
+                        }
+                    }
+                }
+            },
+            orderBy: { order: 'asc' },
+        });
+
+        const lessons = await prisma.lesson.findMany({
+            where: { courseId },
+            include: {
+                quizzes: {
+                    include: {
+                        creator: {
+                            select: { id: true, username: true, email: true }
+                        }
+                    }
+                }
+            },
+            orderBy: { order: 'asc' },
+        });
+
+        // Group lessons by moduleId stored in content JSON
+        // If moduleId is not in content, we'll need to handle it differently
+        const moduleMap = new Map<string, any[]>();
+        
+        lessons.forEach(lesson => {
+            const content = lesson.content as any;
+            const moduleId = content?.moduleId;
+            if (moduleId) {
+                if (!moduleMap.has(moduleId)) {
+                    moduleMap.set(moduleId, []);
+                }
+                moduleMap.get(moduleId)!.push(lesson);
+            }
+        });
+
+        return modules.map(module => ({
+            ...module,
+            lessons: moduleMap.get(module.id) || []
+        }));
+    }
+
+    /**
+     * Update a module
+     */
+    async updateModuleInCourse(courseId: string, moduleId: string, data: {
+        title?: string;
+        description?: string;
+    }) {
+        // Verify module belongs to course
+        const module = await prisma.courseModule.findFirst({
+            where: { id: moduleId, courseId },
+        });
+        if (!module) {
+            throw new Error('Module not found or does not belong to this course');
+        }
+        return prisma.courseModule.update({
+            where: { id: moduleId },
+            data,
+        });
+    }
+
     // ============================================================
     // LESSON CRUD
     // ============================================================
@@ -719,8 +800,20 @@ export class CoursesService {
         content?: Prisma.InputJsonValue;
         order: number;
         courseId: string;
+        description?: string;
+        duration?: number;
+        isPreview?: boolean;
     }) {
-        return prisma.lesson.create({ data });
+        // Store moduleId in content JSON since Lesson model doesn't have moduleId field
+        const content = (data.content as any) || {};
+        content.moduleId = moduleId;
+        
+        return prisma.lesson.create({ 
+            data: {
+                ...data,
+                content: content as Prisma.InputJsonValue,
+            }
+        });
     }
 
     /**

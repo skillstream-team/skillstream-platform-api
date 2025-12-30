@@ -77,11 +77,11 @@ exports.createEnrollmentSchema = zod_1.z.object({
 });
 // Module schemas
 exports.createModuleSchema = zod_1.z.object({
-    courseId: zod_1.z.string().min(1),
     title: zod_1.z.string().min(1).max(200),
     description: zod_1.z.string().max(5000).optional(),
     order: zod_1.z.number().int().min(0),
     createdBy: zod_1.z.string().min(1),
+    // courseId comes from URL params, not body
 });
 // Quiz schemas
 exports.createQuizSchema = zod_1.z.object({

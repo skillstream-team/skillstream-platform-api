@@ -164,7 +164,15 @@ class CoursesService {
      *         description: Paginated list of courses
      */
     async getAllCourses(page = 1, limit = 20, search, minPrice, maxPrice, instructorId, categoryId, difficulty, minRating, maxRating, minDuration, maxDuration, language, tags, sortBy = 'createdAt', sortOrder = 'desc') {
-        const cacheKey = cache_1.cacheKeys.courseList(page, limit);
+        // Generate cache key with filters to ensure different queries don't share cache
+        const cacheKey = cache_1.cacheKeys.courseList(page, limit, {
+            instructorId,
+            categoryId,
+            difficulty,
+            search,
+            sortBy,
+            sortOrder,
+        });
         // Try cache first
         const cached = await (0, cache_1.getCache)(cacheKey);
         if (cached) {
@@ -371,7 +379,7 @@ class CoursesService {
             tags: tagsMap.get(course.id) || [],
         }));
         const result = {
-            data: coursesWithTags,
+            courses: coursesWithTags,
             pagination: {
                 page,
                 limit: take,
@@ -621,6 +629,70 @@ class CoursesService {
     async deleteModule(moduleId) {
         return prisma_1.prisma.courseModule.delete({ where: { id: moduleId } });
     }
+    /**
+     * Get all modules with lessons for a course
+     */
+    async getCourseModulesWithLessons(courseId) {
+        const modules = await prisma_1.prisma.courseModule.findMany({
+            where: { courseId },
+            include: {
+                quizzes: {
+                    include: {
+                        creator: {
+                            select: { id: true, username: true, email: true }
+                        }
+                    }
+                }
+            },
+            orderBy: { order: 'asc' },
+        });
+        const lessons = await prisma_1.prisma.lesson.findMany({
+            where: { courseId },
+            include: {
+                quizzes: {
+                    include: {
+                        creator: {
+                            select: { id: true, username: true, email: true }
+                        }
+                    }
+                }
+            },
+            orderBy: { order: 'asc' },
+        });
+        // Group lessons by moduleId stored in content JSON
+        // If moduleId is not in content, we'll need to handle it differently
+        const moduleMap = new Map();
+        lessons.forEach(lesson => {
+            const content = lesson.content;
+            const moduleId = content?.moduleId;
+            if (moduleId) {
+                if (!moduleMap.has(moduleId)) {
+                    moduleMap.set(moduleId, []);
+                }
+                moduleMap.get(moduleId).push(lesson);
+            }
+        });
+        return modules.map(module => ({
+            ...module,
+            lessons: moduleMap.get(module.id) || []
+        }));
+    }
+    /**
+     * Update a module
+     */
+    async updateModuleInCourse(courseId, moduleId, data) {
+        // Verify module belongs to course
+        const module = await prisma_1.prisma.courseModule.findFirst({
+            where: { id: moduleId, courseId },
+        });
+        if (!module) {
+            throw new Error('Module not found or does not belong to this course');
+        }
+        return prisma_1.prisma.courseModule.update({
+            where: { id: moduleId },
+            data,
+        });
+    }
     // ============================================================
     // LESSON CRUD
     // ============================================================
@@ -632,7 +704,15 @@ class CoursesService {
      *     tags: [Lessons]
      */
     async addLessonToModule(moduleId, data) {
-        return prisma_1.prisma.lesson.create({ data });
+        // Store moduleId in content JSON since Lesson model doesn't have moduleId field
+        const content = data.content || {};
+        content.moduleId = moduleId;
+        return prisma_1.prisma.lesson.create({
+            data: {
+                ...data,
+                content: content,
+            }
+        });
     }
     /**
      * @swagger

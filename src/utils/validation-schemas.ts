@@ -84,11 +84,11 @@ export const createEnrollmentSchema = z.object({
 
 // Module schemas
 export const createModuleSchema = z.object({
-  courseId: z.string().min(1),
   title: z.string().min(1).max(200),
   description: z.string().max(5000).optional(),
   order: z.number().int().min(0),
   createdBy: z.string().min(1),
+  // courseId comes from URL params, not body
 });
 
 // Quiz schemas

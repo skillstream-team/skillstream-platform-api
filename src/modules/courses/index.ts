@@ -46,7 +46,20 @@ import { calendarSchema } from './routes/graphql/calendar.resolver';
 
 export function registerCoursesModule(app: express.Application) {
   // REST routes
+  // Register main courses router FIRST to handle base routes like POST /, GET /, etc.
+  // This ensures POST /api/courses matches before parameterized routes
   app.use('/api/courses', restCoursesRoutes);
+  
+  // Register specific course sub-routes AFTER the main router
+  // These have parameterized routes like /:courseId/tags which won't conflict
+  app.use('/api/courses/wishlist', wishlistRoutes);
+  app.use('/api/courses', prerequisitesRoutes);
+  app.use('/api/courses', tagsRoutes); // Course-specific tag routes
+  app.use('/api/courses', instructorQARoutes);
+  app.use('/api/courses', shareRoutes);
+  app.use('/api/courses', comparisonRoutes);
+  app.use('/api/courses', courseImportRoutes);
+  
   app.use('/api', progressRoutes);
   app.use('/api', announcementsRoutes);
   app.use('/api', recommendationsUserRoutes);
@@ -70,19 +83,12 @@ export function registerCoursesModule(app: express.Application) {
   app.use('/api', collaborationRoutes);
   app.use('/api', teacherEarningsRoutes);
   app.use('/api/categories', categoriesRoutes);
-  app.use('/api/courses/wishlist', wishlistRoutes);
-  app.use('/api/courses', prerequisitesRoutes);
   app.use('/api/dashboard', dashboardRoutes);
   app.use('/api/bundles', bundlesRoutes);
   app.use('/api/coupons', couponsRoutes);
   app.use('/api/learning-paths', learningPathsRoutes);
-  app.use('/api/courses', tagsRoutes); // Course-specific tag routes
   app.use('/api/tags', tagsPlatformRoutes); // Platform-wide tag routes
-  app.use('/api/courses', instructorQARoutes);
   app.use('/api/referrals', referralRoutes);
-  app.use('/api/courses', shareRoutes);
-  app.use('/api/courses', comparisonRoutes);
-  app.use('/api/courses', courseImportRoutes);
   app.use('/api', lessonPaymentRoutes);
 
   // GraphQL endpoints

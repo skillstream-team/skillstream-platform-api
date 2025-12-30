@@ -68,7 +68,8 @@ router.post('/',
       const course = await service.createCourse(req.body);
       res.json(course);
     } catch (err) {
-      res.status(400).json({ error: (err as Error).message });
+      const error = err as Error;
+      res.status(400).json({ error: error.message });
     }
   }
 );

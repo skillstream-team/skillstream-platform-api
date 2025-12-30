@@ -5,6 +5,7 @@ services:
   - type: web
     name: skillstream-api
     env: node
+    nodeVersion: 20
     plan: starter
     buildCommand: npm install && npm run build
     startCommand: npm start

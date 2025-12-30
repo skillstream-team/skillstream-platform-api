@@ -2,12 +2,16 @@
   "name": "skillstream-platform-api",
   "version": "1.0.0",
   "main": "index.js",
+  "engines": {
+    "node": ">=20.0.0",
+    "npm": ">=10.0.0"
+  },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "node dist/server.js",
     "build": "tsc && npx prisma generate",
     "dev": "ts-node-dev --respawn --transpile-only src/server.ts",
-    "postinstall": "npx prisma generate"
+    "postinstall": "npx prisma generate || echo 'Warning: Prisma generate failed in postinstall, will retry in build step'"
   },
   "keywords": [],
   "author": "",

@@ -665,9 +665,14 @@ export class CoursesService {
         isPublished?: boolean;
         createdBy: string;
     }) {
-        return prisma.courseModule.create({
+        const module = await prisma.courseModule.create({
             data: { ...data, courseId, content: data.content ?? {}, description: data.description ?? '' },
         });
+        
+        // Invalidate course cache to ensure fresh data on next fetch
+        await deleteCache(cacheKeys.course(courseId));
+        
+        return module;
     }
 
     /**
@@ -754,7 +759,12 @@ export class CoursesService {
                 if (!moduleMap.has(moduleId)) {
                     moduleMap.set(moduleId, []);
                 }
-                moduleMap.get(moduleId)!.push(lesson);
+                // Extract description from content if it exists (since Lesson model doesn't have description field)
+                const lessonWithDescription = {
+                    ...lesson,
+                    description: content?.description || '',
+                };
+                moduleMap.get(moduleId)!.push(lessonWithDescription);
             }
         });
 
@@ -804,16 +814,27 @@ export class CoursesService {
         duration?: number;
         isPreview?: boolean;
     }) {
-        // Store moduleId in content JSON since Lesson model doesn't have moduleId field
+        // Store moduleId and description in content JSON since Lesson model doesn't have these fields
         const content = (data.content as any) || {};
         content.moduleId = moduleId;
+        if (data.description) {
+            content.description = data.description;
+        }
         
-        return prisma.lesson.create({ 
+        // Remove description from data since it's not a field in the Lesson model
+        const { description, ...lessonData } = data;
+        
+        const lesson = await prisma.lesson.create({ 
             data: {
-                ...data,
+                ...lessonData,
                 content: content as Prisma.InputJsonValue,
             }
         });
+        
+        // Invalidate course cache to ensure fresh data on next fetch
+        await deleteCache(cacheKeys.course(data.courseId));
+        
+        return lesson;
     }
 
     /**

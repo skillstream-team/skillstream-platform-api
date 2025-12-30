@@ -587,9 +587,12 @@ class CoursesService {
      *     tags: [Modules]
      */
     async addModuleToCourse(courseId, data) {
-        return prisma_1.prisma.courseModule.create({
+        const module = await prisma_1.prisma.courseModule.create({
             data: { ...data, courseId, content: data.content ?? {}, description: data.description ?? '' },
         });
+        // Invalidate course cache to ensure fresh data on next fetch
+        await (0, cache_1.deleteCache)(cache_1.cacheKeys.course(courseId));
+        return module;
     }
     /**
      * @swagger
@@ -669,7 +672,12 @@ class CoursesService {
                 if (!moduleMap.has(moduleId)) {
                     moduleMap.set(moduleId, []);
                 }
-                moduleMap.get(moduleId).push(lesson);
+                // Extract description from content if it exists (since Lesson model doesn't have description field)
+                const lessonWithDescription = {
+                    ...lesson,
+                    description: content?.description || '',
+                };
+                moduleMap.get(moduleId).push(lessonWithDescription);
             }
         });
         return modules.map(module => ({
@@ -704,15 +712,23 @@ class CoursesService {
      *     tags: [Lessons]
      */
     async addLessonToModule(moduleId, data) {
-        // Store moduleId in content JSON since Lesson model doesn't have moduleId field
+        // Store moduleId and description in content JSON since Lesson model doesn't have these fields
         const content = data.content || {};
         content.moduleId = moduleId;
-        return prisma_1.prisma.lesson.create({
+        if (data.description) {
+            content.description = data.description;
+        }
+        // Remove description from data since it's not a field in the Lesson model
+        const { description, ...lessonData } = data;
+        const lesson = await prisma_1.prisma.lesson.create({
             data: {
-                ...data,
+                ...lessonData,
                 content: content,
             }
         });
+        // Invalidate course cache to ensure fresh data on next fetch
+        await (0, cache_1.deleteCache)(cache_1.cacheKeys.course(data.courseId));
+        return lesson;
     }
     /**
      * @swagger

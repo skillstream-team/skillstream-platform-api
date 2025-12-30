@@ -289,7 +289,12 @@ router.put('/:id/modules/:moduleId', auth_1.requireAuth, (0, roles_1.requireRole
  */
 router.post('/:id/modules/:moduleId/lessons', auth_1.requireAuth, (0, roles_1.requireRole)('TEACHER'), async (req, res) => {
     try {
-        const lesson = await service.addLessonToModule(req.params.moduleId, req.body);
+        // Add courseId from route params to the request body
+        const lessonData = {
+            ...req.body,
+            courseId: req.params.id,
+        };
+        const lesson = await service.addLessonToModule(req.params.moduleId, lessonData);
         res.json(lesson);
     }
     catch (err) {

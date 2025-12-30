@@ -313,7 +313,12 @@ router.post('/:id/modules/:moduleId/lessons',
   requireRole('TEACHER'), 
   async (req,res) => {
     try{
-        const lesson = await service.addLessonToModule(req.params.moduleId, req.body);
+        // Add courseId from route params to the request body
+        const lessonData = {
+            ...req.body,
+            courseId: req.params.id,
+        };
+        const lesson = await service.addLessonToModule(req.params.moduleId, lessonData);
         res.json(lesson);
     }catch(err){
         res.status(400).json({ error: (err as Error).message });

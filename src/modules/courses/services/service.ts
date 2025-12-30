@@ -679,8 +679,11 @@ export class CoursesService {
             },
         });
         
-        // Invalidate course cache to ensure fresh data on next fetch
-        await deleteCache(cacheKeys.course(courseId));
+        // Invalidate both course and modules cache
+        await Promise.all([
+            deleteCache(cacheKeys.course(courseId)),
+            deleteCache(cacheKeys.courseModules(courseId))
+        ]);
         
         return module;
     }
@@ -719,36 +722,51 @@ export class CoursesService {
      * Get all modules with lessons for a course
      */
     async getCourseModulesWithLessons(courseId: string) {
-        const modules = await prisma.courseModule.findMany({
-            where: { courseId },
-            include: {
-                quizzes: {
-                    include: {
-                        creator: {
-                            select: { id: true, username: true, email: true }
-                        }
-                    }
-                }
-            },
-            orderBy: { order: 'asc' },
-        });
+        // Check cache first
+        const cacheKey = cacheKeys.courseModules(courseId);
+        const cached = await getCache(cacheKey);
+        if (cached) {
+            return cached;
+        }
 
-        const lessons = await prisma.lesson.findMany({
-            where: { courseId },
-            include: {
-                quizzes: {
-                    include: {
-                        creator: {
-                            select: { id: true, username: true, email: true }
-                        }
-                    }
-                }
-            },
-            orderBy: { order: 'asc' },
-        });
+        // Fetch modules and lessons in parallel with minimal data
+        const [modules, lessons] = await Promise.all([
+            prisma.courseModule.findMany({
+                where: { courseId },
+                select: {
+                    id: true,
+                    courseId: true,
+                    title: true,
+                    description: true,
+                    order: true,
+                    isPublished: true,
+                    publishedAt: true,
+                    createdBy: true,
+                    createdAt: true,
+                    updatedAt: true,
+                    // Don't include quizzes for builder - they're not needed
+                },
+                orderBy: { order: 'asc' },
+            }),
+            prisma.lesson.findMany({
+                where: { courseId },
+                select: {
+                    id: true,
+                    courseId: true,
+                    title: true,
+                    content: true,
+                    order: true,
+                    duration: true,
+                    isPreview: true,
+                    createdAt: true,
+                    updatedAt: true,
+                    // Don't include quizzes for builder - they're not needed
+                },
+                orderBy: { order: 'asc' },
+            }),
+        ]);
 
         // Group lessons by moduleId stored in content JSON
-        // If moduleId is not in content, we'll need to handle it differently
         const moduleMap = new Map<string, any[]>();
         
         lessons.forEach(lesson => {
@@ -758,19 +776,26 @@ export class CoursesService {
                 if (!moduleMap.has(moduleId)) {
                     moduleMap.set(moduleId, []);
                 }
-                // Extract description from content if it exists (since Lesson model doesn't have description field)
+                // Extract description from content if it exists
                 const lessonWithDescription = {
                     ...lesson,
                     description: content?.description || '',
+                    moduleId: moduleId,
+                    quizzes: [], // Empty array for builder view
                 };
                 moduleMap.get(moduleId)!.push(lessonWithDescription);
             }
         });
 
-        return modules.map(module => ({
+        const result = modules.map(module => ({
             ...module,
             lessons: moduleMap.get(module.id) || []
         }));
+
+        // Cache the result
+        await setCache(cacheKey, result, CACHE_TTL.SHORT);
+        
+        return result;
     }
 
     /**
@@ -791,7 +816,11 @@ export class CoursesService {
             where: { id: moduleId },
             data,
         });
-        await deleteCache(cacheKeys.course(courseId));
+        // Invalidate both course and modules cache
+        await Promise.all([
+            deleteCache(cacheKeys.course(courseId)),
+            deleteCache(cacheKeys.courseModules(courseId))
+        ]);
         return updated;
     }
 
@@ -828,8 +857,11 @@ export class CoursesService {
         // Delete the module
         await prisma.courseModule.delete({ where: { id: moduleId } });
         
-        // Invalidate cache
-        await deleteCache(cacheKeys.course(module.courseId));
+        // Invalidate both course and modules cache
+        await Promise.all([
+            deleteCache(cacheKeys.course(module.courseId)),
+            deleteCache(cacheKeys.courseModules(module.courseId))
+        ]);
     }
 
     // ============================================================
@@ -880,8 +912,11 @@ export class CoursesService {
             data: lessonData
         });
         
-        // Invalidate course cache to ensure fresh data on next fetch
-        await deleteCache(cacheKeys.course(data.courseId));
+        // Invalidate both course and modules cache
+        await Promise.all([
+            deleteCache(cacheKeys.course(data.courseId)),
+            deleteCache(cacheKeys.courseModules(data.courseId))
+        ]);
         
         // Extract description from content for the response
         const lessonContent = lesson.content as any;
@@ -898,8 +933,16 @@ export class CoursesService {
      *     summary: Update lesson details
      *     tags: [Lessons]
      */
-    async updateLesson(lessonId: string, data: Partial<{ title: string; content: Prisma.InputJsonValue; order: number }>) {
-        return prisma.lesson.update({ where: { id: lessonId }, data });
+    async updateLesson(lessonId: string, data: Partial<{ title: string; content: Prisma.InputJsonValue; order: number; duration: number; isPreview: boolean }>) {
+        const lesson = await prisma.lesson.update({ where: { id: lessonId }, data });
+        
+        // Invalidate both course and modules cache
+        await Promise.all([
+            deleteCache(cacheKeys.course(lesson.courseId)),
+            deleteCache(cacheKeys.courseModules(lesson.courseId))
+        ]);
+        
+        return lesson;
     }
 
     /**
@@ -910,7 +953,23 @@ export class CoursesService {
      *     tags: [Lessons]
      */
     async deleteLesson(lessonId: string) {
-        return prisma.lesson.delete({ where: { id: lessonId } });
+        // Get lesson to find courseId for cache invalidation
+        const lesson = await prisma.lesson.findUnique({
+            where: { id: lessonId },
+            select: { courseId: true },
+        });
+        
+        const deletedLesson = await prisma.lesson.delete({ where: { id: lessonId } });
+        
+        // Invalidate both course and modules cache
+        if (lesson) {
+            await Promise.all([
+                deleteCache(cacheKeys.course(lesson.courseId)),
+                deleteCache(cacheKeys.courseModules(lesson.courseId))
+            ]);
+        }
+        
+        return deletedLesson;
     }
 
     // ============================================================

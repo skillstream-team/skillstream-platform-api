@@ -81,6 +81,7 @@ async function deleteCachePattern(pattern) {
  */
 exports.cacheKeys = {
     course: (id) => `course:${id}`,
+    courseModules: (courseId) => `course:${courseId}:modules`,
     courseList: (page, limit, filters) => {
         const filterParts = [];
         if (filters?.instructorId)

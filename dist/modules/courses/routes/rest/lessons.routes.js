@@ -39,7 +39,9 @@ const roles_1 = require("../../../../middleware/roles");
 const subscription_1 = require("../../../../middleware/subscription");
 const prisma_1 = require("../../../../utils/prisma");
 const email_service_1 = require("../../../users/services/email.service");
+const service_1 = require("../../services/service");
 const router = (0, express_1.Router)();
+const service = new service_1.CoursesService();
 /**
  * @swagger
  * /api/lessons/quick:
@@ -301,6 +303,61 @@ router.get('/lessons', auth_1.requireAuth, subscription_1.requireSubscription, a
     catch (error) {
         console.error('Error fetching lessons:', error);
         res.status(500).json({ error: 'Failed to fetch lessons' });
+    }
+});
+/**
+ * @swagger
+ * /api/lessons/{id}:
+ *   put:
+ *     summary: Update a lesson
+ *     tags: [Lessons]
+ */
+router.put('/lessons/:id', auth_1.requireAuth, (0, roles_1.requireRole)('TEACHER'), async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { title, description, order, duration, isPreview, moduleId } = req.body;
+        // Get lesson to find courseId for cache invalidation
+        const existingLesson = await prisma_1.prisma.lesson.findUnique({
+            where: { id },
+            select: { courseId: true, content: true },
+        });
+        if (!existingLesson) {
+            return res.status(404).json({ error: 'Lesson not found' });
+        }
+        // Build update data
+        const updateData = {};
+        if (title !== undefined)
+            updateData.title = title;
+        if (order !== undefined)
+            updateData.order = order;
+        if (duration !== undefined)
+            updateData.duration = duration;
+        if (isPreview !== undefined)
+            updateData.isPreview = isPreview;
+        // Handle content JSON (description and moduleId)
+        const existingContent = existingLesson.content || {};
+        const contentUpdate = { ...existingContent };
+        if (description !== undefined)
+            contentUpdate.description = description;
+        if (moduleId !== undefined)
+            contentUpdate.moduleId = moduleId;
+        updateData.content = contentUpdate;
+        // Update lesson using service
+        const updatedLesson = await service.updateLesson(id, updateData);
+        // Invalidate cache
+        const { deleteCache, cacheKeys } = await Promise.resolve().then(() => __importStar(require('../../../../utils/cache')));
+        await deleteCache(cacheKeys.course(existingLesson.courseId));
+        // Extract description and moduleId from content for response
+        const content = updatedLesson.content;
+        res.json({
+            ...updatedLesson,
+            description: content?.description || '',
+            moduleId: content?.moduleId || '',
+        });
+    }
+    catch (error) {
+        console.error('Error updating lesson:', error);
+        res.status(500).json({ error: 'Failed to update lesson' });
     }
 });
 /**

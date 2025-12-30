@@ -73,6 +73,7 @@ export async function deleteCachePattern(pattern: string): Promise<void> {
  */
 export const cacheKeys = {
   course: (id: string) => `course:${id}`,
+  courseModules: (courseId: string) => `course:${courseId}:modules`,
   courseList: (page: number, limit: number, filters?: {
     instructorId?: string;
     categoryId?: string;

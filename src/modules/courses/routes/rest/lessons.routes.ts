@@ -4,8 +4,10 @@ import { requireRole } from '../../../../middleware/roles';
 import { requireSubscription } from '../../../../middleware/subscription';
 import { prisma } from '../../../../utils/prisma';
 import { emailService } from '../../../users/services/email.service';
+import { CoursesService } from '../../services/service';
 
 const router = Router();
+const service = new CoursesService();
 
 /**
  * @swagger
@@ -302,6 +304,62 @@ router.get('/lessons', requireAuth, requireSubscription, async (req, res) => {
   } catch (error) {
     console.error('Error fetching lessons:', error);
     res.status(500).json({ error: 'Failed to fetch lessons' });
+  }
+});
+
+/**
+ * @swagger
+ * /api/lessons/{id}:
+ *   put:
+ *     summary: Update a lesson
+ *     tags: [Lessons]
+ */
+router.put('/lessons/:id', requireAuth, requireRole('TEACHER'), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { title, description, order, duration, isPreview, moduleId } = req.body;
+    
+    // Get lesson to find courseId for cache invalidation
+    const existingLesson = await prisma.lesson.findUnique({
+      where: { id },
+      select: { courseId: true, content: true },
+    });
+
+    if (!existingLesson) {
+      return res.status(404).json({ error: 'Lesson not found' });
+    }
+
+    // Build update data
+    const updateData: any = {};
+    if (title !== undefined) updateData.title = title;
+    if (order !== undefined) updateData.order = order;
+    if (duration !== undefined) updateData.duration = duration;
+    if (isPreview !== undefined) updateData.isPreview = isPreview;
+
+    // Handle content JSON (description and moduleId)
+    const existingContent = (existingLesson.content as any) || {};
+    const contentUpdate: any = { ...existingContent };
+    if (description !== undefined) contentUpdate.description = description;
+    if (moduleId !== undefined) contentUpdate.moduleId = moduleId;
+    updateData.content = contentUpdate;
+
+    // Update lesson using service
+    const updatedLesson = await service.updateLesson(id, updateData);
+
+    // Invalidate cache
+    const { deleteCache, cacheKeys } = await import('../../../../utils/cache');
+    await deleteCache(cacheKeys.course(existingLesson.courseId));
+
+    // Extract description and moduleId from content for response
+    const content = updatedLesson.content as any;
+    res.json({
+      ...updatedLesson,
+      description: content?.description || '',
+      moduleId: content?.moduleId || '',
+    });
+  } catch (error) {
+    console.error('Error updating lesson:', error);
+    res.status(500).json({ error: 'Failed to update lesson' });
   }
 });
 

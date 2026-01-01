@@ -7,6 +7,7 @@ import { generateToken, JWTPayload } from '../../../utils/jwt';
 import { emailService } from './email.service';
 import { getCache, setCache, deleteCachePattern, cacheKeys, CACHE_TTL } from '../../../utils/cache';
 import { ReferralService } from '../../courses/services/referral.service';
+import { getAuth } from '../../../utils/firebase';
 
 const JWT_SECRET = process.env.JWT_SECRET as string;
 if (!JWT_SECRET) {
@@ -873,6 +874,132 @@ export class UsersService {
       });
     } catch (error) {
       throw new Error('Error updating user roles: ' + (error as Error).message);
+    }
+  }
+
+  /**
+   * Sync Firebase user with backend database
+   * Creates or updates user record with firebaseUid
+   * This is called when a user authenticates via Firebase
+   */
+  async syncFirebaseUser(data: {
+    firebaseUid: string;
+    firebaseToken: string;
+    email: string;
+    displayName?: string | null;
+    photoURL?: string | null;
+    emailVerified?: boolean;
+    username?: string;
+    firstName?: string;
+    lastName?: string;
+    role?: 'STUDENT' | 'TEACHER';
+    provider?: string;
+    referralCode?: string;
+  }) {
+    try {
+      // Verify Firebase token
+      const auth = getAuth();
+      const decodedToken = await auth.verifyIdToken(data.firebaseToken);
+
+      // Check if user exists by firebaseUid
+      let user = await prisma.user.findUnique({
+        where: { firebaseUid: data.firebaseUid },
+      });
+
+      if (user) {
+        // Update existing user
+        user = await prisma.user.update({
+          where: { id: user.id },
+          data: {
+            email: data.email,
+            emailVerified: data.emailVerified || false,
+            avatar: data.photoURL || user.avatar,
+            firstName: data.firstName || user.firstName,
+            lastName: data.lastName || user.lastName,
+            provider: data.provider || user.provider,
+            providerId: data.firebaseUid,
+            providerEmail: data.email,
+          },
+        });
+      } else {
+        // Check if user exists by email
+        const existingUser = await prisma.user.findUnique({
+          where: { email: data.email },
+        });
+
+        if (existingUser) {
+          // Link Firebase UID to existing user
+          user = await prisma.user.update({
+            where: { id: existingUser.id },
+            data: {
+              firebaseUid: data.firebaseUid,
+              provider: data.provider || existingUser.provider,
+              providerId: data.firebaseUid,
+              providerEmail: data.email,
+              avatar: data.photoURL || existingUser.avatar,
+            },
+          });
+        } else {
+          // Create new user
+          // Generate username from email if not provided
+          const username = data.username || data.email.split('@')[0] + '_' + Date.now();
+          
+          // Check username uniqueness
+          let finalUsername = username;
+          let counter = 1;
+          while (await prisma.user.findUnique({ where: { username: finalUsername } })) {
+            finalUsername = `${username}_${counter}`;
+            counter++;
+          }
+
+          user = await prisma.user.create({
+            data: {
+              firebaseUid: data.firebaseUid,
+              email: data.email,
+              username: finalUsername,
+              role: data.role || 'STUDENT',
+              firstName: data.firstName || data.displayName?.split(' ')[0] || null,
+              lastName: data.lastName || data.displayName?.split(' ').slice(1).join(' ') || null,
+              avatar: data.photoURL || null,
+              isVerified: data.emailVerified || false,
+              provider: data.provider || 'firebase',
+              providerId: data.firebaseUid,
+              providerEmail: data.email,
+              password: null, // No password for Firebase users
+            },
+          });
+
+          // Create default settings for new user (same as regular registration)
+          try {
+            const { SettingsService } = await import('./settings.service');
+            const settingsService = new SettingsService();
+            await settingsService.createDefaultSettings(user.id);
+          } catch (error) {
+            console.error('Error creating default settings:', error);
+            // Don't fail user creation if settings creation fails
+          }
+
+          // Apply referral code if provided (only for new users)
+          if (data.referralCode) {
+            try {
+              const referralService = new ReferralService();
+              await referralService.applyReferralCode(data.referralCode, user.id);
+            } catch (referralError) {
+              console.warn('Failed to apply referral code:', referralError);
+              // Don't fail user creation if referral fails
+            }
+          }
+        }
+      }
+
+      // Generate JWT token for backend
+      const { password: _, ...userWithoutPassword } = user;
+      const token = generateToken({ id: user.id, role: user.role });
+
+      return { token, user: userWithoutPassword };
+    } catch (error) {
+      console.error('Firebase sync error:', error);
+      throw new Error('Error syncing Firebase user: ' + (error as Error).message);
     }
   }
 }

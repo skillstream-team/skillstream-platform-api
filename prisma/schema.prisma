@@ -21,6 +21,11 @@ model User {
   providerId    String? // OAuth provider user ID
   providerEmail String? // Email from OAuth provider
 
+  // Firebase integration
+  // Note: firebaseUid has a sparse unique index created manually in MongoDB
+  // This allows multiple null values while ensuring uniqueness for non-null values
+  firebaseUid   String? // Firebase Authentication UID for realtime features
+
   // Profile fields
   firstName String?
   lastName  String?

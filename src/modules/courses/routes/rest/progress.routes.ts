@@ -286,5 +286,148 @@ router.get('/courses/:courseId/progress', requireAuth, requireSubscription, asyn
   }
 });
 
+/**
+ * @swagger
+ * /api/progress/sync-milestone:
+ *   post:
+ *     summary: Sync progress milestone from Firestore to database
+ *     description: Called when a user reaches a progress milestone (25%, 50%, 75%, 100%)
+ *       This endpoint persists the milestone to the database for reporting and analytics
+ *     tags: [Progress]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - courseId
+ *               - lessonId
+ *               - progressPercent
+ *             properties:
+ *               courseId:
+ *                 type: string
+ *               lessonId:
+ *                 type: string
+ *               videoId:
+ *                 type: string
+ *               progressPercent:
+ *                 type: number
+ *                 minimum: 0
+ *                 maximum: 100
+ *               currentTime:
+ *                 type: number
+ *     responses:
+ *       200:
+ *         description: Milestone synced successfully
+ *       400:
+ *         description: Invalid request
+ */
+router.post('/sync-milestone', requireAuth, async (req, res) => {
+  try {
+    const userId = (req as any).user?.id;
+    if (!userId) {
+      return res.status(401).json({ error: 'User not authenticated' });
+    }
+
+    const { courseId, lessonId, videoId, progressPercent, currentTime } = req.body;
+
+    if (!courseId || !lessonId || progressPercent === undefined) {
+      return res.status(400).json({ error: 'Missing required fields: courseId, lessonId, progressPercent' });
+    }
+
+    // Determine status based on progress
+    let status: 'not_started' | 'in_progress' | 'completed' = 'in_progress';
+    if (progressPercent >= 100) {
+      status = 'completed';
+    } else if (progressPercent > 0) {
+      status = 'in_progress';
+    } else {
+      status = 'not_started';
+    }
+
+    // Update or create progress record
+    const progress = await prisma.progress.upsert({
+      where: {
+        studentId_courseId_type_itemId: {
+          studentId: userId,
+          courseId,
+          type: 'video',
+          itemId: lessonId,
+        },
+      },
+      update: {
+        progress: Math.min(progressPercent, 100),
+        status,
+        lastAccessed: new Date(),
+        completedAt: status === 'completed' ? new Date() : undefined,
+        // Update timeSpent if currentTime is provided
+        ...(currentTime && {
+          timeSpent: {
+            increment: Math.floor(currentTime / 60), // Convert seconds to minutes
+          },
+        }),
+      },
+      create: {
+        studentId: userId,
+        courseId,
+        type: 'video',
+        itemId: lessonId,
+        progress: Math.min(progressPercent, 100),
+        status,
+        lastAccessed: new Date(),
+        completedAt: status === 'completed' ? new Date() : null,
+        timeSpent: currentTime ? Math.floor(currentTime / 60) : 0,
+      },
+    });
+
+    // If video progress, also update video-specific progress
+    if (videoId) {
+      try {
+        await prisma.progress.upsert({
+          where: {
+            studentId_courseId_type_itemId: {
+              studentId: userId,
+              courseId,
+              type: 'video',
+              itemId: videoId,
+            },
+          },
+          update: {
+            progress: Math.min(progressPercent, 100),
+            status,
+            lastAccessed: new Date(),
+            completedAt: status === 'completed' ? new Date() : undefined,
+          },
+          create: {
+            studentId: userId,
+            courseId,
+            type: 'video',
+            itemId: videoId,
+            progress: Math.min(progressPercent, 100),
+            status,
+            lastAccessed: new Date(),
+            completedAt: status === 'completed' ? new Date() : null,
+            timeSpent: currentTime ? Math.floor(currentTime / 60) : 0,
+          },
+        });
+      } catch (error) {
+        // Video progress update is optional, log but don't fail
+        console.warn('Failed to update video-specific progress:', error);
+      }
+    }
+
+    res.json({
+      success: true,
+      data: progress,
+    });
+  } catch (error) {
+    console.error('Error syncing progress milestone:', error);
+    res.status(500).json({
+      error: 'Failed to sync progress milestone',
+    });
+  }
+});
+
 export default router;
 

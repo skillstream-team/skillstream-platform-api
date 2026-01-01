@@ -248,7 +248,7 @@ async function startKafka() {
         await consumer.subscribe({ topic: "notification.send", fromBeginning: false });
 
         await consumer.run({
-            eachMessage: async ({ message }) => {
+            eachMessage: async ({ message }: { message: { value: Buffer | null; key?: Buffer | null } }) => {
                 if (!message.value) return;
                 try {
                     const notif = JSON.parse(message.value.toString());

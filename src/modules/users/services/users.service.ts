@@ -901,8 +901,8 @@ export class UsersService {
       const auth = getAuth();
       const decodedToken = await auth.verifyIdToken(data.firebaseToken);
 
-      // Check if user exists by firebaseUid
-      let user = await prisma.user.findUnique({
+      // Check if user exists by firebaseUid (using findFirst since firebaseUid is not @unique in schema)
+      let user = await prisma.user.findFirst({
         where: { firebaseUid: data.firebaseUid },
       });
 
@@ -912,7 +912,7 @@ export class UsersService {
           where: { id: user.id },
           data: {
             email: data.email,
-            emailVerified: data.emailVerified || false,
+            isVerified: data.emailVerified || false,
             avatar: data.photoURL || user.avatar,
             firstName: data.firstName || user.firstName,
             lastName: data.lastName || user.lastName,

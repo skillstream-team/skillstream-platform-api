@@ -41,8 +41,8 @@ export const verifyFirebaseToken = async (
       const auth = getAuth();
       const decodedToken = await auth.verifyIdToken(token);
       
-      // Find user by firebaseUid
-      const user = await prisma.user.findUnique({
+      // Find user by firebaseUid (using findFirst since firebaseUid is not @unique in schema)
+      const user = await prisma.user.findFirst({
         where: { firebaseUid: decodedToken.uid },
         select: {
           id: true,

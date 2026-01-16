@@ -58,7 +58,7 @@ const enrollmentService = new EnrollmentService();
  *       401:
  *         description: Unauthorized
  */
-router.get('/', requireAuth, requireSubscription, async (req, res) => {
+router.get('/', requireAuth, async (req, res) => {
   try {
     const user = (req as any).user;
     const page = parseInt(req.query.page as string) || 1;
@@ -187,7 +187,7 @@ router.get('/', requireAuth, requireSubscription, async (req, res) => {
  *       404:
  *         description: Enrollment not found
  */
-router.get('/:id', requireAuth, requireSubscription, async (req, res) => {
+router.get('/:id', requireAuth, async (req, res) => {
   try {
     const user = (req as any).user;
     const enrollmentId = req.params.id;
@@ -395,7 +395,7 @@ router.post('/', requireAuth, requireSubscription, async (req, res) => {
  *       404:
  *         description: Enrollment not found
  */
-router.delete('/:id', requireAuth, requireSubscription, async (req, res) => {
+router.delete('/:id', requireAuth, async (req, res) => {
   try {
     const user = (req as any).user;
     const enrollmentId = req.params.id;

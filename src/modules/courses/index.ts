@@ -2,6 +2,7 @@ import express from 'express';
 import { graphqlHTTP } from 'express-graphql';
 import restCoursesRoutes from './routes/rest/courses.routes';
 import progressRoutes from './routes/rest/progress.routes';
+import enrollmentsRoutes from './routes/rest/enrollments.routes';
 import announcementsRoutes from './routes/rest/announcements.routes';
 import recommendationsUserRoutes from './routes/rest/recommendations-user.routes';
 import bookingsRoutes from './routes/rest/bookings.routes';
@@ -61,6 +62,7 @@ export function registerCoursesModule(app: express.Application) {
   app.use('/api/courses', courseImportRoutes);
   
   app.use('/api', progressRoutes);
+  app.use('/api/enrollments', enrollmentsRoutes);
   app.use('/api', announcementsRoutes);
   app.use('/api', recommendationsUserRoutes);
   app.use('/api', bookingsRoutes);

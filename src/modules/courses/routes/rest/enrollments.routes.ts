@@ -81,48 +81,48 @@ router.get('/', requireAuth, requireSubscription, async (req, res) => {
     const skip = (page - 1) * limit;
     const take = limit;
 
+    const include = {
+      course: {
+        select: {
+          id: true,
+          title: true,
+          description: true,
+          price: true,
+          thumbnailUrl: true,
+          duration: true,
+          difficulty: true,
+          categoryId: true,
+          language: true,
+          instructorId: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      },
+      student: {
+        select: {
+          id: true,
+          username: true,
+          email: true,
+        },
+      },
+      payment: {
+        select: {
+          id: true,
+          amount: true,
+          currency: true,
+          status: true,
+          provider: true,
+          transactionId: true,
+        },
+      },
+    } as const;
+
     const [enrollments, total] = await Promise.all([
       prisma.enrollment.findMany({
         where,
         skip,
         take,
-        include: {
-          course: {
-            select: {
-              id: true,
-              title: true,
-              description: true,
-              price: true,
-              thumbnailUrl: true,
-              duration: true,
-              difficulty: true,
-              rating: true,
-              enrolledCount: true,
-              categoryId: true,
-              language: true,
-              instructorId: true,
-              createdAt: true,
-              updatedAt: true,
-            },
-          },
-          student: {
-            select: {
-              id: true,
-              username: true,
-              email: true,
-            },
-          },
-          payment: {
-            select: {
-              id: true,
-              amount: true,
-              currency: true,
-              status: true,
-              provider: true,
-              transactionId: true,
-            },
-          },
-        },
+        include,
         orderBy: { createdAt: 'desc' },
       }),
       prisma.enrollment.count({ where }),
@@ -192,41 +192,45 @@ router.get('/:id', requireAuth, requireSubscription, async (req, res) => {
     const user = (req as any).user;
     const enrollmentId = req.params.id;
 
-    const enrollment = await prisma.enrollment.findUnique({
-      where: { id: enrollmentId },
-      include: {
-        course: {
-          select: {
-            id: true,
-            title: true,
-            description: true,
-            price: true,
-            thumbnailUrl: true,
-            duration: true,
-            difficulty: true,
-            rating: true,
-            enrolledCount: true,
-            createdAt: true,
-          },
-        },
-        student: {
-          select: {
-            id: true,
-            username: true,
-            email: true,
-          },
-        },
-        payment: {
-          select: {
-            id: true,
-            amount: true,
-            currency: true,
-            status: true,
-            provider: true,
-            transactionId: true,
-          },
+    const include = {
+      course: {
+        select: {
+          id: true,
+          title: true,
+          description: true,
+          price: true,
+          thumbnailUrl: true,
+          duration: true,
+          difficulty: true,
+          categoryId: true,
+          language: true,
+          instructorId: true,
+          createdAt: true,
+          updatedAt: true,
         },
       },
+      student: {
+        select: {
+          id: true,
+          username: true,
+          email: true,
+        },
+      },
+      payment: {
+        select: {
+          id: true,
+          amount: true,
+          currency: true,
+          status: true,
+          provider: true,
+          transactionId: true,
+        },
+      },
+    } as const;
+
+    const enrollment = await prisma.enrollment.findUnique({
+      where: { id: enrollmentId },
+      include,
     });
 
     if (!enrollment) {

@@ -47,13 +47,16 @@ import { calendarSchema } from './routes/graphql/calendar.resolver';
 
 export function registerCoursesModule(app: express.Application) {
   // REST routes
-  // Register main courses router FIRST to handle base routes like POST /, GET /, etc.
+  // Register specific routes BEFORE the main courses router to ensure they match first
+  // This prevents /api/courses/:id from matching routes like /api/courses/wishlist
+  app.use('/api/courses/wishlist', wishlistRoutes);
+  
+  // Register main courses router AFTER specific routes
   // This ensures POST /api/courses matches before parameterized routes
   app.use('/api/courses', restCoursesRoutes);
   
-  // Register specific course sub-routes AFTER the main router
+  // Register other specific course sub-routes AFTER the main router
   // These have parameterized routes like /:courseId/tags which won't conflict
-  app.use('/api/courses/wishlist', wishlistRoutes);
   app.use('/api/courses', prerequisitesRoutes);
   app.use('/api/courses', tagsRoutes); // Course-specific tag routes
   app.use('/api/courses', instructorQARoutes);

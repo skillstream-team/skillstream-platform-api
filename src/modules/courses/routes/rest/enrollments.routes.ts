@@ -32,7 +32,7 @@ const enrollmentService = new EnrollmentService();
  *           default: 20
  *           maximum: 100
  *       - in: query
- *         name: courseId
+ *         name: collectionId
  *         schema:
  *           type: string
  *         description: Filter by course ID
@@ -63,7 +63,7 @@ router.get('/', requireAuth, async (req, res) => {
     const user = (req as any).user;
     const page = parseInt(req.query.page as string) || 1;
     const limit = Math.min(parseInt(req.query.limit as string) || 20, 100);
-    const courseId = req.query.courseId as string | undefined;
+    const collectionId = req.query.collectionId as string | undefined;
     const studentIdParam = req.query.studentId as string | undefined;
 
     // Students can only see their own enrollments unless they're admin/teacher
@@ -74,15 +74,15 @@ router.get('/', requireAuth, async (req, res) => {
 
     // Build where clause
     const where: any = { studentId };
-    if (courseId) {
-      where.courseId = courseId;
+    if (collectionId) {
+      where.collectionId = collectionId;
     }
 
     const skip = (page - 1) * limit;
     const take = limit;
 
     const include = {
-      course: {
+      collection: {
         select: {
           id: true,
           title: true,
@@ -131,11 +131,11 @@ router.get('/', requireAuth, async (req, res) => {
     // Transform to match frontend expected format
     const formattedEnrollments = enrollments.map((enrollment) => ({
       id: enrollment.id,
-      courseId: enrollment.courseId,
+      collectionId: enrollment.collectionId,
       studentId: enrollment.studentId,
       paymentId: enrollment.paymentId,
       createdAt: enrollment.createdAt.toISOString(),
-      course: enrollment.course,
+      collection: enrollment.collection,
       student: enrollment.student,
       payment: enrollment.payment,
     }));
@@ -193,7 +193,7 @@ router.get('/:id', requireAuth, async (req, res) => {
     const enrollmentId = req.params.id;
 
     const include = {
-      course: {
+      collection: {
         select: {
           id: true,
           title: true,
@@ -244,11 +244,11 @@ router.get('/:id', requireAuth, async (req, res) => {
 
     const formattedEnrollment = {
       id: enrollment.id,
-      courseId: enrollment.courseId,
+      collectionId: enrollment.collectionId,
       studentId: enrollment.studentId,
       paymentId: enrollment.paymentId,
       createdAt: enrollment.createdAt.toISOString(),
-      course: enrollment.course,
+      collection: enrollment.collection,
       student: enrollment.student,
       payment: enrollment.payment,
     };
@@ -276,9 +276,9 @@ router.get('/:id', requireAuth, async (req, res) => {
  *           schema:
  *             type: object
  *             required:
- *               - courseId
+ *               - collectionId
  *             properties:
- *               courseId:
+ *               collectionId:
  *                 type: string
  *               paymentId:
  *                 type: string
@@ -297,39 +297,39 @@ router.get('/:id', requireAuth, async (req, res) => {
 router.post('/', requireAuth, requireSubscription, async (req, res) => {
   try {
     const user = (req as any).user;
-    const { courseId, paymentId } = req.body;
+    const { collectionId, paymentId } = req.body;
 
-    if (!courseId) {
-      return res.status(400).json({ error: 'courseId is required' });
+    if (!collectionId) {
+      return res.status(400).json({ error: 'collectionId is required' });
     }
 
-    // Get course to get price
-    const course = await prisma.course.findUnique({
-      where: { id: courseId },
+    // Get collection to get price
+    const collection = await prisma.collection.findUnique({
+      where: { id: collectionId },
       select: { id: true, title: true, price: true },
     });
 
-    if (!course) {
-      return res.status(404).json({ error: 'Course not found' });
+    if (!collection) {
+      return res.status(404).json({ error: 'Collection not found' });
     }
 
     // Check if already enrolled
     const existingEnrollment = await prisma.enrollment.findFirst({
       where: {
-        courseId,
+        collectionId,
         studentId: user.id,
       },
     });
 
     if (existingEnrollment) {
-      return res.status(400).json({ error: 'You are already enrolled in this course' });
+      return res.status(400).json({ error: 'You are already enrolled in this collection' });
     }
 
     // Create enrollment using the service
     const enrollmentData = {
-      courseId,
+      collectionId,
       studentId: user.id,
-      amount: course.price || 0,
+      amount: collection.price || 0,
       currency: 'USD',
       provider: 'internal',
       transactionId: paymentId,
@@ -340,11 +340,11 @@ router.post('/', requireAuth, requireSubscription, async (req, res) => {
     // Format response
     const formattedEnrollment = {
       id: enrollment.id,
-      courseId: enrollment.courseId,
+      collectionId: enrollment.collectionId,
       studentId: enrollment.studentId,
       paymentId: enrollment.paymentId,
       createdAt: enrollment.createdAt.toISOString(),
-      course: enrollment.course,
+      collection: enrollment.collection,
       student: enrollment.student,
       payment: enrollment.payment,
     };
@@ -356,7 +356,7 @@ router.post('/', requireAuth, requireSubscription, async (req, res) => {
                       error.message.includes('prerequisite') ||
                       error.message.includes('subscription')
                       ? 400 : 500;
-    res.status(statusCode).json({ error: error.message || 'Failed to enroll in course' });
+    res.status(statusCode).json({ error: error.message || 'Failed to enroll in collection' });
   }
 });
 
@@ -402,7 +402,7 @@ router.delete('/:id', requireAuth, async (req, res) => {
 
     const enrollment = await prisma.enrollment.findUnique({
       where: { id: enrollmentId },
-      select: { id: true, studentId: true, courseId: true },
+      select: { id: true, studentId: true, collectionId: true },
     });
 
     if (!enrollment) {

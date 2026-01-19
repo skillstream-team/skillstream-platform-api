@@ -47,22 +47,22 @@ import { calendarSchema } from './routes/graphql/calendar.resolver';
 
 export function registerCoursesModule(app: express.Application) {
   // REST routes
-  // Register specific routes BEFORE the main courses router to ensure they match first
-  // This prevents /api/courses/:id from matching routes like /api/courses/wishlist
-  app.use('/api/courses/wishlist', wishlistRoutes);
+  // Register specific routes BEFORE the main collections router to ensure they match first
+  // This prevents /api/collections/:id from matching routes like /api/collections/wishlist
+  app.use('/api/collections/wishlist', wishlistRoutes);
   
-  // Register main courses router AFTER specific routes
-  // This ensures POST /api/courses matches before parameterized routes
-  app.use('/api/courses', restCoursesRoutes);
+  // Register main collections router AFTER specific routes
+  // This ensures POST /api/collections matches before parameterized routes
+  app.use('/api/collections', restCoursesRoutes);
   
-  // Register other specific course sub-routes AFTER the main router
-  // These have parameterized routes like /:courseId/tags which won't conflict
-  app.use('/api/courses', prerequisitesRoutes);
-  app.use('/api/courses', tagsRoutes); // Course-specific tag routes
-  app.use('/api/courses', instructorQARoutes);
-  app.use('/api/courses', shareRoutes);
-  app.use('/api/courses', comparisonRoutes);
-  app.use('/api/courses', courseImportRoutes);
+  // Register other specific collection sub-routes AFTER the main router
+  // These have parameterized routes like /:collectionId/tags which won't conflict
+  app.use('/api/collections', prerequisitesRoutes);
+  app.use('/api/collections', tagsRoutes); // Collection-specific tag routes
+  app.use('/api/collections', instructorQARoutes);
+  app.use('/api/collections', shareRoutes);
+  app.use('/api/collections', comparisonRoutes);
+  app.use('/api/collections', courseImportRoutes);
   
   app.use('/api', progressRoutes);
   app.use('/api/enrollments', enrollmentsRoutes);
@@ -123,7 +123,7 @@ export function registerCoursesModule(app: express.Application) {
   }));
 }
 
-export { CoursesService } from './services/service';
+export { CollectionsService } from './services/service';
 export { EnrollmentService } from './services/enrollment.service';
 export { PaymentService } from './services/payment.service';
 export { MediaService } from './services/media.service';

@@ -72,9 +72,9 @@ export async function deleteCachePattern(pattern: string): Promise<void> {
  * Cache key generators
  */
 export const cacheKeys = {
-  course: (id: string) => `course:${id}`,
-  courseModules: (courseId: string) => `course:${courseId}:modules`,
-  courseList: (page: number, limit: number, filters?: {
+  collection: (id: string) => `collection:${id}`,
+  collectionModules: (collectionId: string) => `collection:${collectionId}:modules`,
+  collectionList: (page: number, limit: number, filters?: {
     instructorId?: string;
     categoryId?: string;
     difficulty?: string;
@@ -89,11 +89,11 @@ export const cacheKeys = {
     if (filters?.search) filterParts.push(`search:${filters.search}`);
     if (filters?.sortBy) filterParts.push(`sort:${filters.sortBy}:${filters.sortOrder || 'desc'}`);
     const filterStr = filterParts.length > 0 ? `:${filterParts.join(':')}` : '';
-    return `courses:list:${page}:${limit}${filterStr}`;
+    return `collections:list:${page}:${limit}${filterStr}`;
   },
   user: (id: string) => `user:${id}`,
   userProfile: (id: string) => `user:profile:${id}`,
-  enrollments: (courseId: string, page: number, limit: number) => `enrollments:${courseId}:${page}:${limit}`,
+  enrollments: (collectionId: string, page: number, limit: number) => `enrollments:${collectionId}:${page}:${limit}`,
   studentEnrollments: (studentId: string, page: number, limit: number) => `enrollments:student:${studentId}:${page}:${limit}`,
 };
 

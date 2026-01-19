@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { CoursesService } from '../../services/service';
+import { CollectionsService } from '../../services/service';
 import { EnrollmentService } from '../../services/enrollment.service';
 import { requireRole } from '../../../../middleware/roles';
 import { requireAuth } from '../../../../middleware/auth';
@@ -9,7 +9,7 @@ import { createCourseSchema, updateCourseSchema, courseIdParamSchema, createModu
 import { prisma } from '../../../../utils/prisma';
 
 const router = Router();
-const service = new CoursesService();
+const service = new CollectionsService();
 const enrollmentService = new EnrollmentService();
 
 /**
@@ -76,15 +76,15 @@ router.post('/',
       
       // Auto-generate order if not provided (get max order + 1 for this instructor)
       if (payload.order == null) {
-        const maxOrderCourse = await prisma.course.findFirst({
+        const maxOrderCollection = await prisma.collection.findFirst({
           where: { instructorId: payload.instructorId },
           orderBy: { order: 'desc' },
           select: { order: true },
         });
-        payload.order = (maxOrderCourse?.order ?? -1) + 1;
+        payload.order = (maxOrderCollection?.order ?? -1) + 1;
       }
       
-      const course = await service.createCourse(payload);
+      const collection = await service.createCollection(payload);
       res.json(course);
     } catch (err) {
       const error = err as Error;
@@ -171,7 +171,7 @@ router.get('/:id/modules',
     validate({ params: courseIdParamSchema }),
     async (req, res) => {
         try {
-            const modules = await service.getCourseModulesWithLessons(req.params.id);
+            const modules = await service.getCollectionModulesWithLessons(req.params.id);
             res.json(modules);
         } catch (err) {
             res.status(400).json({ error: (err as Error).message });
@@ -185,7 +185,7 @@ router.post('/:id/modules',
     validate({ params: courseIdParamSchema, body: createModuleSchema }),
     async (req, res) => {
         try{
-            const courseModule = await service.addModuleToCourse(req.params.id, req.body)
+            const collectionModule = await service.addModuleToCollection(req.params.id, req.body)
             res.json(courseModule);
         }catch(err){
             res.status(400).json({ error: (err as Error).message });
@@ -242,7 +242,7 @@ router.put('/:id/modules/:moduleId',
     validate({ params: courseIdParamSchema }),
     async (req, res) => {
         try {
-            const module = await service.updateModuleInCourse(req.params.id, req.params.moduleId, req.body);
+            const module = await service.updateModuleInCollection(req.params.id, req.params.moduleId, req.body);
             res.json(module);
         } catch (err) {
             res.status(400).json({ error: (err as Error).message });
@@ -667,7 +667,7 @@ router.get('/', async (req, res) => {
 router.get('/:id/preview', async (req, res) => {
     try {
         const courseId = req.params.id;
-        const course = await service.getCourseById(courseId);
+        const collection = await service.getCollectionById(courseId);
         
         if (!course) {
             return res.status(404).json({ error: 'Course not found' });
@@ -847,7 +847,7 @@ router.put('/:id',
   validate({ params: courseIdParamSchema, body: updateCourseSchema }),
   async (req, res) => {
     try {
-      const course = await service.updateCourse(req.params.id, req.body);
+      const collection = await service.updateCollection(req.params.id, req.body);
       res.json(course);
     } catch (err) {
       res.status(400).json({ error: (err as Error).message });
@@ -895,7 +895,7 @@ router.delete('/:id',
   validate({ params: courseIdParamSchema }),
   async (req, res) => {
     try {
-      await service.deleteCourse(req.params.id);
+      await service.deleteCollection(req.params.id);
       res.json({ success: true });
     } catch (err) {
       res.status(400).json({ error: (err as Error).message });

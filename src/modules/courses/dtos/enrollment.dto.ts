@@ -1,5 +1,5 @@
 export interface CreateEnrollmentDto {
-  courseId: string;
+  collectionId: string;
   studentId: string;
   amount: number;
   currency?: string;
@@ -9,11 +9,11 @@ export interface CreateEnrollmentDto {
 
 export interface EnrollmentResponseDto {
   id: string;
-  courseId: string;
+  collectionId: string;
   studentId: string;
   paymentId: string | null;
   createdAt: Date;
-  course: {
+  collection: {
     id: string;
     title: string;
     price: number;

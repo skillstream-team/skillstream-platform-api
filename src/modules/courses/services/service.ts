@@ -3,9 +3,9 @@ import { CreateQuizQuestionDto } from '../dtos/learning.dto';
 import { prisma } from '../../../utils/prisma';
 import { getCache, setCache, deleteCache, deleteCachePattern, cacheKeys, CACHE_TTL } from '../../../utils/cache';
 
-export class CoursesService {
+export class CollectionsService {
     // ============================================================
-    // COURSE CRUD
+    // COLLECTION CRUD
     // ============================================================
 
     /**
@@ -37,7 +37,7 @@ export class CoursesService {
      *       201:
      *         description: Course created successfully
      */
-    async createCourse(data: {
+    async createCollection(data: {
         title: string;
         description?: string;
         price: number;
@@ -77,12 +77,12 @@ export class CoursesService {
         if (data.learningObjectives) courseData.learningObjectives = data.learningObjectives;
         if (data.requirements) courseData.requirements = data.requirements;
 
-        const course = await prisma.course.create({ data: courseData });
+        const collection = await prisma.collection.create({ data: courseData });
         
-        // Invalidate course list cache
-        await deleteCachePattern('courses:list:*');
+        // Invalidate collection list cache
+        await deleteCachePattern('collections:list:*');
         
-        return course;
+        return collection;
     }
 
     /**
@@ -177,7 +177,7 @@ export class CoursesService {
      *       200:
      *         description: Paginated list of courses
      */
-    async getAllCourses(
+    async getAllCollections(
         page: number = 1,
         limit: number = 20,
         search?: string,
@@ -196,7 +196,7 @@ export class CoursesService {
         sortOrder: 'asc' | 'desc' = 'desc'
     ) {
         // Generate cache key with filters to ensure different queries don't share cache
-        const cacheKey = cacheKeys.courseList(page, limit, {
+        const cacheKey = cacheKeys.collectionList(page, limit, {
             instructorId,
             categoryId,
             difficulty,
@@ -290,8 +290,8 @@ export class CoursesService {
                 orderBy = { createdAt: sortOrder };
         }
 
-        const [courses, total] = await Promise.all([
-            prisma.course.findMany({
+        const [collections, total] = await Promise.all([
+            prisma.collection.findMany({
                 where,
                 skip,
                 take,
@@ -321,7 +321,7 @@ export class CoursesService {
                     _count: {
                         select: {
                             enrollments: true,
-                            lessons: true,
+                            collectionLessons: true,
                             quizzes: true,
                             reviews: true,
                         }
@@ -329,43 +329,43 @@ export class CoursesService {
                 },
                 orderBy,
             }),
-            prisma.course.count({ where }),
+            prisma.collection.count({ where }),
         ]);
         
-        // Fetch average ratings for all courses
-        const courseIds = courses.map(c => c.id);
-        const reviews = await prisma.courseReview.findMany({
+        // Fetch average ratings for all collections
+        const collectionIds = collections.map(c => c.id);
+        const reviews = await prisma.collectionReview.findMany({
             where: {
-                courseId: { in: courseIds },
+                collectionId: { in: collectionIds },
                 isPublished: true,
             },
             select: {
-                courseId: true,
+                collectionId: true,
                 rating: true,
             },
         });
 
-        // Calculate average rating per course
+        // Calculate average rating per collection
         const ratingsMap = new Map<string, { average: number; count: number }>();
-        for (const courseId of courseIds) {
-            const courseReviews = reviews.filter(r => r.courseId === courseId);
-            const average = courseReviews.length > 0
-                ? courseReviews.reduce((sum, r) => sum + r.rating, 0) / courseReviews.length
+        for (const collectionId of collectionIds) {
+            const collectionReviews = reviews.filter(r => r.collectionId === collectionId);
+            const average = collectionReviews.length > 0
+                ? collectionReviews.reduce((sum, r) => sum + r.rating, 0) / collectionReviews.length
                 : 0;
-            ratingsMap.set(courseId, {
+            ratingsMap.set(collectionId, {
                 average: Math.round(average * 10) / 10,
-                count: courseReviews.length,
+                count: collectionReviews.length,
             });
         }
 
         // Add ratings to courses
-        let coursesWithRatings = courses.map(course => {
-            const enrollmentCount = course._count.enrollments;
-            const averageRating = ratingsMap.get(course.id)?.average || 0;
-            const reviewCount = ratingsMap.get(course.id)?.count || 0;
+        let collectionsWithRatings = collections.map(collection => {
+            const enrollmentCount = collection._count.enrollments;
+            const averageRating = ratingsMap.get(collection.id)?.average || 0;
+            const reviewCount = ratingsMap.get(collection.id)?.count || 0;
             
             return {
-                ...course,
+                ...collection,
                 averageRating,
                 reviewCount,
                 enrollmentCount,
@@ -374,9 +374,9 @@ export class CoursesService {
         
         // Apply rating filter if specified
         if (minRating !== undefined || maxRating !== undefined) {
-            coursesWithRatings = coursesWithRatings.filter((course) => {
-                if (minRating !== undefined && course.averageRating < minRating) return false;
-                if (maxRating !== undefined && course.averageRating > maxRating) return false;
+            collectionsWithRatings = collectionsWithRatings.filter((collection) => {
+                if (minRating !== undefined && collection.averageRating < minRating) return false;
+                if (maxRating !== undefined && collection.averageRating > maxRating) return false;
                 return true;
             });
         }
@@ -406,30 +406,30 @@ export class CoursesService {
             : total;
 
         // Include tags in response
-        const courseIdsForTags = coursesWithRatings.map((c) => c.id);
-        const courseTags = await prisma.courseTag.findMany({
-            where: { courseId: { in: courseIdsForTags } },
+        const collectionIdsForTags = collectionsWithRatings.map((c) => c.id);
+        const collectionTags = await prisma.collectionTag.findMany({
+            where: { collectionId: { in: collectionIdsForTags } },
             select: {
-                courseId: true,
+                collectionId: true,
                 name: true,
             },
         });
 
         const tagsMap = new Map<string, string[]>();
-        for (const tag of courseTags) {
-            if (!tagsMap.has(tag.courseId)) {
-                tagsMap.set(tag.courseId, []);
+        for (const tag of collectionTags) {
+            if (!tagsMap.has(tag.collectionId)) {
+                tagsMap.set(tag.collectionId, []);
             }
-            tagsMap.get(tag.courseId)!.push(tag.name);
+            tagsMap.get(tag.collectionId)!.push(tag.name);
         }
 
-        const coursesWithTags = coursesWithRatings.map((course) => ({
-            ...course,
-            tags: tagsMap.get(course.id) || [],
+        const collectionsWithTags = collectionsWithRatings.map((collection) => ({
+            ...collection,
+            tags: tagsMap.get(collection.id) || [],
         }));
 
         const result = {
-            courses: coursesWithTags,
+            collections: collectionsWithTags,
             pagination: {
                 page,
                 limit: take,
@@ -463,8 +463,8 @@ export class CoursesService {
      *       404:
      *         description: Course not found
      */
-    async getCourseById(id: string) {
-        const cacheKey = cacheKeys.course(id);
+    async getCollectionById(id: string) {
+        const cacheKey = cacheKeys.collection(id);
         
         // Try cache first
         const cached = await getCache(cacheKey);
@@ -472,7 +472,7 @@ export class CoursesService {
             return cached;
         }
 
-        const course = await prisma.course.findUnique({
+        const collection = await prisma.collection.findUnique({
             where: { id },
             select: {
                 id: true,
@@ -504,8 +504,13 @@ export class CoursesService {
                 modules: {
                     select: { id: true, title: true, order: true }
                 },
-                lessons: {
-                    select: { id: true, title: true, order: true }
+                collectionLessons: {
+                    include: {
+                        lesson: {
+                            select: { id: true, title: true, order: true }
+                        }
+                    },
+                    orderBy: { order: 'asc' }
                 },
                 quizzes: {
                     select: { id: true, title: true }
@@ -520,14 +525,14 @@ export class CoursesService {
             },
         });
 
-        if (!course) {
+        if (!collection) {
             return null;
         }
 
         // Calculate average rating
-        const reviews = await prisma.courseReview.findMany({
+        const reviews = await prisma.collectionReview.findMany({
             where: {
-                courseId: id,
+                collectionId: id,
                 isPublished: true,
             },
             select: {
@@ -540,8 +545,8 @@ export class CoursesService {
             : 0;
 
         // Get prerequisites
-        const prerequisites = await prisma.coursePrerequisite.findMany({
-            where: { courseId: id },
+        const prerequisites = await prisma.collectionPrerequisite.findMany({
+            where: { collectionId: id },
             include: {
                 prerequisite: {
                     select: {
@@ -555,37 +560,31 @@ export class CoursesService {
             orderBy: { createdAt: 'asc' },
         });
 
-        // Get tags for course
-        const tags = await prisma.courseTag.findMany({
-            where: { courseId: id },
+        // Get tags for collection
+        const collectionTags = await prisma.collectionTag.findMany({
+            where: { collectionId: id },
             select: { name: true },
         });
 
-        // Get tags for course
-        const courseTags = await prisma.courseTag.findMany({
-            where: { courseId: id },
-            select: { name: true },
-        });
-
-        const courseWithRating = {
-            ...course,
+        const collectionWithRating = {
+            ...collection,
             averageRating,
-            reviewCount: course._count.reviews,
+            reviewCount: collection._count.reviews,
             prerequisites: prerequisites.map((p) => ({
                 id: p.id,
                 prerequisiteId: p.prerequisiteId,
                 prerequisite: p.prerequisite,
                 isRequired: p.isRequired,
             })),
-            tags: courseTags.map((t) => t.name),
-            learningObjectives: course.learningObjectives ? (course.learningObjectives as any) : undefined,
-            requirements: course.requirements ? (course.requirements as any) : undefined,
+            tags: collectionTags.map((t) => t.name),
+            learningObjectives: collection.learningObjectives ? (collection.learningObjectives as any) : undefined,
+            requirements: collection.requirements ? (collection.requirements as any) : undefined,
         };
 
         // Cache result
-        await setCache(cacheKey, courseWithRating, CACHE_TTL.MEDIUM);
+        await setCache(cacheKey, collectionWithRating, CACHE_TTL.MEDIUM);
 
-        return courseWithRating;
+        return collectionWithRating;
     }
 
     /**
@@ -595,8 +594,8 @@ export class CoursesService {
      *     summary: Update course information
      *     tags: [Courses]
      */
-    async updateCourse(id: string, data: Prisma.CourseUpdateInput) {
-        const course = await prisma.course.update({
+    async updateCollection(id: string, data: Prisma.CollectionUpdateInput) {
+        const collection = await prisma.collection.update({
             where: { id },
             data,
             select: {
@@ -625,10 +624,10 @@ export class CoursesService {
         });
         
         // Invalidate caches
-        await deleteCache(cacheKeys.course(id));
-        await deleteCachePattern('courses:list:*');
+        await deleteCache(cacheKeys.collection(id));
+        await deleteCachePattern('collections:list:*');
         
-        return course;
+        return collection;
     }
 
     /**
@@ -638,12 +637,12 @@ export class CoursesService {
      *     summary: Delete a course by ID
      *     tags: [Courses]
      */
-    async deleteCourse(id: string) {
-        await prisma.course.delete({ where: { id } });
+    async deleteCollection(id: string) {
+        await prisma.collection.delete({ where: { id } });
         
         // Invalidate caches
-        await deleteCache(cacheKeys.course(id));
-        await deleteCachePattern('courses:list:*');
+        await deleteCache(cacheKeys.collection(id));
+        await deleteCachePattern('collections:list:*');
     }
 
     // ============================================================
@@ -657,7 +656,7 @@ export class CoursesService {
      *     summary: Add a module to a course
      *     tags: [Modules]
      */
-    async addModuleToCourse(courseId: string, data: {
+    async addModuleToCollection(collectionId: string, data: {
         title: string;
         content?: Prisma.InputJsonValue;
         description?: string;
@@ -668,10 +667,10 @@ export class CoursesService {
         // Default to published if not specified
         const isPublished = data.isPublished !== undefined ? data.isPublished : true;
         
-        const module = await prisma.courseModule.create({
+        const module = await prisma.collectionModule.create({
             data: { 
                 ...data, 
-                courseId, 
+                collectionId, 
                 content: data.content ?? {}, 
                 description: data.description ?? '',
                 isPublished,
@@ -696,7 +695,7 @@ export class CoursesService {
      *     tags: [Modules]
      */
     async getModuleById(moduleId: string) {
-        return prisma.courseModule.findUnique({
+        return prisma.collectionModule.findUnique({
             where: { id: moduleId },
             include: {
                 quizzes: true,
@@ -714,28 +713,28 @@ export class CoursesService {
      *     summary: Update a module
      *     tags: [Modules]
      */
-    async updateModule(moduleId: string, data: Prisma.CourseModuleUpdateInput) {
-        return prisma.courseModule.update({ where: { id: moduleId }, data });
+    async updateModule(moduleId: string, data: Prisma.CollectionModuleUpdateInput) {
+        return prisma.collectionModule.update({ where: { id: moduleId }, data });
     }
 
     /**
      * Get all modules with lessons for a course
      */
-    async getCourseModulesWithLessons(courseId: string) {
+    async getCollectionModulesWithLessons(collectionId: string) {
         // Check cache first
-        const cacheKey = cacheKeys.courseModules(courseId);
+        const cacheKey = cacheKeys.collectionModules(collectionId);
         const cached = await getCache(cacheKey);
         if (cached) {
             return cached;
         }
 
-        // Fetch modules and lessons in parallel with minimal data
-        const [modules, lessons] = await Promise.all([
-            prisma.courseModule.findMany({
-                where: { courseId },
+        // Fetch modules and collection lessons in parallel with minimal data
+        const [modules, collectionLessons] = await Promise.all([
+            prisma.collectionModule.findMany({
+                where: { collectionId },
                 select: {
                     id: true,
-                    courseId: true,
+                    collectionId: true,
                     title: true,
                     description: true,
                     order: true,
@@ -748,19 +747,20 @@ export class CoursesService {
                 },
                 orderBy: { order: 'asc' },
             }),
-            prisma.lesson.findMany({
-                where: { courseId },
-                select: {
-                    id: true,
-                    courseId: true,
-                    title: true,
-                    content: true,
-                    order: true,
-                    duration: true,
-                    isPreview: true,
-                    createdAt: true,
-                    updatedAt: true,
-                    // Don't include quizzes for builder - they're not needed
+            prisma.collectionLesson.findMany({
+                where: { collectionId },
+                include: {
+                    lesson: {
+                        select: {
+                            id: true,
+                            title: true,
+                            content: true,
+                            duration: true,
+                            isPreview: true,
+                            createdAt: true,
+                            updatedAt: true,
+                        }
+                    }
                 },
                 orderBy: { order: 'asc' },
             }),
@@ -769,7 +769,8 @@ export class CoursesService {
         // Group lessons by moduleId stored in content JSON
         const moduleMap = new Map<string, any[]>();
         
-        lessons.forEach(lesson => {
+        collectionLessons.forEach(collectionLesson => {
+            const lesson = collectionLesson.lesson;
             const content = lesson.content as any;
             const moduleId = content?.moduleId;
             if (moduleId) {
@@ -801,18 +802,18 @@ export class CoursesService {
     /**
      * Update a module
      */
-    async updateModuleInCourse(courseId: string, moduleId: string, data: {
+    async updateModuleInCollection(collectionId: string, moduleId: string, data: {
         title?: string;
         description?: string;
     }) {
-        // Verify module belongs to course
-        const module = await prisma.courseModule.findFirst({
-            where: { id: moduleId, courseId },
+        // Verify module belongs to collection
+        const module = await prisma.collectionModule.findFirst({
+            where: { id: moduleId, collectionId },
         });
         if (!module) {
-            throw new Error('Module not found or does not belong to this course');
+            throw new Error('Module not found or does not belong to this collection');
         }
-        const updated = await prisma.courseModule.update({
+        const updated = await prisma.collectionModule.update({
             where: { id: moduleId },
             data,
         });
@@ -825,42 +826,45 @@ export class CoursesService {
     }
 
     async deleteModule(moduleId: string) {
-        // Get module to find courseId for cache invalidation
-        const module = await prisma.courseModule.findUnique({
+        // Get module to find collectionId for cache invalidation
+        const module = await prisma.collectionModule.findUnique({
             where: { id: moduleId },
-            select: { courseId: true },
+            select: { collectionId: true },
         });
         
         if (!module) {
             throw new Error('Module not found');
         }
         
-        // Delete all lessons in this module first
-        // Query all lessons and filter by moduleId in content JSON
-        const allLessons = await prisma.lesson.findMany({
+        // Delete all collection lessons in this module first
+        // Query all collection lessons and filter by moduleId in content JSON
+        const allCollectionLessons = await prisma.collectionLesson.findMany({
             where: {
-                courseId: module.courseId,
+                collectionId: module.collectionId,
             },
+            include: {
+                lesson: true
+            }
         });
         
-        // Filter lessons where content.moduleId matches
-        const lessonsToDelete = allLessons.filter((lesson: any) => {
-            const content = lesson.content as any;
+        // Filter collection lessons where lesson content.moduleId matches
+        const collectionLessonsToRemove = allCollectionLessons.filter((cl: any) => {
+            const content = cl.lesson.content as any;
             return content?.moduleId === moduleId;
         });
         
-        // Delete lessons
-        for (const lesson of lessonsToDelete) {
-            await prisma.lesson.delete({ where: { id: lesson.id } });
+        // Remove collection lesson relationships (don't delete lessons - they're independent)
+        for (const collectionLesson of collectionLessonsToRemove) {
+            await prisma.collectionLesson.delete({ where: { id: collectionLesson.id } });
         }
         
         // Delete the module
-        await prisma.courseModule.delete({ where: { id: moduleId } });
+        await prisma.collectionModule.delete({ where: { id: moduleId } });
         
-        // Invalidate both course and modules cache
+        // Invalidate both collection and modules cache
         await Promise.all([
-            deleteCache(cacheKeys.course(module.courseId)),
-            deleteCache(cacheKeys.courseModules(module.courseId))
+            deleteCache(cacheKeys.collection(module.collectionId)),
+            deleteCache(cacheKeys.collectionModules(module.collectionId))
         ]);
     }
 
@@ -879,7 +883,7 @@ export class CoursesService {
         title: string;
         content?: Prisma.InputJsonValue;
         order: number;
-        courseId: string;
+        collectionId: string;
         description?: string;
         duration?: number;
         isPreview?: boolean;
@@ -891,12 +895,10 @@ export class CoursesService {
             content.description = data.description;
         }
         
-        // Explicitly build the lesson data without description field
-        // Only include fields that exist in the Lesson Prisma model
+        // Create lesson (independent of collection)
         const lessonData: any = {
             title: data.title,
             order: data.order,
-            courseId: data.courseId,
             content: content as Prisma.InputJsonValue,
         };
         
@@ -912,10 +914,19 @@ export class CoursesService {
             data: lessonData
         });
         
-        // Invalidate both course and modules cache
+        // Add lesson to collection via CollectionLesson
+        await prisma.collectionLesson.create({
+            data: {
+                collectionId: data.collectionId,
+                lessonId: lesson.id,
+                order: data.order,
+            }
+        });
+        
+        // Invalidate both collection and modules cache
         await Promise.all([
-            deleteCache(cacheKeys.course(data.courseId)),
-            deleteCache(cacheKeys.courseModules(data.courseId))
+            deleteCache(cacheKeys.collection(data.collectionId)),
+            deleteCache(cacheKeys.collectionModules(data.collectionId))
         ]);
         
         // Extract description from content for the response
@@ -936,11 +947,20 @@ export class CoursesService {
     async updateLesson(lessonId: string, data: Partial<{ title: string; content: Prisma.InputJsonValue; order: number; duration: number; isPreview: boolean }>) {
         const lesson = await prisma.lesson.update({ where: { id: lessonId }, data });
         
-        // Invalidate both course and modules cache
-        await Promise.all([
-            deleteCache(cacheKeys.course(lesson.courseId)),
-            deleteCache(cacheKeys.courseModules(lesson.courseId))
-        ]);
+        // Invalidate collection caches for all collections this lesson belongs to
+        const collectionLessons = await prisma.collectionLesson.findMany({
+            where: { lessonId },
+            select: { collectionId: true }
+        });
+        
+        await Promise.all(
+            collectionLessons.map(cl => 
+                Promise.all([
+                    deleteCache(cacheKeys.collection(cl.collectionId)),
+                    deleteCache(cacheKeys.collectionModules(cl.collectionId))
+                ])
+            )
+        );
         
         return lesson;
     }
@@ -953,21 +973,29 @@ export class CoursesService {
      *     tags: [Lessons]
      */
     async deleteLesson(lessonId: string) {
-        // Get lesson to find courseId for cache invalidation
-        const lesson = await prisma.lesson.findUnique({
-            where: { id: lessonId },
-            select: { courseId: true },
+        // Get all collections this lesson belongs to for cache invalidation
+        const collectionLessons = await prisma.collectionLesson.findMany({
+            where: { lessonId },
+            select: { collectionId: true }
         });
         
+        // Delete all collection lesson relationships
+        await prisma.collectionLesson.deleteMany({
+            where: { lessonId }
+        });
+        
+        // Delete the lesson itself
         const deletedLesson = await prisma.lesson.delete({ where: { id: lessonId } });
         
-        // Invalidate both course and modules cache
-        if (lesson) {
-            await Promise.all([
-                deleteCache(cacheKeys.course(lesson.courseId)),
-                deleteCache(cacheKeys.courseModules(lesson.courseId))
-            ]);
-        }
+        // Invalidate collection caches for all affected collections
+        await Promise.all(
+            collectionLessons.map(cl => 
+                Promise.all([
+                    deleteCache(cacheKeys.collection(cl.collectionId)),
+                    deleteCache(cacheKeys.collectionModules(cl.collectionId))
+                ])
+            )
+        );
         
         return deletedLesson;
     }
@@ -985,7 +1013,7 @@ export class CoursesService {
      */
     async addQuizToLesson(lessonId: string, data: {
         title: string;
-        courseId: string;
+        collectionId: string;
         description?: string;
         instructions?: string;
         timeLimit?: number;
@@ -999,7 +1027,7 @@ export class CoursesService {
         return prisma.quiz.create({
             data: {
                 title: data.title,
-                course: { connect: { id: data.courseId } },
+                collection: { connect: { id: data.collectionId } },
                 Lesson: { connect: { id: lessonId } },
                 creator: { connect: { id: data.createdBy } },
                 description: data.description,

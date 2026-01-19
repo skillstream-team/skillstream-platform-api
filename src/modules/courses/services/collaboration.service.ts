@@ -2,7 +2,7 @@ import { prisma } from '../../../utils/prisma';
 import { deleteCache } from '../../../utils/cache';
 
 export interface CreateStudyGroupDto {
-  courseId?: string;
+  collectionId?: string;
   name: string;
   description?: string;
   createdBy: string;
@@ -12,8 +12,8 @@ export interface CreateStudyGroupDto {
 
 export interface StudyGroupDto {
   id: string;
-  courseId?: string;
-  course?: {
+  collectionId?: string;
+  collection?: {
     id: string;
     title: string;
   };
@@ -53,7 +53,7 @@ export interface GroupProjectDto {
 
 export interface CreateSharedWorkspaceDto {
   groupId?: string;
-  courseId?: string;
+  collectionId?: string;
   userId: string;
   name: string;
   description?: string;
@@ -65,7 +65,7 @@ export interface CreateSharedWorkspaceDto {
 export interface SharedWorkspaceDto {
   id: string;
   groupId?: string;
-  courseId?: string;
+  collectionId?: string;
   userId: string;
   user: {
     id: string;
@@ -87,7 +87,7 @@ export class CollaborationService {
   async createStudyGroup(data: CreateStudyGroupDto): Promise<StudyGroupDto> {
     const group = await prisma.studyGroup.create({
       data: {
-        courseId: data.courseId,
+        collectionId: data.collectionId,
         name: data.name,
         description: data.description,
         createdBy: data.createdBy,
@@ -95,7 +95,7 @@ export class CollaborationService {
         isPublic: data.isPublic !== false,
       },
       include: {
-        course: {
+        collection: {
           select: {
             id: true,
             title: true,
@@ -127,7 +127,7 @@ export class CollaborationService {
    * Get study groups
    */
   async getStudyGroups(
-    courseId?: string,
+    collectionId?: string,
     userId?: string,
     page: number = 1,
     limit: number = 20
@@ -144,7 +144,7 @@ export class CollaborationService {
     const take = Math.min(limit, 100);
 
     const where: any = {};
-    if (courseId) where.courseId = courseId;
+    if (collectionId) where.collectionId = collectionId;
     if (userId) {
       where.OR = [
         { isPublic: true },
@@ -161,7 +161,7 @@ export class CollaborationService {
         skip,
         take,
         include: {
-          course: {
+          collection: {
             select: {
               id: true,
               title: true,
@@ -285,7 +285,7 @@ export class CollaborationService {
     const workspace = await prisma.sharedWorkspace.create({
       data: {
         groupId: data.groupId,
-        courseId: data.courseId,
+        collectionId: data.collectionId,
         userId: data.userId,
         name: data.name,
         description: data.description,
@@ -311,12 +311,12 @@ export class CollaborationService {
    */
   async getSharedWorkspaces(
     groupId?: string,
-    courseId?: string,
+    collectionId?: string,
     userId?: string
   ): Promise<SharedWorkspaceDto[]> {
     const where: any = {};
     if (groupId) where.groupId = groupId;
-    if (courseId) where.courseId = courseId;
+    if (collectionId) where.collectionId = collectionId;
     if (userId) {
       where.OR = [
         { userId },
@@ -385,8 +385,8 @@ export class CollaborationService {
   private mapGroupToDto(group: any): StudyGroupDto {
     return {
       id: group.id,
-      courseId: group.courseId || undefined,
-      course: group.course || undefined,
+      collectionId: group.collectionId || undefined,
+      collection: group.collection || undefined,
       name: group.name,
       description: group.description || undefined,
       createdBy: group.createdBy,
@@ -417,7 +417,7 @@ export class CollaborationService {
     return {
       id: workspace.id,
       groupId: workspace.groupId || undefined,
-      courseId: workspace.courseId || undefined,
+      collectionId: workspace.collectionId || undefined,
       userId: workspace.userId,
       user: workspace.user,
       name: workspace.name,

@@ -41,7 +41,7 @@ export class ComparisonService {
       throw new Error('Can compare between 2 and 5 courses');
     }
 
-    const courses = await prisma.course.findMany({
+    const courses = await prisma.collection.findMany({
       where: { id: { in: courseIds } },
       include: {
         category: {
@@ -84,23 +84,23 @@ export class ComparisonService {
     });
 
     // Calculate average ratings
-    const reviews = await prisma.courseReview.findMany({
+    const reviews = await prisma.collectionReview.findMany({
       where: {
-        courseId: { in: courseIds },
+        collectionId: { in: courseIds },
         isPublished: true,
       },
       select: {
-        courseId: true,
+        collectionId: true,
         rating: true,
       },
     });
 
     const ratingsMap = new Map<string, number>();
     for (const courseId of courseIds) {
-      const courseReviews = reviews.filter((r) => r.courseId === courseId);
+      const courseReviews = reviews.filter((r: any) => r.collectionId === courseId);
       const average =
         courseReviews.length > 0
-          ? courseReviews.reduce((sum, r) => sum + r.rating, 0) / courseReviews.length
+          ? courseReviews.reduce((sum: number, r: any) => sum + r.rating, 0) / courseReviews.length
           : 0;
       ratingsMap.set(courseId, Math.round(average * 10) / 10);
     }

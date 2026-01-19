@@ -426,7 +426,7 @@ export class CategoryService {
           include: {
             _count: {
               select: {
-                courses: true,
+                collections: true,
               },
             },
           },

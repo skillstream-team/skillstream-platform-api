@@ -60,12 +60,6 @@ export class SubscriptionAccessService {
       : await prisma.subscriptionAccess.create({
           data: accessData,
         });
-      update: {
-        expiresAt: accessExpiresAt,
-        accessType,
-      },
-      create: accessData,
-    });
 
     // Invalidate cache
     await deleteCache(cacheKeys.user(userId));

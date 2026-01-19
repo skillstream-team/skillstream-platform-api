@@ -89,12 +89,16 @@ export async function getPreviewContent(
   next: NextFunction
 ) {
   try {
-    const { courseId } = req.params;
+    const { collectionId } = req.params;
 
     const [previewLessons, previewVideos] = await Promise.all([
       prisma.lesson.findMany({
         where: {
-          courseId,
+          collectionLessons: {
+            some: {
+              collectionId,
+            },
+          },
           isPreview: true,
         },
         select: {
@@ -108,7 +112,7 @@ export async function getPreviewContent(
       }),
       prisma.video.findMany({
         where: {
-          courseId,
+          collectionId,
           isPreview: true,
         },
         select: {

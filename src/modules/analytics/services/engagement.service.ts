@@ -26,24 +26,32 @@ export class EngagementService {
       engagementData.lessonId = contentId;
     }
 
-    // Update or create engagement record
-    const engagement = await prisma.studentEngagement.upsert({
+    // Find existing engagement record
+    const existing = await prisma.studentEngagement.findFirst({
       where: {
-        studentId_collectionId_lessonId_period: {
-          studentId,
-          collectionId: contentType === 'COLLECTION' ? contentId : null,
-          lessonId: contentType === 'LESSON' ? contentId : null,
-          period,
-        },
+        studentId,
+        period,
+        ...(contentType === 'COLLECTION' 
+          ? { collectionId: contentId, lessonId: null }
+          : { lessonId: contentId, collectionId: null }
+        ),
       },
-      update: {
-        watchTimeMinutes: {
-          increment: minutes,
-        },
-        lastWatchedAt: now,
-      },
-      create: engagementData,
     });
+
+    // Update or create engagement record
+    const engagement = existing
+      ? await prisma.studentEngagement.update({
+          where: { id: existing.id },
+          data: {
+            watchTimeMinutes: {
+              increment: minutes,
+            },
+            lastWatchedAt: now,
+          },
+        })
+      : await prisma.studentEngagement.create({
+          data: engagementData,
+        });
 
     return engagement;
   }
@@ -73,22 +81,30 @@ export class EngagementService {
       engagementData.lessonId = contentId;
     }
 
-    const engagement = await prisma.studentEngagement.upsert({
+    // Find existing engagement record
+    const existing = await prisma.studentEngagement.findFirst({
       where: {
-        studentId_collectionId_lessonId_period: {
-          studentId,
-          collectionId: contentType === 'COLLECTION' ? contentId : null,
-          lessonId: contentType === 'LESSON' ? contentId : null,
-          period,
-        },
+        studentId,
+        period,
+        ...(contentType === 'COLLECTION' 
+          ? { collectionId: contentId, lessonId: null }
+          : { lessonId: contentId, collectionId: null }
+        ),
       },
-      update: {
-        isCompleted: true,
-        completionPercent: 100,
-        completedAt: now,
-      },
-      create: engagementData,
     });
+
+    const engagement = existing
+      ? await prisma.studentEngagement.update({
+          where: { id: existing.id },
+          data: {
+            isCompleted: true,
+            completionPercent: 100,
+            completedAt: now,
+          },
+        })
+      : await prisma.studentEngagement.create({
+          data: engagementData,
+        });
 
     return engagement;
   }
@@ -119,22 +135,30 @@ export class EngagementService {
       engagementData.lessonId = contentId;
     }
 
-    const engagement = await prisma.studentEngagement.upsert({
+    // Find existing engagement record
+    const existing = await prisma.studentEngagement.findFirst({
       where: {
-        studentId_collectionId_lessonId_period: {
-          studentId,
-          collectionId: contentType === 'COLLECTION' ? contentId : null,
-          lessonId: contentType === 'LESSON' ? contentId : null,
-          period,
-        },
+        studentId,
+        period,
+        ...(contentType === 'COLLECTION' 
+          ? { collectionId: contentId, lessonId: null }
+          : { lessonId: contentId, collectionId: null }
+        ),
       },
-      update: {
-        completionPercent: Math.min(100, Math.max(0, percent)),
-        isCompleted: percent >= 100,
-        ...(percent >= 100 && { completedAt: now }),
-      },
-      create: engagementData,
     });
+
+    const engagement = existing
+      ? await prisma.studentEngagement.update({
+          where: { id: existing.id },
+          data: {
+            completionPercent: Math.min(100, Math.max(0, percent)),
+            isCompleted: percent >= 100,
+            ...(percent >= 100 && { completedAt: now }),
+          },
+        })
+      : await prisma.studentEngagement.create({
+          data: engagementData,
+        });
 
     return engagement;
   }

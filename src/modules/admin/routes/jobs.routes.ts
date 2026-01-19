@@ -1,11 +1,11 @@
 import { Router } from 'express';
-import { requireAuth } from '../../../../middleware/auth';
-import { requireRole } from '../../../../middleware/roles';
-import { SubscriptionAccessService } from '../../../subscriptions/services/subscription-access.service';
-import { SubscriptionRevenueService } from '../../../earnings/services/subscription-revenue.service';
-import { SubscriptionService } from '../../../subscriptions/services/subscription.service';
-import { LessonPaymentService } from '../../../courses/services/lesson-payment.service';
-import { prisma } from '../../../../utils/prisma';
+import { requireAuth } from '../../../middleware/auth';
+import { requireRole } from '../../../middleware/roles';
+import { SubscriptionAccessService } from '../../subscriptions/services/subscription-access.service';
+import { SubscriptionRevenueService } from '../../earnings/services/subscription-revenue.service';
+import { SubscriptionService } from '../../subscriptions/services/subscription.service';
+import { LessonPaymentService } from '../../courses/services/lesson-payment.service';
+import { prisma } from '../../../utils/prisma';
 
 const router = Router();
 

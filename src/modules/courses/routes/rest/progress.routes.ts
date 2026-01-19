@@ -40,7 +40,7 @@ router.get('/users/:userId/progress', requireAuth, requireSubscription, async (r
     // Get all enrollments for the user
     const enrollments = await prisma.enrollment.findMany({
       where: { studentId: userId },
-      select: { courseId: true, course: { select: { id: true, title: true } } }
+      select: { collectionId: true, collection: { select: { id: true, title: true } } }
     });
     
     // Get progress for each enrollment (with pagination per course)
@@ -50,7 +50,7 @@ router.get('/users/:userId/progress', requireAuth, requireSubscription, async (r
           prisma.progress.findMany({
           where: {
             studentId: userId,
-            courseId: enrollment.courseId
+            collectionId: enrollment.collectionId
           },
             skip,
             take: limit,
@@ -62,7 +62,7 @@ router.get('/users/:userId/progress', requireAuth, requireSubscription, async (r
               timeSpent: true,
               lastAccessed: true,
               completedAt: true,
-              course: { select: { id: true, title: true } },
+              collection: { select: { id: true, title: true } },
               module: { select: { id: true, title: true } }
             },
             orderBy: { lastAccessed: 'desc' }
@@ -70,13 +70,13 @@ router.get('/users/:userId/progress', requireAuth, requireSubscription, async (r
           prisma.progress.count({
             where: {
               studentId: userId,
-              courseId: enrollment.courseId
+              collectionId: enrollment.collectionId
           }
           })
         ]);
         return {
-          courseId: enrollment.courseId,
-          course: enrollment.course,
+          collectionId: enrollment.collectionId,
+          collection: enrollment.collection,
           progress: progress || [],
           pagination: {
             page,
@@ -152,15 +152,15 @@ router.get('/users/:userId/progress/courses', requireAuth, requireSubscription, 
 
     const enrollments = await prisma.enrollment.findMany({
       where: { studentId: userId },
-      select: { courseId: true, course: { select: { id: true, title: true } } }
+      select: { collectionId: true, collection: { select: { id: true, title: true } } }
     });
     
-    const coursesWithProgress = await Promise.all(
+    const collectionsWithProgress = await Promise.all(
       enrollments.map(async (enrollment: any) => {
         const progress = await prisma.progress.findMany({
           where: {
             studentId: userId,
-            courseId: enrollment.courseId
+            collectionId: enrollment.collectionId
           },
           select: { status: true }
         });
@@ -168,17 +168,17 @@ router.get('/users/:userId/progress/courses', requireAuth, requireSubscription, 
         const totalItems = progress?.length || 0;
         const completionRate = totalItems > 0 ? (completedItems / totalItems) * 100 : 0;
         
-        let courseStatus = 'not_started';
+        let collectionStatus = 'not_started';
         if (completionRate === 100) {
-          courseStatus = 'completed';
+          collectionStatus = 'completed';
         } else if (completionRate > 0) {
-          courseStatus = 'in_progress';
+          collectionStatus = 'in_progress';
         }
 
         return {
-          courseId: enrollment.courseId,
-          course: enrollment.course,
-          status: courseStatus,
+          collectionId: enrollment.collectionId,
+          collection: enrollment.collection,
+          status: collectionStatus,
           completionRate,
           completedItems,
           totalItems
@@ -187,9 +187,9 @@ router.get('/users/:userId/progress/courses', requireAuth, requireSubscription, 
     );
 
     // Filter by status if provided
-    let filtered = coursesWithProgress;
+    let filtered = collectionsWithProgress;
     if (status === 'in_progress' || status === 'completed') {
-      filtered = coursesWithProgress.filter((item: any) => item.status === status);
+      filtered = collectionsWithProgress.filter((item: any) => item.status === status);
     }
 
     res.json({
@@ -212,13 +212,13 @@ router.get('/users/:userId/progress/courses', requireAuth, requireSubscription, 
 
 /**
  * @swagger
- * /api/courses/{courseId}/progress:
+ * /api/collections/{collectionId}/progress:
  *   get:
- *     summary: Get progress for current user in a specific course
+ *     summary: Get progress for current user in a specific collection
  *     tags: [Progress]
  *     parameters:
  *       - in: path
- *         name: courseId
+ *         name: collectionId
  *         required: true
  *         schema:
  *           type: string
@@ -226,9 +226,9 @@ router.get('/users/:userId/progress/courses', requireAuth, requireSubscription, 
  *       200:
  *         description: Progress retrieved successfully
  */
-router.get('/courses/:courseId/progress', requireAuth, requireSubscription, async (req, res) => {
+router.get('/collections/:collectionId/progress', requireAuth, requireSubscription, async (req, res) => {
   try {
-    const { courseId } = req.params;
+    const { collectionId } = req.params;
     const userId = (req as any).user?.id;
 
     if (!userId) {
@@ -243,7 +243,7 @@ router.get('/courses/:courseId/progress', requireAuth, requireSubscription, asyn
       prisma.progress.findMany({
       where: {
         studentId: userId,
-        courseId: courseId
+        collectionId: collectionId
       },
         skip,
         take: limit,
@@ -255,7 +255,7 @@ router.get('/courses/:courseId/progress', requireAuth, requireSubscription, asyn
           timeSpent: true,
           lastAccessed: true,
           completedAt: true,
-          course: { select: { id: true, title: true } },
+          collection: { select: { id: true, title: true } },
           module: { select: { id: true, title: true } }
         },
         orderBy: { lastAccessed: 'desc' }
@@ -263,7 +263,7 @@ router.get('/courses/:courseId/progress', requireAuth, requireSubscription, asyn
       prisma.progress.count({
         where: {
           studentId: userId,
-          courseId: courseId
+          collectionId: collectionId
       }
       })
     ]);
@@ -305,7 +305,7 @@ router.get('/courses/:courseId/progress', requireAuth, requireSubscription, asyn
  *               - lessonId
  *               - progressPercent
  *             properties:
- *               courseId:
+ *               collectionId:
  *                 type: string
  *               lessonId:
  *                 type: string
@@ -330,10 +330,10 @@ router.post('/sync-milestone', requireAuth, async (req, res) => {
       return res.status(401).json({ error: 'User not authenticated' });
     }
 
-    const { courseId, lessonId, videoId, progressPercent, currentTime } = req.body;
+    const { collectionId, lessonId, videoId, progressPercent, currentTime } = req.body;
 
-    if (!courseId || !lessonId || progressPercent === undefined) {
-      return res.status(400).json({ error: 'Missing required fields: courseId, lessonId, progressPercent' });
+    if (!collectionId || !lessonId || progressPercent === undefined) {
+      return res.status(400).json({ error: 'Missing required fields: collectionId, lessonId, progressPercent' });
     }
 
     // Determine status based on progress
@@ -349,9 +349,9 @@ router.post('/sync-milestone', requireAuth, async (req, res) => {
     // Update or create progress record
     const progress = await prisma.progress.upsert({
       where: {
-        studentId_courseId_type_itemId: {
+        studentId_collectionId_type_itemId: {
           studentId: userId,
-          courseId,
+          collectionId,
           type: 'video',
           itemId: lessonId,
         },
@@ -370,7 +370,7 @@ router.post('/sync-milestone', requireAuth, async (req, res) => {
       },
       create: {
         studentId: userId,
-        courseId,
+        collectionId,
         type: 'video',
         itemId: lessonId,
         progress: Math.min(progressPercent, 100),
@@ -386,9 +386,9 @@ router.post('/sync-milestone', requireAuth, async (req, res) => {
       try {
         await prisma.progress.upsert({
           where: {
-            studentId_courseId_type_itemId: {
+            studentId_collectionId_type_itemId: {
               studentId: userId,
-              courseId,
+              collectionId,
               type: 'video',
               itemId: videoId,
             },
@@ -401,7 +401,7 @@ router.post('/sync-milestone', requireAuth, async (req, res) => {
           },
           create: {
             studentId: userId,
-            courseId,
+            collectionId,
             type: 'video',
             itemId: videoId,
             progress: Math.min(progressPercent, 100),

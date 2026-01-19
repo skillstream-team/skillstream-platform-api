@@ -4,10 +4,10 @@ import { requireRole } from '../../../../middleware/roles';
 import { requireSubscription } from '../../../../middleware/subscription';
 import { prisma } from '../../../../utils/prisma';
 import { emailService } from '../../../users/services/email.service';
-import { CoursesService } from '../../services/service';
+import { CollectionsService } from '../../services/service';
 
 const router = Router();
-const service = new CoursesService();
+const service = new CollectionsService();
 
 /**
  * @swagger

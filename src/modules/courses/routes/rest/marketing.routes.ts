@@ -6,17 +6,17 @@ const router = Router();
 
 /**
  * @swagger
- * /api/courses/{courseId}/marketing:
+ * /api/collections/{collectionId}/marketing:
  *   get:
- *     summary: Get course details with marketing context
+ *     summary: Get collection details with marketing context
  *     tags: [Marketing]
  */
-router.get('/courses/:courseId/marketing', requireAuth, async (req, res) => {
+router.get('/collections/:collectionId/marketing', requireAuth, async (req, res) => {
   try {
-    const { courseId } = req.params;
+    const { collectionId } = req.params;
 
-    const course = await prisma.course.findUnique({
-      where: { id: courseId },
+    const collection = await prisma.collection.findUnique({
+      where: { id: collectionId },
       include: {
         instructor: {
           select: { id: true, username: true, email: true }
@@ -32,18 +32,18 @@ router.get('/courses/:courseId/marketing', requireAuth, async (req, res) => {
       }
     });
 
-    if (!course) {
-      return res.status(404).json({ error: 'Course not found' });
+    if (!collection) {
+      return res.status(404).json({ error: 'Collection not found' });
     }
 
     // Calculate marketing stats
-    const totalEnrollments = course.enrollments.length;
-    const completedCount = course.progress.filter(p => p.status === 'completed').length;
+    const totalEnrollments = collection.enrollments.length;
+    const completedCount = collection.progress.filter((p: any) => p.status === 'completed').length;
     const completionRate = totalEnrollments > 0 ? (completedCount / totalEnrollments) * 100 : 0;
 
     // Get recent enrollments (for trend analysis)
     const recentEnrollments = await prisma.enrollment.findMany({
-      where: { courseId },
+      where: { collectionId },
       orderBy: { createdAt: 'desc' },
       take: 10
     });
@@ -53,7 +53,7 @@ router.get('/courses/:courseId/marketing', requireAuth, async (req, res) => {
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
     const recentEnrollmentsCount = await prisma.enrollment.count({
       where: {
-        courseId,
+        collectionId,
         createdAt: { gte: thirtyDaysAgo }
       }
     });
@@ -61,7 +61,7 @@ router.get('/courses/:courseId/marketing', requireAuth, async (req, res) => {
     res.json({
       success: true,
       data: {
-        ...course,
+        ...collection,
         marketing: {
           totalEnrollments,
           completedCount,

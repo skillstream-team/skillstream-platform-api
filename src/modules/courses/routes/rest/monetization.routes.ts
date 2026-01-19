@@ -48,7 +48,7 @@ router.get('/lessons/:id/monetization', requireAuth, async (req, res) => {
  *   put:
  *     summary: Update collection monetization type (teacher/admin)
  */
-router.put('/collections/:id/monetization', requireAuth, requireRole('TEACHER', 'ADMIN'), async (req, res) => {
+router.put('/collections/:id/monetization', requireAuth, requireRole('TEACHER'), async (req, res) => {
   try {
     const { monetizationType, subscriptionTier } = req.body;
     const { prisma } = await import('../../../../utils/prisma');
@@ -77,7 +77,7 @@ router.put('/collections/:id/monetization', requireAuth, requireRole('TEACHER', 
  *   put:
  *     summary: Update lesson monetization type (teacher/admin)
  */
-router.put('/lessons/:id/monetization', requireAuth, requireRole('TEACHER', 'ADMIN'), async (req, res) => {
+router.put('/lessons/:id/monetization', requireAuth, requireRole('TEACHER'), async (req, res) => {
   try {
     const { monetizationType } = req.body;
     const { prisma } = await import('../../../../utils/prisma');

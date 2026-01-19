@@ -59,7 +59,7 @@ export class ComparisonService {
         _count: {
           select: {
             enrollments: true,
-            lessons: true,
+            collectionLessons: true,
             modules: true,
             reviews: true,
             certificates: true,
@@ -106,7 +106,7 @@ export class ComparisonService {
     }
 
     return {
-      courses: courses.map((course) => ({
+      courses: courses.map((course: any) => ({
         id: course.id,
         title: course.title,
         description: course.description || undefined,
@@ -128,14 +128,14 @@ export class ComparisonService {
         averageRating: ratingsMap.get(course.id) || 0,
         reviewCount: course._count.reviews,
         enrollmentCount: course._count.enrollments,
-        lessonCount: course._count.lessons,
+        lessonCount: course._count.collectionLessons,
         moduleCount: course._count.modules,
         hasCertificate: course._count.certificates > 0,
-        prerequisites: course.prerequisites.map((p) => ({
+        prerequisites: course.prerequisites.map((p: any) => ({
           id: p.prerequisite.id,
           title: p.prerequisite.title,
         })),
-        tags: course.tags.map((t) => t.name),
+        tags: course.tags.map((t: any) => t.name),
       })),
     };
   }

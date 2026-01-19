@@ -2,7 +2,7 @@ import { prisma } from '../../../utils/prisma';
 import { deleteCache } from '../../../utils/cache';
 
 export interface CreateForumPostDto {
-  courseId: string;
+  collectionId: string;
   authorId: string;
   title: string;
   content: string;
@@ -17,8 +17,8 @@ export interface CreateForumReplyDto {
 
 export interface ForumPostResponseDto {
   id: string;
-  courseId: string;
-  course: {
+  collectionId: string;
+  collection: {
     id: string;
     title: string;
   };
@@ -67,13 +67,13 @@ export class ForumsService {
   async createPost(data: CreateForumPostDto): Promise<ForumPostResponseDto> {
     const post = await prisma.forumPost.create({
       data: {
-        courseId: data.courseId,
+        collectionId: data.collectionId,
         authorId: data.authorId,
         title: data.title,
         content: data.content,
       },
       include: {
-        course: {
+        collection: {
           select: {
             id: true,
             title: true,
@@ -89,7 +89,7 @@ export class ForumsService {
       },
     });
 
-    await deleteCache(`course:${data.courseId}`);
+    await deleteCache(`collection:${data.collectionId}`);
 
     return this.mapPostToDto(post);
   }
@@ -98,7 +98,7 @@ export class ForumsService {
    * Get forum posts for a course
    */
   async getCoursePosts(
-    courseId: string,
+    collectionId: string,
     page: number = 1,
     limit: number = 20,
     search?: string
@@ -114,7 +114,7 @@ export class ForumsService {
     const skip = (page - 1) * limit;
     const take = Math.min(limit, 100);
 
-    const where: any = { courseId };
+    const where: any = { collectionId };
     if (search) {
       where.OR = [
         { title: { contains: search, mode: 'insensitive' } },
@@ -128,7 +128,7 @@ export class ForumsService {
         skip,
         take,
         include: {
-          course: {
+          collection: {
             select: {
               id: true,
               title: true,
@@ -169,7 +169,7 @@ export class ForumsService {
     const post = await prisma.forumPost.findUnique({
       where: { id: postId },
       include: {
-        course: {
+        collection: {
           select: {
             id: true,
             title: true,
@@ -370,7 +370,7 @@ export class ForumsService {
     const post = await prisma.forumPost.findUnique({
       where: { id: postId },
       include: {
-        course: {
+        collection: {
           select: {
             instructorId: true,
           },
@@ -382,8 +382,8 @@ export class ForumsService {
       throw new Error('Post not found');
     }
 
-    if (post.course.instructorId !== instructorId) {
-      throw new Error('Only the course instructor can mark best answer');
+    if (post.collection?.instructorId !== instructorId) {
+      throw new Error('Only the collection instructor can mark best answer');
     }
 
     const reply = await prisma.forumReply.findFirst({
@@ -426,7 +426,7 @@ export class ForumsService {
       where: { id: postId },
       data: { isPinned },
       include: {
-        course: {
+        collection: {
           select: {
             id: true,
             title: true,
@@ -453,7 +453,7 @@ export class ForumsService {
       where: { id: postId },
       data: { isLocked },
       include: {
-        course: {
+        collection: {
           select: {
             id: true,
             title: true,
@@ -478,8 +478,8 @@ export class ForumsService {
   private mapPostToDto(post: any): ForumPostResponseDto {
     return {
       id: post.id,
-      courseId: post.courseId,
-      course: post.course,
+      collectionId: post.collectionId,
+      collection: post.collection,
       authorId: post.authorId,
       author: post.author,
       title: post.title,

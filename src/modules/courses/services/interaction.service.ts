@@ -52,7 +52,7 @@ class InteractionService {
      */
     async trackInteraction(data: {
         userId: string;
-        courseId?: string;
+        collectionId?: string;
         moduleId?: string;
         quizId?: string;
         eventType: string;
@@ -150,10 +150,10 @@ class InteractionService {
 async function getRecommendedCourses(userId: string) {
     const interactions = await prisma.interaction.findMany({ where: { userId } });
 
-    const courseScores: Record<string, number> = {};
+    const collectionScores: Record<string, number> = {};
 
     interactions.forEach(i => {
-        if (!i.courseId) return;
+        if (!i.collectionId) return;
         let score = 0;
         switch (i.eventType) {
             case 'view': score += 1; break;
@@ -164,17 +164,17 @@ async function getRecommendedCourses(userId: string) {
                 break;
             case 'search': score += 2; break;
         }
-        const key = i.courseId as unknown as string;
-        courseScores[key] = (courseScores[key] || 0) + score;
+        const key = i.collectionId as unknown as string;
+        collectionScores[key] = (collectionScores[key] || 0) + score;
     });
 
-    const topCourseIds = Object.entries(courseScores)
+    const topCollectionIds = Object.entries(collectionScores)
         .sort(([, a], [, b]) => b - a)
         .slice(0, 5)
-        .map(([courseId]) => courseId);
+        .map(([collectionId]) => collectionId);
 
-    return prisma.course.findMany({
-        where: { id: { in: topCourseIds } }
+    return prisma.collection.findMany({
+        where: { id: { in: topCollectionIds } }
     });
 }
 

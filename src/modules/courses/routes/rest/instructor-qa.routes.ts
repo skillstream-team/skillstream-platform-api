@@ -86,7 +86,7 @@ router.post('/:courseId/qa', requireAuth, async (req, res) => {
     const { question } = req.body;
 
     const qa = await qaService.askQuestion({
-      courseId,
+      collectionId: courseId,
       studentId: userId,
       question,
     });

@@ -10,7 +10,7 @@ export interface CreateCouponDto {
   usageLimit?: number;
   expiresAt?: Date;
   applicableTo: 'ALL' | 'COURSE' | 'BUNDLE' | 'SUBSCRIPTION';
-  courseId?: string;
+  collectionId?: string;
   bundleId?: string;
 }
 
@@ -26,7 +26,7 @@ export interface CouponResponseDto {
   expiresAt?: Date;
   isActive: boolean;
   applicableTo: string;
-  courseId?: string;
+  collectionId?: string;
   bundleId?: string;
   createdAt: Date;
   updatedAt: Date;
@@ -64,8 +64,8 @@ export class CouponsService {
     }
 
     // Validate applicable target
-    if (data.applicableTo === 'COURSE' && !data.courseId) {
-      throw new Error('Course ID required for course-specific coupon');
+    if (data.applicableTo === 'COURSE' && !data.collectionId) {
+      throw new Error('Collection ID required for collection-specific coupon');
     }
 
     if (data.applicableTo === 'BUNDLE' && !data.bundleId) {
@@ -82,7 +82,7 @@ export class CouponsService {
         usageLimit: data.usageLimit,
         expiresAt: data.expiresAt,
         applicableTo: data.applicableTo,
-        courseId: data.courseId,
+        collectionId: data.collectionId,
         bundleId: data.bundleId,
       },
     });
@@ -170,13 +170,13 @@ export class CouponsService {
       };
     }
 
-    // Check specific course/bundle match
-    if (coupon.applicableTo === 'COURSE' && coupon.courseId !== courseId) {
+    // Check specific collection/bundle match
+    if (coupon.applicableTo === 'COURSE' && coupon.collectionId !== courseId) {
       return {
         valid: false,
         discountAmount: 0,
         finalAmount: amount,
-        error: 'Coupon is not valid for this course',
+        error: 'Coupon is not valid for this collection',
       };
     }
 
@@ -290,7 +290,7 @@ export class CouponsService {
       expiresAt: coupon.expiresAt || undefined,
       isActive: coupon.isActive,
       applicableTo: coupon.applicableTo,
-      courseId: coupon.courseId || undefined,
+      collectionId: coupon.collectionId || undefined,
       bundleId: coupon.bundleId || undefined,
       createdAt: coupon.createdAt,
       updatedAt: coupon.updatedAt,

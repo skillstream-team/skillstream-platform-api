@@ -478,7 +478,7 @@ export class EnrollmentService {
             where: { collectionId },
             select: { id: true },
         });
-        const forumPostIds = courseForumPosts.map(p => p.id);
+        const forumPostIds = collectionForumPosts.map((p: any) => p.id);
 
         // Query all activity sources in parallel
         const [

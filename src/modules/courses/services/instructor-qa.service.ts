@@ -2,7 +2,7 @@ import { prisma } from '../../../utils/prisma';
 import { deleteCache } from '../../../utils/cache';
 
 export interface CreateQuestionDto {
-  courseId: string;
+  collectionId: string;
   studentId: string;
   question: string;
 }
@@ -15,8 +15,8 @@ export interface CreateAnswerDto {
 
 export interface QAResponseDto {
   id: string;
-  courseId: string;
-  course: {
+  collectionId: string;
+  collection: {
     id: string;
     title: string;
   };
@@ -51,23 +51,23 @@ export class InstructorQAService {
     // Verify student is enrolled
     const enrollment = await prisma.enrollment.findFirst({
       where: {
-        courseId: data.courseId,
+        collectionId: data.collectionId,
         studentId: data.studentId,
       },
     });
 
     if (!enrollment) {
-      throw new Error('You must be enrolled in the course to ask questions');
+      throw new Error('You must be enrolled in the collection to ask questions');
     }
 
     const qa = await prisma.instructorQA.create({
       data: {
-        courseId: data.courseId,
+        collectionId: data.collectionId,
         studentId: data.studentId,
         question: data.question,
       },
       include: {
-        course: {
+        collection: {
           select: {
             id: true,
             title: true,
@@ -105,7 +105,7 @@ export class InstructorQAService {
     const qa = await prisma.instructorQA.findUnique({
       where: { id: data.qaId },
       include: {
-        course: {
+        collection: {
           select: {
             id: true,
             title: true,
@@ -119,9 +119,9 @@ export class InstructorQAService {
       throw new Error('Question not found');
     }
 
-    // Verify instructor is the course instructor
-    if (qa.course.instructorId !== data.instructorId) {
-      throw new Error('Only the course instructor can answer questions');
+    // Verify instructor is the collection instructor
+    if (qa.collection.instructorId !== data.instructorId) {
+      throw new Error('Only the collection instructor can answer questions');
     }
 
     const answer = await prisma.instructorQAAnswer.create({
@@ -141,7 +141,7 @@ export class InstructorQAService {
     });
 
     // Invalidate cache
-    await deleteCache(`course:${qa.courseId}`);
+    await deleteCache(`collection:${qa.collectionId}`);
 
     return this.getQuestionById(data.qaId);
   }
@@ -153,7 +153,7 @@ export class InstructorQAService {
     const qa = await prisma.instructorQA.findUnique({
       where: { id: qaId },
       include: {
-        course: {
+        collection: {
           select: {
             id: true,
             title: true,
@@ -189,10 +189,10 @@ export class InstructorQAService {
   }
 
   /**
-   * Get questions for a course
+   * Get questions for a collection
    */
   async getCourseQuestions(
-    courseId: string,
+    collectionId: string,
     page: number = 1,
     limit: number = 20,
     answeredOnly?: boolean
@@ -208,7 +208,7 @@ export class InstructorQAService {
     const skip = (page - 1) * limit;
     const take = Math.min(limit, 100);
 
-    const where: any = { courseId };
+    const where: any = { collectionId };
     if (answeredOnly !== undefined) {
       where.isAnswered = answeredOnly;
     }
@@ -219,7 +219,7 @@ export class InstructorQAService {
         skip,
         take,
         include: {
-          course: {
+          collection: {
             select: {
               id: true,
               title: true,
@@ -286,7 +286,7 @@ export class InstructorQAService {
         skip,
         take,
         include: {
-          course: {
+          collection: {
             select: {
               id: true,
               title: true,
@@ -331,10 +331,10 @@ export class InstructorQAService {
   private mapToDto(qa: any): QAResponseDto {
     return {
       id: qa.id,
-      courseId: qa.courseId,
-      course: {
-        id: qa.course.id,
-        title: qa.course.title,
+      collectionId: qa.collectionId,
+      collection: {
+        id: qa.collection.id,
+        title: qa.collection.title,
       },
       studentId: qa.studentId,
       student: {

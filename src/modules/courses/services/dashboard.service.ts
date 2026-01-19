@@ -17,16 +17,16 @@ export interface DashboardData {
     id: string;
     type: 'assignment' | 'quiz';
     title: string;
-    courseId: string;
-    courseTitle: string;
+    collectionId: string;
+    collectionTitle: string;
     dueDate: Date;
   }>;
   recentActivity: Array<{
     id: string;
     type: string;
     title: string;
-    courseId: string;
-    courseTitle: string;
+    collectionId: string;
+    collectionTitle: string;
     timestamp: Date;
   }>;
   recommendations: Array<{
@@ -74,11 +74,11 @@ export class DashboardService {
     const enrollments = await prisma.enrollment.findMany({
       where: { studentId: userId },
       include: {
-        course: {
+        collection: {
           include: {
             _count: {
               select: {
-                lessons: true,
+                collectionLessons: true,
                 modules: true,
               },
             },
@@ -87,54 +87,55 @@ export class DashboardService {
       },
     });
 
-    // Get progress for all enrolled courses
-    const courseIds = enrollments.map((e) => e.courseId);
+    // Get progress for all enrolled collections
+    const collectionIds = enrollments.map((e) => e.collectionId);
     const progressRecords = await prisma.progress.findMany({
       where: {
         studentId: userId,
-        courseId: { in: courseIds },
+        collectionId: { in: collectionIds },
       },
       orderBy: { lastAccessed: 'desc' },
     });
 
-    // Calculate progress per course
+    // Calculate progress per collection
     const enrolledCourses = await Promise.all(
       enrollments.map(async (enrollment) => {
-        const courseProgress = progressRecords.filter(
-          (p) => p.courseId === enrollment.courseId
+        const collectionProgress = progressRecords.filter(
+          (p) => p.collectionId === enrollment.collectionId
         );
-        const completed = courseProgress.filter(
+        const completed = collectionProgress.filter(
           (p) => p.status === 'completed' || p.status === 'passed'
         ).length;
-        const total = enrollment.course._count.lessons + enrollment.course._count.modules;
+        const total = enrollment.collection._count.collectionLessons + enrollment.collection._count.modules;
         const progress = total > 0 ? (completed / total) * 100 : 0;
 
-        // Get next lesson
-        const nextLesson = await prisma.lesson.findFirst({
-          where: {
-            courseId: enrollment.courseId,
-            id: {
-              notIn: courseProgress
-                .filter((p) => p.type === 'lesson' && p.status === 'completed')
-                .map((p) => p.itemId),
-            },
-          },
+        // Get next lesson (from collection lessons)
+        const collectionLessons = await prisma.collectionLesson.findMany({
+          where: { collectionId: enrollment.collectionId },
+          include: { lesson: true },
           orderBy: { order: 'asc' },
-          select: {
-            id: true,
-            title: true,
-          },
         });
+        
+        const completedLessonIds = collectionProgress
+          .filter((p) => p.type === 'lesson' && p.status === 'completed')
+          .map((p) => p.itemId);
+        
+        const nextLessonData = collectionLessons.find(
+          (cl) => !completedLessonIds.includes(cl.lessonId)
+        );
 
-        const lastProgress = courseProgress[0];
+        const lastProgress = collectionProgress[0];
 
         return {
-          id: enrollment.course.id,
-          title: enrollment.course.title,
-          thumbnailUrl: enrollment.course.thumbnailUrl || undefined,
+          id: enrollment.collection.id,
+          title: enrollment.collection.title,
+          thumbnailUrl: enrollment.collection.thumbnailUrl || undefined,
           progress: Math.round(progress),
           lastAccessed: lastProgress?.lastAccessed,
-          nextLesson: nextLesson || undefined,
+          nextLesson: nextLessonData ? {
+            id: nextLessonData.lesson.id,
+            title: nextLessonData.lesson.title,
+          } : undefined,
         };
       })
     );
@@ -143,12 +144,12 @@ export class DashboardService {
     const now = new Date();
     const upcomingAssignments = await prisma.assignment.findMany({
       where: {
-        courseId: { in: courseIds },
+        collectionId: { in: collectionIds },
         dueDate: { gte: now },
         isPublished: true,
       },
       include: {
-        course: {
+        collection: {
           select: {
             id: true,
             title: true,
@@ -163,8 +164,8 @@ export class DashboardService {
       id: assignment.id,
       type: 'assignment' as const,
       title: assignment.title,
-      courseId: assignment.course.id,
-      courseTitle: assignment.course.title,
+      collectionId: assignment.collection.id,
+      collectionTitle: assignment.collection.title,
       dueDate: assignment.dueDate!,
     }));
 
@@ -172,7 +173,7 @@ export class DashboardService {
     const recentActivity = await prisma.progress.findMany({
       where: { studentId: userId },
       include: {
-        course: {
+        collection: {
           select: {
             id: true,
             title: true,
@@ -187,16 +188,16 @@ export class DashboardService {
       id: p.id,
       type: p.type,
       title: `${p.type} activity`,
-      courseId: p.course.id,
-      courseTitle: p.course.title,
+      collectionId: p.collection.id,
+      collectionTitle: p.collection.title,
       timestamp: p.lastAccessed,
     }));
 
     // Get recommendations (using existing recommendation service logic)
-    const recommendations = await prisma.courseRecommendation.findMany({
+    const recommendations = await prisma.collectionRecommendation.findMany({
       where: { userId },
       include: {
-        course: {
+        collection: {
           include: {
             _count: {
               select: {
@@ -211,34 +212,34 @@ export class DashboardService {
     });
 
     // Calculate average ratings for recommendations
-    const recCourseIds = recommendations.map((r) => r.course.id);
-    const recReviews = await prisma.courseReview.findMany({
+    const recCollectionIds = recommendations.map((r: any) => r.collection.id);
+    const recReviews = await prisma.collectionReview.findMany({
       where: {
-        courseId: { in: recCourseIds },
+        collectionId: { in: recCollectionIds },
         isPublished: true,
       },
       select: {
-        courseId: true,
+        collectionId: true,
         rating: true,
       },
     });
 
     const ratingsMap = new Map<string, number>();
-    for (const courseId of recCourseIds) {
-      const courseReviews = recReviews.filter((r) => r.courseId === courseId);
+    for (const collectionId of recCollectionIds) {
+      const collectionReviews = recReviews.filter((r: any) => r.collectionId === collectionId);
       const average =
-        courseReviews.length > 0
-          ? courseReviews.reduce((sum, r) => sum + r.rating, 0) / courseReviews.length
+        collectionReviews.length > 0
+          ? collectionReviews.reduce((sum: number, r: any) => sum + r.rating, 0) / collectionReviews.length
           : 0;
-      ratingsMap.set(courseId, Math.round(average * 10) / 10);
+      ratingsMap.set(collectionId, Math.round(average * 10) / 10);
     }
 
-    const recs = recommendations.map((rec) => ({
-      id: rec.course.id,
-      title: rec.course.title,
-      thumbnailUrl: rec.course.thumbnailUrl || undefined,
-      difficulty: rec.course.difficulty || undefined,
-      averageRating: ratingsMap.get(rec.course.id) || 0,
+    const recs = recommendations.map((rec: any) => ({
+      id: rec.collection.id,
+      title: rec.collection.title,
+      thumbnailUrl: rec.collection.thumbnailUrl || undefined,
+      difficulty: rec.collection.difficulty || undefined,
+      averageRating: ratingsMap.get(rec.collection.id) || 0,
     }));
 
     // Get statistics

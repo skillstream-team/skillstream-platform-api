@@ -1,8 +1,8 @@
 import { GraphQLObjectType, GraphQLSchema, GraphQLString, GraphQLInt, GraphQLFloat, GraphQLList, GraphQLNonNull } from 'graphql';
-import { CoursesService } from '../../services/service';
+import { CollectionsService } from '../../services/service';
 import { EnrollmentService } from '../../services/enrollment.service';
 
-const service = new CoursesService();
+const service = new CollectionsService();
 const enrollmentService = new EnrollmentService();
 
 const UserType = new GraphQLObjectType({
@@ -58,7 +58,7 @@ const coursesQuery = {
       limit: { type: GraphQLInt },
     },
     resolve: async (_: any, args: any) => {
-      const result = await service.getAllCourses(args.page || 1, args.limit || 20);
+      const result = await service.getAllCollections(args.page || 1, args.limit || 20);
       return (result.data as any[]).map((course: any) => ({
         ...course,
         id: Number(course.id),
@@ -81,7 +81,7 @@ const coursesQuery = {
     type: CourseType,
     args: { id: { type: GraphQLNonNull(GraphQLInt) } },
     resolve: async (_: any, args: any) => {
-        const course = await service.getCourseById(String(args.id)) as any;
+        const course = await service.getCollectionById(String(args.id)) as any;
         if (!course) return null;
         return {
           ...course,
@@ -104,13 +104,13 @@ const coursesQuery = {
   courseEnrollments: {
     type: new GraphQLList(CourseEnrollmentType),
     args: { 
-      courseId: { type: new GraphQLNonNull(GraphQLInt) },
+      collectionId: { type: new GraphQLNonNull(GraphQLString) },
       page: { type: GraphQLInt },
       limit: { type: GraphQLInt },
     },
     resolve: async (_: any, args: any) => {
-      const result = await enrollmentService.getCourseEnrollments(
-        String(args.courseId),
+      const result = await enrollmentService.getCollectionEnrollments(
+        args.collectionId,
         args.page || 1,
         args.limit || 20
       );
@@ -119,9 +119,9 @@ const coursesQuery = {
   },
   courseStats: {
     type: CourseStatsType,
-    args: { courseId: { type: new GraphQLNonNull(GraphQLInt) } },
+    args: { collectionId: { type: new GraphQLNonNull(GraphQLString) } },
     resolve: async (_: any, args: any) => {
-      return await enrollmentService.getCourseStats(String(args.courseId));
+      return await enrollmentService.getCollectionStats(args.collectionId);
     },
   },
 };
@@ -136,7 +136,7 @@ const coursesMutation = {
       instructorId: { type: GraphQLNonNull(GraphQLInt) },
     },
     resolve: async (_: any, args: any) => {
-        const created = await service.createCourse(args);
+        const created = await service.createCollection(args);
         return { ...created, id: Number(created.id) };
     }
   },
@@ -149,7 +149,7 @@ const coursesMutation = {
       price: { type: GraphQLFloat },
     },
     resolve: async (_: any, args: any) => {
-        const updated = await service.updateCourse(String(args.id), args);
+        const updated = await service.updateCollection(String(args.id), args);
         return { ...updated, id: Number(updated.id) };
     }
   },
@@ -157,15 +157,15 @@ const coursesMutation = {
     type: GraphQLString,
     args: { id: { type: GraphQLNonNull(GraphQLInt) } },
     resolve: async (_: any, args: any) => {
-      await service.deleteCourse(String(args.id));
-      return 'Course deleted';
+      await service.deleteCollection(String(args.id));
+      return 'Collection deleted';
     },
   },
   enrollCourse: {
     type: GraphQLString,
     args: {
-      courseId: { type: GraphQLNonNull(GraphQLInt) },
-      studentId: { type: GraphQLNonNull(GraphQLInt) },
+      collectionId: { type: GraphQLNonNull(GraphQLString) },
+      studentId: { type: GraphQLNonNull(GraphQLString) },
       amount: { type: GraphQLNonNull(GraphQLFloat) },
       currency: { type: GraphQLString },
       provider: { type: GraphQLNonNull(GraphQLString) },
@@ -174,16 +174,16 @@ const coursesMutation = {
     resolve: async (_: any, args: any) => {
       try {
         await enrollmentService.enrollStudent({
-          courseId: String(args.courseId),
-          studentId: String(args.studentId),
+          collectionId: args.collectionId,
+          studentId: args.studentId,
           amount: args.amount,
           currency: args.currency,
           provider: args.provider,
           transactionId: args.transactionId,
         });
-        return 'Successfully enrolled in course';
+        return 'Successfully enrolled in collection';
       } catch (error) {
-        throw new Error(error instanceof Error ? error.message : 'Failed to enroll in course');
+        throw new Error(error instanceof Error ? error.message : 'Failed to enroll in collection');
       }
     },
   },

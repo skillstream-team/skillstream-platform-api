@@ -10,25 +10,25 @@ const router = Router();
 
 /**
  * @swagger
- * /api/courses/{courseId}/certificates/{userId}:
+ * /api/collections/{collectionId}/certificates/{userId}:
  *   get:
  *     summary: Get certificate metadata
  *     tags: [Certificates]
  */
-router.get('/courses/:courseId/certificates/:userId', requireAuth, async (req, res) => {
+router.get('/collections/:collectionId/certificates/:userId', requireAuth, async (req, res) => {
   try {
-    const { courseId, userId } = req.params;
+    const { collectionId, userId } = req.params;
 
     const certificate = await prisma.certificate.findFirst({
       where: {
         studentId: userId,
-        courseId: courseId
+        collectionId: collectionId
       },
       include: {
         student: {
           select: { id: true, username: true, email: true }
         },
-        course: {
+        collection: {
           select: { id: true, title: true, description: true }
         }
       }
@@ -50,25 +50,25 @@ router.get('/courses/:courseId/certificates/:userId', requireAuth, async (req, r
 
 /**
  * @swagger
- * /api/courses/{courseId}/certificates/{userId}/download:
+ * /api/collections/{collectionId}/certificates/{userId}/download:
  *   get:
  *     summary: Download certificate as PDF
  *     tags: [Certificates]
  */
-router.get('/courses/:courseId/certificates/:userId/download', requireAuth, async (req, res) => {
+router.get('/collections/:collectionId/certificates/:userId/download', requireAuth, async (req, res) => {
   try {
-    const { courseId, userId } = req.params;
+    const { collectionId, userId } = req.params;
 
     const certificate = await prisma.certificate.findFirst({
       where: {
         studentId: userId,
-        courseId: courseId
+        collectionId: collectionId
       },
       include: {
         student: {
           select: { id: true, username: true, email: true }
         },
-        course: {
+        collection: {
           select: { id: true, title: true, description: true }
         }
       }
@@ -87,8 +87,8 @@ router.get('/courses/:courseId/certificates/:userId/download', requireAuth, asyn
           email: certificate.student.email || ''
         },
         course: {
-          title: certificate.course.title,
-          description: certificate.course.description || undefined
+          title: certificate.collection.title,
+          description: certificate.collection.description || undefined
         },
         issuedAt: certificate.issuedAt || new Date(),
         certificateNumber: certificate.id.substring(0, 8).toUpperCase()
@@ -98,7 +98,7 @@ router.get('/courses/:courseId/certificates/:userId/download', requireAuth, asyn
       res.setHeader('Content-Type', 'application/pdf');
       res.setHeader(
         'Content-Disposition',
-        `attachment; filename="certificate-${certificate.course.title.replace(/[^a-z0-9]/gi, '_')}-${certificate.id.substring(0, 8)}.pdf"`
+        `attachment; filename="certificate-${certificate.collection.title.replace(/[^a-z0-9]/gi, '_')}-${certificate.id.substring(0, 8)}.pdf"`
       );
 
       // Pipe PDF to response
@@ -115,14 +115,14 @@ router.get('/courses/:courseId/certificates/:userId/download', requireAuth, asyn
 
 /**
  * @swagger
- * /api/courses/{courseId}/certificates/{userId}/check-completion:
+ * /api/collections/{collectionId}/certificates/{userId}/check-completion:
  *   get:
- *     summary: Check course completion status
+ *     summary: Check collection completion status
  *     tags: [Certificates]
  */
-router.get('/courses/:courseId/certificates/:userId/check-completion', requireAuth, async (req, res) => {
+router.get('/collections/:collectionId/certificates/:userId/check-completion', requireAuth, async (req, res) => {
   try {
-    const { courseId, userId } = req.params;
+    const { collectionId, userId } = req.params;
     const currentUserId = (req as any).user?.id;
 
     // Users can only check their own completion, or teachers/admins can check any
@@ -130,7 +130,7 @@ router.get('/courses/:courseId/certificates/:userId/check-completion', requireAu
       return res.status(403).json({ error: 'Unauthorized' });
     }
 
-    const completion = await certificateService.checkCourseCompletion(userId, courseId);
+    const completion = await certificateService.checkCourseCompletion(userId, collectionId);
     
     res.json({
       success: true,
@@ -144,7 +144,7 @@ router.get('/courses/:courseId/certificates/:userId/check-completion', requireAu
 
 /**
  * @swagger
- * /api/courses/{courseId}/certificates/{userId}/issue:
+ * /api/collections/{collectionId}/certificates/{userId}/issue:
  *   post:
  *     summary: Manually issue certificate (Teacher/Admin only)
  *     tags: [Certificates]
@@ -154,22 +154,22 @@ const issueCertificateSchema = z.object({
   description: z.string().max(5000).optional(),
 });
 
-router.post('/courses/:courseId/certificates/:userId/issue',
+router.post('/collections/:collectionId/certificates/:userId/issue',
   requireAuth,
   requireRole('Teacher'),
   validate({ 
     params: z.object({ 
-      courseId: z.string().min(1),
+      collectionId: z.string().min(1),
       userId: z.string().min(1)
     }),
     body: issueCertificateSchema
   }),
   async (req, res) => {
     try {
-      const { courseId, userId } = req.params;
+      const { collectionId, userId } = req.params;
       const certificate = await certificateService.issueCertificate(
         userId,
-        courseId,
+        collectionId,
         req.body.title,
         req.body.description
       );
@@ -188,14 +188,14 @@ router.post('/courses/:courseId/certificates/:userId/issue',
 
 /**
  * @swagger
- * /api/courses/{courseId}/certificates/{userId}/auto-issue:
+ * /api/collections/{collectionId}/certificates/{userId}/auto-issue:
  *   post:
- *     summary: Attempt to auto-issue certificate if course is completed
+ *     summary: Attempt to auto-issue certificate if collection is completed
  *     tags: [Certificates]
  */
-router.post('/courses/:courseId/certificates/:userId/auto-issue', requireAuth, async (req, res) => {
+router.post('/collections/:collectionId/certificates/:userId/auto-issue', requireAuth, async (req, res) => {
   try {
-    const { courseId, userId } = req.params;
+    const { collectionId, userId } = req.params;
     const currentUserId = (req as any).user?.id;
 
     // Users can only auto-issue for themselves
@@ -203,7 +203,7 @@ router.post('/courses/:courseId/certificates/:userId/auto-issue', requireAuth, a
       return res.status(403).json({ error: 'Unauthorized' });
     }
 
-    const result = await certificateService.autoIssueCertificate(userId, courseId);
+    const result = await certificateService.autoIssueCertificate(userId, collectionId);
     
     if (result.issued) {
       res.status(201).json({

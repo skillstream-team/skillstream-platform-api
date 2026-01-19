@@ -24,7 +24,7 @@ export class CalendarService {
         endTime: eventData.endTime,
         isAllDay: eventData.isAllDay || false,
         location: eventData.location,
-        courseId: eventData.courseId,
+        collectionId: eventData.courseId, // Note: DTO still uses courseId, but we map to collectionId
         assignmentId: eventData.assignmentId,
         quizId: eventData.quizId,
         isRecurring: eventData.isRecurring || false,
@@ -39,7 +39,7 @@ export class CalendarService {
       },
       include: {
         creator: { select: { id: true, username: true } },
-        course: { select: { id: true, title: true } },
+        collection: { select: { id: true, title: true } },
         assignment: { select: { id: true, title: true } },
         quiz: { select: { id: true, title: true } },
         attendees: {
@@ -94,7 +94,7 @@ export class CalendarService {
       },
       include: {
         creator: { select: { id: true, username: true } },
-        course: { select: { id: true, title: true } },
+        collection: { select: { id: true, title: true } },
         assignment: { select: { id: true, title: true } },
         quiz: { select: { id: true, title: true } },
         attendees: {
@@ -144,7 +144,7 @@ export class CalendarService {
     const skip = (page - 1) * limit;
 
     const where: any = {
-      ...(filters.courseId && { courseId: filters.courseId }),
+      ...(filters.courseId && { collectionId: filters.courseId }),
       ...(filters.type && { type: filters.type }),
       ...(filters.startDate && filters.endDate && {
         OR: [
@@ -178,7 +178,7 @@ export class CalendarService {
         take: limit,
         include: {
           creator: { select: { id: true, username: true } },
-          course: { select: { id: true, title: true } },
+          collection: { select: { id: true, title: true } },
           assignment: { select: { id: true, title: true } },
           quiz: { select: { id: true, title: true } },
           attendees: {
@@ -209,13 +209,13 @@ export class CalendarService {
    * Get personal calendar for a student (all events for enrolled courses)
    */
   async getPersonalCalendar(userId: string, startDate?: Date, endDate?: Date): Promise<PersonalCalendarDto> {
-    // Get user's enrolled courses
+    // Get user's enrolled collections
     const enrollments = await prisma.enrollment.findMany({
       where: { studentId: userId },
-      select: { courseId: true }
+      select: { collectionId: true }
     });
 
-    const courseIds = enrollments.map(e => e.courseId);
+    const collectionIds = enrollments.map((e: any) => e.collectionId);
 
     // Get events for enrolled courses and events where user is an attendee
     const eventsResult = await this.getEvents({
@@ -228,12 +228,12 @@ export class CalendarService {
     // Get upcoming assignment deadlines
     const upcomingAssignments = await prisma.assignment.findMany({
       where: {
-        courseId: { in: courseIds },
+        collectionId: { in: collectionIds },
         dueDate: { gte: new Date() },
         isPublished: true
       },
       include: {
-        course: { select: { title: true } }
+        collection: { select: { title: true } }
       },
       orderBy: { dueDate: 'asc' },
       take: 10
@@ -242,12 +242,12 @@ export class CalendarService {
     // Get upcoming quiz deadlines
     const upcomingQuizzes = await prisma.quiz.findMany({
       where: {
-        courseId: { in: courseIds },
+        collectionId: { in: collectionIds },
         dueDate: { gte: new Date() },
         isPublished: true
       },
       include: {
-        course: { select: { title: true } }
+        collection: { select: { title: true } }
       },
       orderBy: { dueDate: 'asc' },
       take: 10
@@ -256,17 +256,17 @@ export class CalendarService {
     return {
       events,
       upcomingDeadlines: {
-        assignments: upcomingAssignments.map(assignment => ({
+        assignments: upcomingAssignments.map((assignment: any) => ({
           id: assignment.id,
           title: assignment.title,
           dueDate: assignment.dueDate!,
-          courseTitle: assignment.course.title
+          courseTitle: assignment.collection.title
         })),
-        quizzes: upcomingQuizzes.map(quiz => ({
+        quizzes: upcomingQuizzes.map((quiz: any) => ({
           id: quiz.id,
           title: quiz.title,
           dueDate: quiz.dueDate!,
-          courseTitle: quiz.course.title
+          courseTitle: quiz.collection.title
         }))
       }
     };
@@ -394,7 +394,7 @@ export class CalendarService {
         isPublished: true,
         events: { none: {} }
       },
-      include: { course: true }
+      include: { collection: true }
     });
 
     for (const assignment of assignmentsWithoutEvents) {
@@ -404,7 +404,7 @@ export class CalendarService {
         type: 'assignment_due',
         startTime: assignment.dueDate!,
         isAllDay: true,
-        courseId: assignment.courseId,
+        courseId: assignment.collectionId, // Note: DTO uses courseId but we pass collectionId
         assignmentId: assignment.id
       });
     }
@@ -416,7 +416,7 @@ export class CalendarService {
         isPublished: true,
         events: { none: {} }
       },
-      include: { course: true }
+      include: { collection: true }
     });
 
     for (const quiz of quizzesWithoutEvents) {
@@ -426,7 +426,7 @@ export class CalendarService {
         type: 'quiz_due',
         startTime: quiz.dueDate!,
         isAllDay: true,
-        courseId: quiz.courseId,
+        courseId: quiz.collectionId, // Note: DTO uses courseId but we pass collectionId
         quizId: quiz.id
       });
     }
@@ -445,7 +445,7 @@ export class CalendarService {
       endTime: event.endTime,
       isAllDay: event.isAllDay,
       location: event.location,
-      courseId: event.courseId,
+      courseId: event.collectionId, // Note: DTO uses courseId but we map from collectionId
       assignmentId: event.assignmentId,
       quizId: event.quizId,
       isRecurring: event.isRecurring,
@@ -459,7 +459,7 @@ export class CalendarService {
       createdAt: event.createdAt,
       updatedAt: event.updatedAt,
       creator: event.creator,
-      course: event.course,
+      course: event.collection, // Note: DTO uses course but we map from collection
       assignment: event.assignment,
       quiz: event.quiz,
       attendees: event.attendees?.map((attendee: any) => ({

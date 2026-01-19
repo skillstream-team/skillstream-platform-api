@@ -6,7 +6,7 @@ export interface CreateBundleDto {
   description?: string;
   price: number;
   thumbnailUrl?: string;
-  courseIds: string[];
+  collectionIds: string[];
 }
 
 export interface BundleResponseDto {
@@ -16,7 +16,7 @@ export interface BundleResponseDto {
   price: number;
   thumbnailUrl?: string;
   isActive: boolean;
-  courses: Array<{
+  collections: Array<{
     id: string;
     title: string;
     thumbnailUrl?: string;
@@ -30,12 +30,12 @@ export interface BundleResponseDto {
 
 export class BundlesService {
   /**
-   * Create a course bundle
+   * Create a collection bundle
    */
   async createBundle(data: CreateBundleDto): Promise<BundleResponseDto> {
-    // Validate all courses exist
-    const courses = await prisma.course.findMany({
-      where: { id: { in: data.courseIds } },
+    // Validate all collections exist
+    const collections = await prisma.collection.findMany({
+      where: { id: { in: data.collectionIds } },
       select: {
         id: true,
         title: true,
@@ -44,23 +44,23 @@ export class BundlesService {
       },
     });
 
-    if (courses.length !== data.courseIds.length) {
-      throw new Error('One or more courses not found');
+    if (collections.length !== data.collectionIds.length) {
+      throw new Error('One or more collections not found');
     }
 
     // Calculate total value
-    const totalValue = courses.reduce((sum, course) => sum + course.price, 0);
+    const totalValue = collections.reduce((sum: number, collection: any) => sum + collection.price, 0);
     const savings = totalValue - data.price;
 
-    const bundle = await prisma.courseBundle.create({
+    const bundle = await prisma.collectionBundle.create({
       data: {
         title: data.title,
         description: data.description,
         price: data.price,
         thumbnailUrl: data.thumbnailUrl,
         items: {
-          create: data.courseIds.map((courseId, index) => ({
-            courseId,
+          create: data.collectionIds.map((collectionId, index) => ({
+            collectionId,
             order: index,
           })),
         },
@@ -68,7 +68,7 @@ export class BundlesService {
       include: {
         items: {
           include: {
-            course: {
+            collection: {
               select: {
                 id: true,
                 title: true,
@@ -89,12 +89,12 @@ export class BundlesService {
    * Get all active bundles
    */
   async getAllBundles(): Promise<BundleResponseDto[]> {
-    const bundles = await prisma.courseBundle.findMany({
+    const bundles = await prisma.collectionBundle.findMany({
       where: { isActive: true },
       include: {
         items: {
           include: {
-            course: {
+            collection: {
               select: {
                 id: true,
                 title: true,
@@ -109,9 +109,9 @@ export class BundlesService {
       orderBy: { createdAt: 'desc' },
     });
 
-    return bundles.map((bundle) => {
+    return bundles.map((bundle: any) => {
       const totalValue = bundle.items.reduce(
-        (sum, item) => sum + item.course.price,
+        (sum: number, item: any) => sum + item.collection.price,
         0
       );
       const savings = totalValue - bundle.price;
@@ -123,12 +123,12 @@ export class BundlesService {
    * Get bundle by ID
    */
   async getBundleById(bundleId: string): Promise<BundleResponseDto | null> {
-    const bundle = await prisma.courseBundle.findUnique({
+    const bundle = await prisma.collectionBundle.findUnique({
       where: { id: bundleId },
       include: {
         items: {
           include: {
-            course: {
+            collection: {
               select: {
                 id: true,
                 title: true,
@@ -146,25 +146,25 @@ export class BundlesService {
       return null;
     }
 
-    const totalValue = bundle.items.reduce((sum, item) => sum + item.course.price, 0);
+    const totalValue = bundle.items.reduce((sum: number, item: any) => sum + item.collection.price, 0);
     const savings = totalValue - bundle.price;
 
     return this.mapToDto(bundle, totalValue, savings);
   }
 
   /**
-   * Enroll student in bundle (enrolls in all courses)
+   * Enroll student in bundle (enrolls in all collections)
    */
   async enrollInBundle(
     bundleId: string,
     studentId: string
   ): Promise<{ enrolled: number; alreadyEnrolled: number }> {
-    const bundle = await prisma.courseBundle.findUnique({
+    const bundle = await prisma.collectionBundle.findUnique({
       where: { id: bundleId },
       include: {
         items: {
           select: {
-            courseId: true,
+            collectionId: true,
           },
         },
       },
@@ -178,21 +178,21 @@ export class BundlesService {
       throw new Error('Bundle is not active');
     }
 
-    const courseIds = bundle.items.map((item) => item.courseId);
+    const collectionIds = bundle.items.map((item: any) => item.collectionId);
 
     // Check existing enrollments
     const existingEnrollments = await prisma.enrollment.findMany({
       where: {
         studentId,
-        courseId: { in: courseIds },
+        collectionId: { in: collectionIds },
       },
       select: {
-        courseId: true,
+        collectionId: true,
       },
     });
 
-    const existingCourseIds = new Set(existingEnrollments.map((e) => e.courseId));
-    const newCourseIds = courseIds.filter((id) => !existingCourseIds.has(id));
+    const existingCollectionIds = new Set(existingEnrollments.map((e) => e.collectionId));
+    const newCollectionIds = collectionIds.filter((id) => !existingCollectionIds.has(id));
 
     // Create bundle enrollment
     await prisma.bundleEnrollment.create({
@@ -202,12 +202,12 @@ export class BundlesService {
       },
     });
 
-    // Note: Actual course enrollments would be handled by the enrollment service
+    // Note: Actual collection enrollments would be handled by the enrollment service
     // This just tracks bundle enrollment
 
     return {
-      enrolled: newCourseIds.length,
-      alreadyEnrolled: existingCourseIds.size,
+      enrolled: newCollectionIds.length,
+      alreadyEnrolled: existingCollectionIds.size,
     };
   }
 
@@ -223,11 +223,11 @@ export class BundlesService {
       price: bundle.price,
       thumbnailUrl: bundle.thumbnailUrl || undefined,
       isActive: bundle.isActive,
-      courses: bundle.items.map((item: any) => ({
-        id: item.course.id,
-        title: item.course.title,
-        thumbnailUrl: item.course.thumbnailUrl || undefined,
-        price: item.course.price,
+      collections: bundle.items.map((item: any) => ({
+        id: item.collection.id,
+        title: item.collection.title,
+        thumbnailUrl: item.collection.thumbnailUrl || undefined,
+        price: item.collection.price,
       })),
       totalValue,
       savings,

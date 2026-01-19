@@ -263,6 +263,26 @@ export class LessonPaymentService {
       return updatedPayment;
     });
 
+    // Record teacher earnings for lesson/booking payments
+    try {
+      if (payment.lessonId && payment.lesson) {
+        // Check if it's a standalone Lesson (not QuickLesson)
+        const standaloneLesson = await prisma.lesson.findUnique({
+          where: { id: payment.lessonId },
+          select: { teacherId: true, monetizationType: true },
+        });
+
+        if (standaloneLesson && standaloneLesson.monetizationType === 'PREMIUM' && standaloneLesson.teacherId) {
+          const { TeacherEarningsService } = await import('../../earnings/services/teacher-earnings.service');
+          const earningsService = new TeacherEarningsService();
+          await earningsService.recordLessonSale(payment.lessonId, paymentId);
+        }
+      }
+    } catch (earningsError) {
+      console.warn('Failed to record teacher earnings for lesson payment:', earningsError);
+      // Don't throw - payment is already confirmed
+    }
+
     // Send confirmation email
     try {
       if (payment.lessonId && payment.lesson) {

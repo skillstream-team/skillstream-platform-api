@@ -8,6 +8,9 @@ import { registerUserModule } from "./modules/users";
 import { registerCoursesModule } from "./modules/courses";
 import { registerMessagingModule } from "./modules/messaging";
 import { registerSubscriptionRoutes } from "./modules/subscriptions";
+import { registerWorkshopRoutes } from "./modules/workshops";
+import { registerAnalyticsRoutes } from "./modules/analytics";
+import { registerEarningsRoutes } from "./modules/earnings";
 import { setSocketIO } from "./modules/users/services/admin-messaging.service";
 import { validateEnv, env } from "./utils/env";
 import { errorHandler } from "./middleware/error-handler";
@@ -109,6 +112,13 @@ registerUserModule(app);
 registerCoursesModule(app);
 registerMessagingModule(app, io);
 registerSubscriptionRoutes(app);
+registerWorkshopRoutes(app);
+registerAnalyticsRoutes(app);
+registerEarningsRoutes(app);
+
+// Register admin job routes (for manual task execution)
+import adminJobsRoutes from './modules/admin/routes/jobs.routes';
+app.use('/api/admin', adminJobsRoutes);
 
 // Setup Swagger docs
 setupSwagger(app);

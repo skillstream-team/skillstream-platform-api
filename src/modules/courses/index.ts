@@ -39,6 +39,8 @@ import shareRoutes from './routes/rest/share.routes';
 import comparisonRoutes from './routes/rest/comparison.routes';
 import courseImportRoutes from './routes/rest/course-import.routes';
 import lessonPaymentRoutes from './routes/rest/lesson-payment.routes';
+import lessonPurchaseRoutes from './routes/rest/lesson-purchase.routes';
+import monetizationRoutes from './routes/rest/monetization.routes';
 import { coursesSchema } from './routes/graphql/course.resolver';
 import { enrollmentSchema } from './routes/graphql/enrollment.resolver';
 import { mediaSchema } from './routes/graphql/media.resolver';
@@ -95,6 +97,8 @@ export function registerCoursesModule(app: express.Application) {
   app.use('/api/tags', tagsPlatformRoutes); // Platform-wide tag routes
   app.use('/api/referrals', referralRoutes);
   app.use('/api', lessonPaymentRoutes);
+  app.use('/api', lessonPurchaseRoutes);
+  app.use('/api', monetizationRoutes);
 
   // GraphQL endpoints
   app.use('/graphql/courses', graphqlHTTP({
@@ -148,6 +152,7 @@ export { ReferralService } from './services/referral.service';
 export { ShareService } from './services/share.service';
 export { ComparisonService } from './services/comparison.service';
 export { CourseImportService } from './services/course-import.service';
+export { MonetizationService } from './services/monetization.service';
 export { coursesSchema };
 export { enrollmentSchema };
 export { mediaSchema };

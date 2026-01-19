@@ -36,10 +36,29 @@ export class EnrollmentService {
      *         description: Student already enrolled or invalid data
      */
     async enrollStudent(data: CreateEnrollmentDto): Promise<EnrollmentResponseDto> {
-        // Check if student has active subscription
-        const hasSubscription = await this.subscriptionService.hasActiveSubscription(data.studentId);
-        if (!hasSubscription) {
-            throw new Error('Active subscription required to enroll in courses. Please subscribe ($6/month) to continue.');
+        // Check collection monetization type
+        const collection = await prisma.collection.findUnique({
+            where: { id: data.collectionId },
+            select: { monetizationType: true, price: true },
+        });
+
+        if (!collection) {
+            throw new Error('Collection not found');
+        }
+
+        // Check access based on monetization type
+        const { MonetizationService } = await import('./monetization.service');
+        const monetizationService = new MonetizationService();
+        const canAccess = await monetizationService.canAccess(data.studentId, data.collectionId, 'COLLECTION');
+
+        if (!canAccess) {
+            if (collection.monetizationType === 'SUBSCRIPTION') {
+                throw new Error('Active subscription required to access this collection. Please subscribe to continue.');
+            } else if (collection.monetizationType === 'PREMIUM') {
+                throw new Error('This is a premium collection. Please purchase to enroll.');
+            } else {
+                throw new Error('You do not have access to this collection.');
+            }
         }
 
         // Check prerequisites
@@ -120,6 +139,18 @@ export class EnrollmentService {
         } catch (emailError) {
             console.warn('Failed to send enrollment email:', emailError);
             // Don't fail enrollment if email fails
+        }
+
+        // Record teacher earnings for premium collections
+        if (collection.monetizationType === 'PREMIUM' && result.payment) {
+            try {
+                const { TeacherEarningsService } = await import('../../earnings/services/teacher-earnings.service');
+                const earningsService = new TeacherEarningsService();
+                await earningsService.recordPremiumSale(data.collectionId, result.payment.id);
+            } catch (earningsError) {
+                console.warn('Failed to record teacher earnings:', earningsError);
+                // Don't fail enrollment if earnings recording fails
+            }
         }
 
         // Track referral activity

@@ -92,6 +92,50 @@ export class SubscriptionService {
       // Don't fail subscription activation if referral tracking fails
     }
 
+    // Grant access to all subscription-marked content
+    try {
+      const { SubscriptionAccessService } = await import('./subscription-access.service');
+      const accessService = new SubscriptionAccessService();
+
+      // Get all subscription-marked collections
+      const subscriptionCollections = await prisma.collection.findMany({
+        where: {
+          monetizationType: 'SUBSCRIPTION',
+          isPublished: true,
+        },
+        select: { id: true },
+      });
+
+      // Get all subscription-marked lessons
+      const subscriptionLessons = await prisma.lesson.findMany({
+        where: {
+          monetizationType: 'SUBSCRIPTION',
+        },
+        select: { id: true },
+      });
+
+      // Grant access to collections
+      for (const collection of subscriptionCollections) {
+        try {
+          await accessService.grantAccess(userId, collection.id, 'COLLECTION', 'SUBSCRIPTION', result.expiresAt || undefined);
+        } catch (error) {
+          console.warn(`Failed to grant access to collection ${collection.id}:`, error);
+        }
+      }
+
+      // Grant access to lessons
+      for (const lesson of subscriptionLessons) {
+        try {
+          await accessService.grantAccess(userId, lesson.id, 'LESSON', 'SUBSCRIPTION', result.expiresAt || undefined);
+        } catch (error) {
+          console.warn(`Failed to grant access to lesson ${lesson.id}:`, error);
+        }
+      }
+    } catch (accessError) {
+      console.warn('Failed to grant subscription access to content:', accessError);
+      // Don't fail subscription activation if access granting fails
+    }
+
     // Invalidate cache
     await deleteCachePattern(`subscription:*:${userId}*`);
 

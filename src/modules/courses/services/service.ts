@@ -886,8 +886,17 @@ export class CollectionsService {
         collectionId: string;
         description?: string;
         duration?: number;
+        price?: number;
         isPreview?: boolean;
     }) {
+        // Validate price
+        if (data.price === undefined || data.price === null) {
+            throw new Error('Price is required for lessons');
+        }
+        if (typeof data.price !== 'number' || data.price < 0) {
+            throw new Error('Price must be a non-negative number');
+        }
+
         // Store moduleId and description in content JSON since Lesson model doesn't have these fields
         const content = (data.content as any) || {};
         content.moduleId = moduleId;
@@ -900,6 +909,7 @@ export class CollectionsService {
             title: data.title,
             order: data.order,
             content: content as Prisma.InputJsonValue,
+            price: data.price || 0,
         };
         
         // Add optional fields only if they exist

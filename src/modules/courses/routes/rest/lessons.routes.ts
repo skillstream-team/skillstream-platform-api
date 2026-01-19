@@ -168,12 +168,21 @@ router.post('/lessons', requireAuth, requireRole('TEACHER'), async (req, res) =>
       title, 
       description, 
       duration,
+      price,
       isPreview,
       content
     } = req.body;
 
     if (!title || !title.trim()) {
       return res.status(400).json({ error: 'Title is required' });
+    }
+
+    if (price === undefined || price === null) {
+      return res.status(400).json({ error: 'Price is required' });
+    }
+
+    if (typeof price !== 'number' || price < 0) {
+      return res.status(400).json({ error: 'Price must be a non-negative number' });
     }
 
     // Build content JSON
@@ -188,6 +197,7 @@ router.post('/lessons', requireAuth, requireRole('TEACHER'), async (req, res) =>
         title: title.trim(),
         content: lessonContent,
         duration: duration || null,
+        price: price || 0,
         isPreview: isPreview || false,
         teacherId: userId,
         order: 0,
@@ -229,6 +239,7 @@ router.get('/lessons/:id', requireAuth, async (req, res) => {
         scheduledAt: true,
         teacherId: true,
         duration: true,
+        price: true,
         joinLink: true,
         meetingId: true,
         status: true,
@@ -361,7 +372,7 @@ router.get('/lessons', requireAuth, requireSubscription, async (req, res) => {
 router.put('/lessons/:id', requireAuth, requireRole('TEACHER'), async (req, res) => {
   try {
     const { id } = req.params;
-    const { title, description, order, duration, isPreview, moduleId } = req.body;
+    const { title, description, order, duration, price, isPreview, moduleId } = req.body;
     
     // Get lesson to check if it exists
     const existingLesson = await prisma.lesson.findUnique({
@@ -378,6 +389,12 @@ router.put('/lessons/:id', requireAuth, requireRole('TEACHER'), async (req, res)
     if (title !== undefined) updateData.title = title;
     if (order !== undefined) updateData.order = order;
     if (duration !== undefined) updateData.duration = duration;
+    if (price !== undefined) {
+      if (typeof price !== 'number' || price < 0) {
+        return res.status(400).json({ error: 'Price must be a non-negative number' });
+      }
+      updateData.price = price;
+    }
     if (isPreview !== undefined) updateData.isPreview = isPreview;
 
     // Handle content JSON (description and moduleId)

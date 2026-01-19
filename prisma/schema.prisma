@@ -112,6 +112,10 @@ model User {
   userLevels             UserLevel[]               @relation("UserLevelUser")
   subscription           Subscription?
   teacherEarnings        TeacherEarnings[]         @relation("TeacherEarnings")
+  subscriptionAccesses   SubscriptionAccess[]
+  liveWorkshopsCreated   LiveWorkshop[]            @relation("LiveWorkshopTeacher")
+  liveWorkshopEnrollments LiveWorkshopEnrollment[] @relation("LiveWorkshopStudent")
+  studentEngagements     StudentEngagement[]       @relation("StudentEngagement")
   teacherPayouts         TeacherPayout[]           @relation("TeacherPayouts")
   earningsSummary        TeacherEarningsSummary?   @relation("TeacherEarningsSummary")
   wishlistEntries        CollectionWishlist[]
@@ -179,6 +183,10 @@ model Collection {
   isPublished      Boolean @default(false)
   rejectionReason  String? // Reason if rejected
   
+  // Monetization
+  monetizationType String @default("PREMIUM") // "FREE", "SUBSCRIPTION", "PREMIUM"
+  subscriptionTier String? // "BASIC", "PRO", "ENTERPRISE" (for future multi-tier)
+  
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
   createdBy    String   @db.ObjectId
@@ -222,12 +230,15 @@ model Collection {
   learningPathCollections LearningPathCollection[] @relation("LearningPathCollections")
   coupons            Coupon[]
   imports            CollectionImport[]
+  subscriptionAccesses SubscriptionAccess[]
+  engagements        StudentEngagement[]
   
   @@index([difficulty])
   @@index([language])
   @@index([moderationStatus, isPublished])
   @@index([isPublished, createdAt])
   @@index([duration])
+  @@index([monetizationType])
 }
 
 // Join table for Collections and Lessons (many-to-many)
@@ -277,6 +288,9 @@ model Payment {
   booking   Booking? @relation(fields: [bookingId], references: [id])
   lessonId  String? @db.ObjectId
   lesson    QuickLesson? @relation(fields: [lessonId], references: [id])
+  
+  // Workshop payment
+  workshopEnrollment LiveWorkshopEnrollment?
 
   amount        Float
   currency      String   @default("USD")
@@ -319,17 +333,22 @@ model Lesson {
   scheduledAt DateTime?
   teacherId   String?   @db.ObjectId
   duration    Int? // Duration in minutes
+  price       Float      @default(0) // Price for the lesson
   joinLink    String?
   meetingId   String?
   status      String    @default("scheduled") // "scheduled", "in_progress", "completed", "cancelled"
   isPreview   Boolean   @default(false) // Free preview lesson
+  monetizationType String @default("PREMIUM") // "FREE", "SUBSCRIPTION", "PREMIUM"
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
   quizzes     Quiz[]
   collectionLessons CollectionLesson[]
+  subscriptionAccesses SubscriptionAccess[]
+  engagements        StudentEngagement[]
   
   @@index([isPreview])
   @@index([teacherId])
+  @@index([monetizationType])
 }
 
 model Quiz {
@@ -1268,7 +1287,7 @@ model Interaction {
 
   user   User          @relation(fields: [userId], references: [id])
   collection Collection?       @relation(fields: [collectionId], references: [id])
-  module CourseModule? @relation(fields: [moduleId], references: [id])
+  module CollectionModule? @relation(fields: [moduleId], references: [id])
   quiz   Quiz?         @relation(fields: [quizId], references: [id])
 }
 
@@ -1675,8 +1694,8 @@ model TeacherEarnings {
   teacherId String @db.ObjectId
   teacher   User   @relation("TeacherEarnings", fields: [teacherId], references: [id], onDelete: Cascade)
 
-  collectionId String @db.ObjectId
-  collection   Collection @relation("CollectionEarnings", fields: [collectionId], references: [id], onDelete: Cascade)
+  collectionId String? @db.ObjectId
+  collection   Collection? @relation("CollectionEarnings", fields: [collectionId], references: [id], onDelete: Cascade)
 
   periodStart DateTime // Start of the month/period
   periodEnd   DateTime // End of the month/period
@@ -1687,19 +1706,41 @@ model TeacherEarnings {
   amount          Float // Total earnings for this period
   currency        String @default("USD")
 
+  // New fields for hybrid monetization
+  revenueSource String @default("COLLECTION") 
+    // "COLLECTION" (premium sales), "SUBSCRIPTION" (revenue pool), 
+    // "LIVE_WORKSHOP", "LESSON" (standalone lesson sales)
+  
+  sourceId      String? // ID of collection, lesson, or workshop
+  sourceType    String? // "COLLECTION", "LESSON", "WORKSHOP"
+  
+  // Subscription-specific fields
+  watchTimeMinutes Int? @default(0) // Total watch time for subscription revenue
+  completionRate   Float? // Completion rate for engagement calculation
+  engagedStudents  Int? @default(0) // Students who completed >50% of content
+  
+  // Platform fee
+  platformFeePercent Float @default(0.30) // 30% platform fee (configurable)
+  platformFeeAmount  Float @default(0)
+  netAmount          Float // Amount after platform fee
+
   status   String         @default("PENDING") // "PENDING", "AVAILABLE", "PAID"
   paidAt   DateTime?
   payoutId String?        @db.ObjectId
   payout   TeacherPayout? @relation(fields: [payoutId], references: [id], onDelete: SetNull)
+  
+  revenuePool SubscriptionRevenuePool? @relation(fields: [revenuePoolId], references: [id])
+  revenuePoolId String? @db.ObjectId
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@unique([teacherId, collectionId, period])
+  @@unique([teacherId, collectionId, period, revenueSource])
   @@index([teacherId, period])
   @@index([status, period])
   @@index([collectionId, period])
   @@index([payoutId])
+  @@index([revenueSource, period])
 }
 
 model TeacherPayout {
@@ -2095,4 +2136,162 @@ model EmailTemplate {
 
   @@unique([type])
   @@index([isActive, type])
+}
+
+// ============================================================
+// HYBRID MONETIZATION MODELS
+// ============================================================
+
+model SubscriptionAccess {
+  id           String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId       String   @db.ObjectId
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // Content access
+  collectionId String?  @db.ObjectId
+  collection   Collection? @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+  lessonId     String?  @db.ObjectId
+  lesson       Lesson?  @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  
+  // Access metadata
+  grantedAt    DateTime @default(now())
+  expiresAt    DateTime? // Null = access until subscription expires
+  accessType   String   @default("SUBSCRIPTION") // "SUBSCRIPTION", "TRIAL", "PROMOTIONAL"
+  
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  
+  @@unique([userId, collectionId, lessonId])
+  @@index([userId, expiresAt])
+  @@index([collectionId])
+  @@index([lessonId])
+}
+
+model StudentEngagement {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  studentId   String   @db.ObjectId
+  student     User     @relation("StudentEngagement", fields: [studentId], references: [id], onDelete: Cascade)
+  
+  // Content reference
+  collectionId String? @db.ObjectId
+  collection   Collection? @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+  lessonId     String? @db.ObjectId
+  lesson       Lesson? @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  
+  // Engagement metrics
+  watchTimeMinutes Int @default(0)
+  lastWatchedAt     DateTime?
+  completionPercent Float @default(0) // 0-100
+  isCompleted       Boolean @default(false)
+  completedAt       DateTime?
+  
+  // Period for subscription revenue
+  period      String // "2024-01" format
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@unique([studentId, collectionId, lessonId, period])
+  @@index([collectionId, period])
+  @@index([lessonId, period])
+  @@index([studentId, period])
+}
+
+model SubscriptionRevenuePool {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  period      String   @unique // "2024-01" format
+  periodStart DateTime
+  periodEnd   DateTime
+  
+  // Revenue metrics
+  totalRevenue      Float @default(0) // Total subscription revenue for period
+  platformFee       Float @default(0) // Platform's cut
+  teacherPool       Float @default(0) // Amount distributed to teachers
+  totalWatchTime    Int   @default(0) // Total minutes watched by subscribers
+  totalEngagements  Int   @default(0) // Total lesson completions
+  
+  // Distribution status
+  status      String @default("PENDING") // "PENDING", "CALCULATING", "DISTRIBUTED"
+  distributedAt DateTime?
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  earnings    TeacherEarnings[]
+  
+  @@index([period, status])
+}
+
+model LiveWorkshop {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  teacherId   String   @db.ObjectId
+  teacher     User     @relation("LiveWorkshopTeacher", fields: [teacherId], references: [id], onDelete: Cascade)
+  
+  title       String
+  description String?
+  scheduledAt DateTime
+  duration    Int // Duration in minutes
+  maxSeats    Int
+  currentSeats Int @default(0)
+  
+  // Pricing
+  pricePerSeat Float
+  platformFeePercent Float @default(0.30) // Configurable
+  platformFeeAmount  Float
+  teacherEarnings    Float // Calculated after platform fee
+  
+  // Access
+  joinLink    String?
+  meetingId    String?
+  recordingUrl String? // Available after workshop ends
+  
+  // Status
+  status      String @default("SCHEDULED") 
+    // "SCHEDULED", "LIVE", "COMPLETED", "CANCELLED"
+  
+  // Enrollment
+  enrollments LiveWorkshopEnrollment[]
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@index([teacherId, scheduledAt])
+  @@index([status, scheduledAt])
+}
+
+model LiveWorkshopEnrollment {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  workshopId  String   @db.ObjectId
+  workshop    LiveWorkshop @relation(fields: [workshopId], references: [id], onDelete: Cascade)
+  studentId   String   @db.ObjectId
+  student     User     @relation("LiveWorkshopStudent", fields: [studentId], references: [id], onDelete: Cascade)
+  
+  paymentId   String?  @unique @db.ObjectId
+  payment     Payment? @relation(fields: [paymentId], references: [id])
+  
+  attended    Boolean  @default(false)
+  attendanceAt DateTime?
+  
+  createdAt   DateTime @default(now())
+  
+  @@unique([workshopId, studentId])
+  @@index([workshopId])
+  @@index([studentId])
+}
+
+model FeatureFlag {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  name        String   @unique
+  description String?
+  enabled     Boolean  @default(false)
+  rolloutPercent Int   @default(0) // 0-100, for gradual rollout
+  
+  // Targeting
+  targetRoles String[] // ["TEACHER", "STUDENT"] - empty = all
+  targetUserIds String[] // Specific user IDs for beta testing
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@index([name, enabled])
 }

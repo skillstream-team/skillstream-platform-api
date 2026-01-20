@@ -24,16 +24,16 @@ router.get('/users/:userId/earnings-report', auth_1.requireAuth, (0, roles_1.req
         const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
         const endOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0);
         const startOfYear = new Date(now.getFullYear(), 0, 1);
-        // Get all payments for courses taught by this teacher
-        const tutorCourses = await prisma_1.prisma.course.findMany({
+        // Get all payments for collections taught by this teacher
+        const tutorCollections = await prisma_1.prisma.collection.findMany({
             where: { instructorId: userId },
             select: { id: true }
         });
-        const courseIds = tutorCourses.map(c => c.id);
+        const collectionIds = tutorCollections.map((c) => c.id);
         // Current month earnings
         const currentMonthPayments = await prisma_1.prisma.payment.findMany({
             where: {
-                courseId: { in: courseIds },
+                collectionId: { in: collectionIds },
                 status: 'COMPLETED',
                 createdAt: { gte: startOfMonth }
             }
@@ -41,7 +41,7 @@ router.get('/users/:userId/earnings-report', auth_1.requireAuth, (0, roles_1.req
         // Previous month earnings
         const previousMonthPayments = await prisma_1.prisma.payment.findMany({
             where: {
-                courseId: { in: courseIds },
+                collectionId: { in: collectionIds },
                 status: 'COMPLETED',
                 createdAt: { gte: startOfLastMonth, lte: endOfLastMonth }
             }
@@ -49,7 +49,7 @@ router.get('/users/:userId/earnings-report', auth_1.requireAuth, (0, roles_1.req
         // Year to date earnings
         const yearToDatePayments = await prisma_1.prisma.payment.findMany({
             where: {
-                courseId: { in: courseIds },
+                collectionId: { in: collectionIds },
                 status: 'COMPLETED',
                 createdAt: { gte: startOfYear }
             }
@@ -57,7 +57,7 @@ router.get('/users/:userId/earnings-report', auth_1.requireAuth, (0, roles_1.req
         // Lifetime earnings
         const lifetimePayments = await prisma_1.prisma.payment.findMany({
             where: {
-                courseId: { in: courseIds },
+                collectionId: { in: collectionIds },
                 status: 'COMPLETED'
             }
         });
@@ -68,8 +68,8 @@ router.get('/users/:userId/earnings-report', auth_1.requireAuth, (0, roles_1.req
         const previousMonth = calculateTotal(previousMonthPayments);
         const yearToDate = calculateTotal(yearToDatePayments);
         const lifetime = calculateTotal(lifetimePayments);
-        // Get courses with earnings
-        const courses = await prisma_1.prisma.course.findMany({
+        // Get collections with earnings
+        const collections = await prisma_1.prisma.collection.findMany({
             where: { instructorId: userId },
             include: {
                 payments: {
@@ -85,7 +85,7 @@ router.get('/users/:userId/earnings-report', auth_1.requireAuth, (0, roles_1.req
             const monthEnd = new Date(now.getFullYear(), now.getMonth() - i + 1, 0);
             const monthPayments = await prisma_1.prisma.payment.findMany({
                 where: {
-                    courseId: { in: courseIds },
+                    collectionId: { in: collectionIds },
                     status: 'COMPLETED',
                     createdAt: { gte: monthStart, lte: monthEnd }
                 }
@@ -99,11 +99,11 @@ router.get('/users/:userId/earnings-report', auth_1.requireAuth, (0, roles_1.req
         // Get transactions
         const transactions = await prisma_1.prisma.payment.findMany({
             where: {
-                courseId: { in: courseIds },
+                collectionId: { in: collectionIds },
                 status: 'COMPLETED'
             },
             include: {
-                course: {
+                collection: {
                     select: { id: true, title: true }
                 },
                 student: {
@@ -121,7 +121,7 @@ router.get('/users/:userId/earnings-report', auth_1.requireAuth, (0, roles_1.req
                 yearToDate,
                 lifetime,
                 tutorShare,
-                courses: courses.map(c => ({
+                collections: collections.map((c) => ({
                     id: c.id,
                     title: c.title,
                     totalEarnings: calculateTotal(c.payments),

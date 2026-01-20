@@ -1,6 +1,7 @@
 export interface CreateRecommendationDto {
   userId: string;
-  courseId: string;
+  courseId: string; // API compatibility - maps to collectionId
+  collectionId: string;
   score: number;
   reason: string;
   algorithm: string;
@@ -33,7 +34,8 @@ export interface RecommendationResponseDto {
 
 export interface UserInteractionDto {
   userId: string;
-  courseId?: string;
+  courseId?: string; // Still named courseId for API compatibility, but maps to collectionId
+  collectionId?: string;
   type: 'view' | 'enroll' | 'complete' | 'rate' | 'search';
   value?: number;
   metadata?: any;

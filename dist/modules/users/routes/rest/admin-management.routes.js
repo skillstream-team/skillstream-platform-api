@@ -240,7 +240,7 @@ router.post('/admin/courses/:id/moderate', auth_1.requireAuth, (0, validation_1.
     }
     try {
         const adminId = req.user.id;
-        const course = await adminService.moderateCourse(req.params.id, req.body.status, req.body.rejectionReason, adminId);
+        const course = await adminService.moderateCollection(req.params.id, req.body.status, req.body.rejectionReason, adminId);
         res.json({
             success: true,
             data: course,

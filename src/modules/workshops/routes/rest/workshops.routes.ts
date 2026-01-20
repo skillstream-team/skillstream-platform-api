@@ -14,7 +14,7 @@ const workshopService = new WorkshopService();
  *   post:
  *     summary: Create a live workshop
  */
-router.post('/', requireAuth, requireRole('TEACHER', 'ADMIN'), async (req, res) => {
+router.post('/', requireAuth, requireRole('TEACHER'), async (req, res) => {
   try {
     const userId = (req as any).user?.id;
     const { title, description, scheduledAt, duration, maxSeats, pricePerSeat, platformFeePercent } = req.body;
@@ -169,7 +169,7 @@ router.post('/:id/enroll', requireAuth, async (req, res) => {
  *   post:
  *     summary: Mark workshop as completed (teacher only)
  */
-router.post('/:id/complete', requireAuth, requireRole('TEACHER', 'ADMIN'), async (req, res) => {
+router.post('/:id/complete', requireAuth, requireRole('TEACHER'), async (req, res) => {
   try {
     const result = await workshopService.completeWorkshop(req.params.id);
     res.json(result);

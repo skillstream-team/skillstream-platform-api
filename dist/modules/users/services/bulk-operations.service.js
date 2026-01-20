@@ -10,7 +10,7 @@ const cache_1 = require("../../../utils/cache");
 class BulkOperationsService {
     constructor() {
         this.usersService = new users_service_1.UsersService();
-        this.coursesService = new service_1.CoursesService();
+        this.collectionsService = new service_1.CollectionsService();
         this.enrollmentService = new enrollment_service_1.EnrollmentService();
         this.notificationsService = new notifications_service_1.NotificationsService();
     }
@@ -95,7 +95,7 @@ class BulkOperationsService {
     async bulkImportCourses(data) {
         const results = await Promise.allSettled(data.courses.map(async (courseData) => {
             try {
-                await this.coursesService.createCourse({
+                await this.collectionsService.createCollection({
                     ...courseData,
                     createdBy: courseData.instructorId,
                 });
@@ -123,7 +123,7 @@ class BulkOperationsService {
      * Bulk export courses (CSV format)
      */
     async bulkExportCourses() {
-        const courses = await prisma_1.prisma.course.findMany({
+        const courses = await prisma_1.prisma.collection.findMany({
             select: {
                 id: true,
                 title: true,
@@ -163,14 +163,14 @@ class BulkOperationsService {
                     transactionId: undefined,
                 });
                 return {
-                    courseId: enrollmentData.courseId,
+                    collectionId: enrollmentData.collectionId,
                     studentId: enrollmentData.studentId,
                     success: true,
                 };
             }
             catch (error) {
                 return {
-                    courseId: enrollmentData.courseId,
+                    collectionId: enrollmentData.collectionId,
                     studentId: enrollmentData.studentId,
                     success: false,
                     error: error.message,
@@ -184,7 +184,7 @@ class BulkOperationsService {
             failed,
             results: results.map((r) => r.status === 'fulfilled'
                 ? r.value
-                : { courseId: '', studentId: '', success: false, error: 'Unknown error' }),
+                : { collectionId: '', studentId: '', success: false, error: 'Unknown error' }),
         };
     }
     /**

@@ -140,7 +140,7 @@ router.post('/lessons/:lessonId/resources/upload', auth_1.requireAuth, async (re
             file: fileBuffer,
             filename,
             contentType,
-            courseId: courseId.toString(),
+            collectionId: courseId.toString(),
             type: fileType,
         });
         // Create resource record

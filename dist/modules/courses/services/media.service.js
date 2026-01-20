@@ -32,12 +32,12 @@ class MediaService {
             file: data.file,
             filename: data.filename,
             contentType: data.mimeType,
-            courseId: data.courseId,
+            collectionId: data.collectionId,
             type: data.type,
         });
         const material = await prisma_1.prisma.material.create({
             data: {
-                courseId: data.courseId,
+                collectionId: data.collectionId,
                 type: data.type,
                 key: uploadResult.key,
                 filename: data.filename,
@@ -59,9 +59,9 @@ class MediaService {
      *     summary: Get all materials for a specific course
      *     tags: [Materials]
      */
-    async getMaterialsByCourse(courseId) {
+    async getMaterialsByCourse(collectionId) {
         const materials = await prisma_1.prisma.material.findMany({
-            where: { courseId },
+            where: { collectionId },
             include: { uploader: { select: { id: true, username: true, email: true } } },
             orderBy: { createdAt: 'desc' },
         });
@@ -123,9 +123,9 @@ class MediaService {
      *     summary: Get all videos by course
      *     tags: [Videos]
      */
-    async getVideosByCourse(courseId) {
+    async getVideosByCourse(collectionId) {
         const videos = await prisma_1.prisma.video.findMany({
-            where: { courseId },
+            where: { collectionId },
             include: { uploader: { select: { id: true, username: true, email: true } } },
             orderBy: { createdAt: 'desc' },
         });
@@ -228,9 +228,9 @@ class MediaService {
      *     summary: Get all live streams for a course
      *     tags: [Live Streams]
      */
-    async getLiveStreamsByCourse(courseId) {
+    async getLiveStreamsByCourse(collectionId) {
         const liveStreams = await prisma_1.prisma.liveStream.findMany({
-            where: { courseId },
+            where: { collectionId },
             include: { creator: { select: { id: true, username: true, email: true } } },
             orderBy: { createdAt: 'desc' },
         });

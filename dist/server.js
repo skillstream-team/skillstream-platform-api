@@ -47,6 +47,9 @@ const users_1 = require("./modules/users");
 const courses_1 = require("./modules/courses");
 const messaging_1 = require("./modules/messaging");
 const subscriptions_1 = require("./modules/subscriptions");
+const workshops_1 = require("./modules/workshops");
+const analytics_1 = require("./modules/analytics");
+const earnings_1 = require("./modules/earnings");
 const admin_messaging_service_1 = require("./modules/users/services/admin-messaging.service");
 const env_1 = require("./utils/env");
 const error_handler_1 = require("./middleware/error-handler");
@@ -135,6 +138,12 @@ app.use(express_1.default.urlencoded({ extended: true, limit: '10mb' }));
 (0, courses_1.registerCoursesModule)(app);
 (0, messaging_1.registerMessagingModule)(app, io);
 (0, subscriptions_1.registerSubscriptionRoutes)(app);
+(0, workshops_1.registerWorkshopRoutes)(app);
+(0, analytics_1.registerAnalyticsRoutes)(app);
+(0, earnings_1.registerEarningsRoutes)(app);
+// Register admin job routes (for manual task execution)
+const jobs_routes_1 = __importDefault(require("./modules/admin/routes/jobs.routes"));
+app.use('/api/admin', jobs_routes_1.default);
 // Setup Swagger docs
 (0, swagger_1.setupSwagger)(app);
 // Enhanced health check endpoint

@@ -13,7 +13,7 @@ export class ScheduledTasksService {
   private revenueService: SubscriptionRevenueService;
   private engagementService: EngagementService;
   private isRunning: boolean = false;
-  private cronJobs: cron.ScheduledTask[] = [];
+  private cronJobs: any[] = [];
 
   constructor() {
     this.paymentService = new LessonPaymentService();
@@ -57,8 +57,7 @@ export class ScheduledTasksService {
         // Log to error tracking service (Sentry, etc.)
       }
     }, {
-      scheduled: true,
-      timezone: 'UTC',
+        timezone: 'UTC',
     });
     this.cronJobs.push(unpaidLessonsJob);
 
@@ -74,8 +73,7 @@ export class ScheduledTasksService {
         console.error('❌ Error checking expired subscriptions:', error);
       }
     }, {
-      scheduled: true,
-      timezone: 'UTC',
+        timezone: 'UTC',
     });
     this.cronJobs.push(expiredSubsJob);
 
@@ -91,8 +89,7 @@ export class ScheduledTasksService {
         console.error('❌ Error revoking expired access:', error);
       }
     }, {
-      scheduled: true,
-      timezone: 'UTC',
+        timezone: 'UTC',
     });
     this.cronJobs.push(revokeAccessJob);
 
@@ -123,8 +120,7 @@ export class ScheduledTasksService {
         // Critical: Log to monitoring service and alert
       }
     }, {
-      scheduled: true,
-      timezone: 'UTC',
+        timezone: 'UTC',
     });
     this.cronJobs.push(revenueDistJob);
 
@@ -139,8 +135,7 @@ export class ScheduledTasksService {
         console.error('❌ Error aggregating engagement:', error);
       }
     }, {
-      scheduled: true,
-      timezone: 'UTC',
+        timezone: 'UTC',
     });
     this.cronJobs.push(engagementJob);
 

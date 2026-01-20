@@ -80,9 +80,9 @@ async function deleteCachePattern(pattern) {
  * Cache key generators
  */
 exports.cacheKeys = {
-    course: (id) => `course:${id}`,
-    courseModules: (courseId) => `course:${courseId}:modules`,
-    courseList: (page, limit, filters) => {
+    collection: (id) => `collection:${id}`,
+    collectionModules: (collectionId) => `collection:${collectionId}:modules`,
+    collectionList: (page, limit, filters) => {
         const filterParts = [];
         if (filters?.instructorId)
             filterParts.push(`instructor:${filters.instructorId}`);
@@ -95,10 +95,10 @@ exports.cacheKeys = {
         if (filters?.sortBy)
             filterParts.push(`sort:${filters.sortBy}:${filters.sortOrder || 'desc'}`);
         const filterStr = filterParts.length > 0 ? `:${filterParts.join(':')}` : '';
-        return `courses:list:${page}:${limit}${filterStr}`;
+        return `collections:list:${page}:${limit}${filterStr}`;
     },
     user: (id) => `user:${id}`,
     userProfile: (id) => `user:profile:${id}`,
-    enrollments: (courseId, page, limit) => `enrollments:${courseId}:${page}:${limit}`,
+    enrollments: (collectionId, page, limit) => `enrollments:${collectionId}:${page}:${limit}`,
     studentEnrollments: (studentId, page, limit) => `enrollments:student:${studentId}:${page}:${limit}`,
 };

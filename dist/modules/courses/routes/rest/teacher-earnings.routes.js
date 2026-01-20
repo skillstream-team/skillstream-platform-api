@@ -165,13 +165,13 @@ router.post('/teachers/:teacherId/earnings/calculate', auth_1.requireAuth, (0, r
             if (!courseId) {
                 return res.status(400).json({ error: 'courseId is required when allCourses is false' });
             }
-            // Verify teacher owns the course
+            // Verify teacher owns the collection
             const { prisma } = await Promise.resolve().then(() => __importStar(require('../../../../utils/prisma')));
-            const course = await prisma.course.findUnique({
+            const collection = await prisma.collection.findUnique({
                 where: { id: courseId },
             });
-            if (!course || course.instructorId !== teacherId) {
-                return res.status(403).json({ error: 'Course not found or unauthorized' });
+            if (!collection || collection.instructorId !== teacherId) {
+                return res.status(403).json({ error: 'Collection not found or unauthorized' });
             }
             const result = await earningsService.calculateMonthlyEarnings(teacherId, courseId, year, month);
             res.json({

@@ -12,7 +12,7 @@ class PollService {
                 title: data.title,
                 question: data.title, // Using title as question, or you could add question to DTO
                 description: data.description,
-                courseId: data.courseId,
+                collectionId: data.courseId,
                 moduleId: data.moduleId,
                 liveStreamId: data.liveStreamId,
                 createdBy: creatorId,

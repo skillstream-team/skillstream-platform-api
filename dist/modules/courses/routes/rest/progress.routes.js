@@ -38,7 +38,7 @@ router.get('/users/:userId/progress', auth_1.requireAuth, subscription_1.require
         // Get all enrollments for the user
         const enrollments = await prisma_1.prisma.enrollment.findMany({
             where: { studentId: userId },
-            select: { courseId: true, course: { select: { id: true, title: true } } }
+            select: { collectionId: true, collection: { select: { id: true, title: true } } }
         });
         // Get progress for each enrollment (with pagination per course)
         const progressData = await Promise.all(enrollments.map(async (enrollment) => {
@@ -46,7 +46,7 @@ router.get('/users/:userId/progress', auth_1.requireAuth, subscription_1.require
                 prisma_1.prisma.progress.findMany({
                     where: {
                         studentId: userId,
-                        courseId: enrollment.courseId
+                        collectionId: enrollment.collectionId
                     },
                     skip,
                     take: limit,
@@ -58,7 +58,7 @@ router.get('/users/:userId/progress', auth_1.requireAuth, subscription_1.require
                         timeSpent: true,
                         lastAccessed: true,
                         completedAt: true,
-                        course: { select: { id: true, title: true } },
+                        collection: { select: { id: true, title: true } },
                         module: { select: { id: true, title: true } }
                     },
                     orderBy: { lastAccessed: 'desc' }
@@ -66,13 +66,13 @@ router.get('/users/:userId/progress', auth_1.requireAuth, subscription_1.require
                 prisma_1.prisma.progress.count({
                     where: {
                         studentId: userId,
-                        courseId: enrollment.courseId
+                        collectionId: enrollment.collectionId
                     }
                 })
             ]);
             return {
-                courseId: enrollment.courseId,
-                course: enrollment.course,
+                collectionId: enrollment.collectionId,
+                collection: enrollment.collection,
                 progress: progress || [],
                 pagination: {
                     page,
@@ -143,39 +143,39 @@ router.get('/users/:userId/progress/courses', auth_1.requireAuth, subscription_1
         const limit = Math.min(parseInt(req.query.limit) || 20, 100);
         const enrollments = await prisma_1.prisma.enrollment.findMany({
             where: { studentId: userId },
-            select: { courseId: true, course: { select: { id: true, title: true } } }
+            select: { collectionId: true, collection: { select: { id: true, title: true } } }
         });
-        const coursesWithProgress = await Promise.all(enrollments.map(async (enrollment) => {
+        const collectionsWithProgress = await Promise.all(enrollments.map(async (enrollment) => {
             const progress = await prisma_1.prisma.progress.findMany({
                 where: {
                     studentId: userId,
-                    courseId: enrollment.courseId
+                    collectionId: enrollment.collectionId
                 },
                 select: { status: true }
             });
             const completedItems = progress?.filter((p) => p.status === 'completed').length || 0;
             const totalItems = progress?.length || 0;
             const completionRate = totalItems > 0 ? (completedItems / totalItems) * 100 : 0;
-            let courseStatus = 'not_started';
+            let collectionStatus = 'not_started';
             if (completionRate === 100) {
-                courseStatus = 'completed';
+                collectionStatus = 'completed';
             }
             else if (completionRate > 0) {
-                courseStatus = 'in_progress';
+                collectionStatus = 'in_progress';
             }
             return {
-                courseId: enrollment.courseId,
-                course: enrollment.course,
-                status: courseStatus,
+                collectionId: enrollment.collectionId,
+                collection: enrollment.collection,
+                status: collectionStatus,
                 completionRate,
                 completedItems,
                 totalItems
             };
         }));
         // Filter by status if provided
-        let filtered = coursesWithProgress;
+        let filtered = collectionsWithProgress;
         if (status === 'in_progress' || status === 'completed') {
-            filtered = coursesWithProgress.filter((item) => item.status === status);
+            filtered = collectionsWithProgress.filter((item) => item.status === status);
         }
         res.json({
             success: true,
@@ -197,13 +197,13 @@ router.get('/users/:userId/progress/courses', auth_1.requireAuth, subscription_1
 });
 /**
  * @swagger
- * /api/courses/{courseId}/progress:
+ * /api/collections/{collectionId}/progress:
  *   get:
- *     summary: Get progress for current user in a specific course
+ *     summary: Get progress for current user in a specific collection
  *     tags: [Progress]
  *     parameters:
  *       - in: path
- *         name: courseId
+ *         name: collectionId
  *         required: true
  *         schema:
  *           type: string
@@ -211,9 +211,9 @@ router.get('/users/:userId/progress/courses', auth_1.requireAuth, subscription_1
  *       200:
  *         description: Progress retrieved successfully
  */
-router.get('/courses/:courseId/progress', auth_1.requireAuth, subscription_1.requireSubscription, async (req, res) => {
+router.get('/collections/:collectionId/progress', auth_1.requireAuth, subscription_1.requireSubscription, async (req, res) => {
     try {
-        const { courseId } = req.params;
+        const { collectionId } = req.params;
         const userId = req.user?.id;
         if (!userId) {
             return res.status(401).json({ error: 'User not authenticated' });
@@ -225,7 +225,7 @@ router.get('/courses/:courseId/progress', auth_1.requireAuth, subscription_1.req
             prisma_1.prisma.progress.findMany({
                 where: {
                     studentId: userId,
-                    courseId: courseId
+                    collectionId: collectionId
                 },
                 skip,
                 take: limit,
@@ -237,7 +237,7 @@ router.get('/courses/:courseId/progress', auth_1.requireAuth, subscription_1.req
                     timeSpent: true,
                     lastAccessed: true,
                     completedAt: true,
-                    course: { select: { id: true, title: true } },
+                    collection: { select: { id: true, title: true } },
                     module: { select: { id: true, title: true } }
                 },
                 orderBy: { lastAccessed: 'desc' }
@@ -245,7 +245,7 @@ router.get('/courses/:courseId/progress', auth_1.requireAuth, subscription_1.req
             prisma_1.prisma.progress.count({
                 where: {
                     studentId: userId,
-                    courseId: courseId
+                    collectionId: collectionId
                 }
             })
         ]);
@@ -265,6 +265,146 @@ router.get('/courses/:courseId/progress', auth_1.requireAuth, subscription_1.req
     catch (error) {
         console.error('Error fetching course progress:', error);
         res.status(500).json({ error: 'Failed to fetch course progress' });
+    }
+});
+/**
+ * @swagger
+ * /api/progress/sync-milestone:
+ *   post:
+ *     summary: Sync progress milestone from Firestore to database
+ *     description: Called when a user reaches a progress milestone (25%, 50%, 75%, 100%)
+ *       This endpoint persists the milestone to the database for reporting and analytics
+ *     tags: [Progress]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - courseId
+ *               - lessonId
+ *               - progressPercent
+ *             properties:
+ *               collectionId:
+ *                 type: string
+ *               lessonId:
+ *                 type: string
+ *               videoId:
+ *                 type: string
+ *               progressPercent:
+ *                 type: number
+ *                 minimum: 0
+ *                 maximum: 100
+ *               currentTime:
+ *                 type: number
+ *     responses:
+ *       200:
+ *         description: Milestone synced successfully
+ *       400:
+ *         description: Invalid request
+ */
+router.post('/sync-milestone', auth_1.requireAuth, async (req, res) => {
+    try {
+        const userId = req.user?.id;
+        if (!userId) {
+            return res.status(401).json({ error: 'User not authenticated' });
+        }
+        const { collectionId, lessonId, videoId, progressPercent, currentTime } = req.body;
+        if (!collectionId || !lessonId || progressPercent === undefined) {
+            return res.status(400).json({ error: 'Missing required fields: collectionId, lessonId, progressPercent' });
+        }
+        // Determine status based on progress
+        let status = 'in_progress';
+        if (progressPercent >= 100) {
+            status = 'completed';
+        }
+        else if (progressPercent > 0) {
+            status = 'in_progress';
+        }
+        else {
+            status = 'not_started';
+        }
+        // Update or create progress record
+        const progress = await prisma_1.prisma.progress.upsert({
+            where: {
+                studentId_collectionId_type_itemId: {
+                    studentId: userId,
+                    collectionId,
+                    type: 'video',
+                    itemId: lessonId,
+                },
+            },
+            update: {
+                progress: Math.min(progressPercent, 100),
+                status,
+                lastAccessed: new Date(),
+                completedAt: status === 'completed' ? new Date() : undefined,
+                // Update timeSpent if currentTime is provided
+                ...(currentTime && {
+                    timeSpent: {
+                        increment: Math.floor(currentTime / 60), // Convert seconds to minutes
+                    },
+                }),
+            },
+            create: {
+                studentId: userId,
+                collectionId,
+                type: 'video',
+                itemId: lessonId,
+                progress: Math.min(progressPercent, 100),
+                status,
+                lastAccessed: new Date(),
+                completedAt: status === 'completed' ? new Date() : null,
+                timeSpent: currentTime ? Math.floor(currentTime / 60) : 0,
+            },
+        });
+        // If video progress, also update video-specific progress
+        if (videoId) {
+            try {
+                await prisma_1.prisma.progress.upsert({
+                    where: {
+                        studentId_collectionId_type_itemId: {
+                            studentId: userId,
+                            collectionId,
+                            type: 'video',
+                            itemId: videoId,
+                        },
+                    },
+                    update: {
+                        progress: Math.min(progressPercent, 100),
+                        status,
+                        lastAccessed: new Date(),
+                        completedAt: status === 'completed' ? new Date() : undefined,
+                    },
+                    create: {
+                        studentId: userId,
+                        collectionId,
+                        type: 'video',
+                        itemId: videoId,
+                        progress: Math.min(progressPercent, 100),
+                        status,
+                        lastAccessed: new Date(),
+                        completedAt: status === 'completed' ? new Date() : null,
+                        timeSpent: currentTime ? Math.floor(currentTime / 60) : 0,
+                    },
+                });
+            }
+            catch (error) {
+                // Video progress update is optional, log but don't fail
+                console.warn('Failed to update video-specific progress:', error);
+            }
+        }
+        res.json({
+            success: true,
+            data: progress,
+        });
+    }
+    catch (error) {
+        console.error('Error syncing progress milestone:', error);
+        res.status(500).json({
+            error: 'Failed to sync progress milestone',
+        });
     }
 });
 exports.default = router;

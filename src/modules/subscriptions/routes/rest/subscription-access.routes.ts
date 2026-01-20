@@ -34,7 +34,7 @@ router.post('/check', requireAuth, async (req, res) => {
  *   post:
  *     summary: Grant subscription access to content (admin/teacher)
  */
-router.post('/grant', requireAuth, requireRole('TEACHER', 'ADMIN'), async (req, res) => {
+router.post('/grant', requireAuth, requireRole('ADMIN'), async (req, res) => {
   try {
     const userId = (req as any).user?.id;
     const { contentId, contentType, accessType, expiresAt } = req.body;

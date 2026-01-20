@@ -1,6 +1,6 @@
 import { prisma } from '../../../utils/prisma';
 import { UsersService } from './users.service';
-import { CoursesService } from '../../courses/services/service';
+import { CollectionsService } from '../../courses/services/service';
 import { EnrollmentService } from '../../courses/services/enrollment.service';
 import { NotificationsService } from './notifications.service';
 import { deleteCachePattern } from '../../../utils/cache';
@@ -28,7 +28,7 @@ export interface BulkCourseImportDto {
 
 export interface BulkEnrollmentDto {
   enrollments: Array<{
-    courseId: string;
+            collectionId: string;
     studentId: string;
     amount: number;
     currency?: string;
@@ -47,7 +47,7 @@ export interface BulkNotificationDto {
 
 export class BulkOperationsService {
   private usersService = new UsersService();
-  private coursesService = new CoursesService();
+  private collectionsService = new CollectionsService();
   private enrollmentService = new EnrollmentService();
   private notificationsService = new NotificationsService();
 
@@ -154,7 +154,7 @@ export class BulkOperationsService {
     const results = await Promise.allSettled(
       data.courses.map(async (courseData) => {
         try {
-          await this.coursesService.createCourse({
+          await this.collectionsService.createCollection({
             ...courseData,
             createdBy: courseData.instructorId,
           });
@@ -190,7 +190,7 @@ export class BulkOperationsService {
    * Bulk export courses (CSV format)
    */
   async bulkExportCourses(): Promise<string> {
-    const courses = await prisma.course.findMany({
+    const courses = await prisma.collection.findMany({
       select: {
         id: true,
         title: true,
@@ -204,7 +204,7 @@ export class BulkOperationsService {
 
     // Generate CSV
     const headers = ['ID', 'Title', 'Description', 'Price', 'Order', 'Instructor ID', 'Created At'];
-    const rows = courses.map((c) => [
+    const rows = courses.map((c: any) => [
       c.id,
       c.title,
       c.description || '',
@@ -228,7 +228,7 @@ export class BulkOperationsService {
   async bulkEnrollStudents(data: BulkEnrollmentDto): Promise<{
     success: number;
     failed: number;
-    results: Array<{ courseId: string; studentId: string; success: boolean; error?: string }>;
+    results: Array<{ collectionId: string; studentId: string; success: boolean; error?: string }>;
   }> {
     const results = await Promise.allSettled(
       data.enrollments.map(async (enrollmentData) => {
@@ -239,13 +239,13 @@ export class BulkOperationsService {
             transactionId: undefined,
           });
           return {
-            courseId: enrollmentData.courseId,
+            collectionId: enrollmentData.collectionId,
             studentId: enrollmentData.studentId,
             success: true,
           };
         } catch (error) {
           return {
-            courseId: enrollmentData.courseId,
+            collectionId: enrollmentData.collectionId,
             studentId: enrollmentData.studentId,
             success: false,
             error: (error as Error).message,
@@ -265,7 +265,7 @@ export class BulkOperationsService {
       results: results.map((r) =>
         r.status === 'fulfilled'
           ? r.value
-          : { courseId: '', studentId: '', success: false, error: 'Unknown error' }
+          : { collectionId: '', studentId: '', success: false, error: 'Unknown error' }
       ),
     };
   }

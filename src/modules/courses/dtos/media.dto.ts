@@ -1,5 +1,5 @@
 export interface CreateMaterialDto {
-  courseId: string;
+  collectionId: string;
   type: 'pdf' | 'image' | 'document' | 'zip' | 'other';
   filename: string;
   size: number;
@@ -10,7 +10,7 @@ export interface CreateMaterialDto {
 
 export interface MaterialResponseDto {
   id: string;
-  courseId: string;
+  collectionId: string;
   type: string;
   key: string;
   filename: string;
@@ -29,7 +29,7 @@ export interface MaterialResponseDto {
 }
 
 export interface CreateVideoDto {
-  courseId: string;
+  collectionId: string;
   title: string;
   description?: string;
   type: 'on-demand' | 'live';
@@ -40,7 +40,7 @@ export interface CreateVideoDto {
 
 export interface VideoResponseDto {
   id: string;
-  courseId: string;
+  collectionId: string;
   streamId: string;
   title: string;
   description?: string;
@@ -62,7 +62,7 @@ export interface VideoResponseDto {
 }
 
 export interface CreateLiveStreamDto {
-  courseId: string;
+  collectionId: string;
   title: string;
   description?: string;
   createdBy: string;
@@ -71,7 +71,7 @@ export interface CreateLiveStreamDto {
 
 export interface LiveStreamResponseDto {
   id: string;
-  courseId: string;
+  collectionId: string;
   streamId: string;
   title: string;
   description?: string;

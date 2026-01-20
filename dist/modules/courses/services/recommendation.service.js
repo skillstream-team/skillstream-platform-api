@@ -8,14 +8,14 @@ class RecommendationService {
      */
     async generateRecommendations(userId, limit = 10) {
         // Clear old recommendations for this user
-        await prisma_1.prisma.courseRecommendation.deleteMany({
+        await prisma_1.prisma.collectionRecommendation.deleteMany({
             where: { userId }
         });
         const recommendations = [];
         // Get user's enrolled courses and interactions
         const userEnrollments = await prisma_1.prisma.enrollment.findMany({
             where: { studentId: userId },
-            include: { course: true }
+            include: { collection: true }
         });
         const userInteractions = await prisma_1.prisma.userInteraction.findMany({
             where: { userId },
@@ -36,10 +36,10 @@ class RecommendationService {
             .sort((a, b) => b.score - a.score)
             .slice(0, limit);
         // Save recommendations to database
-        const savedRecommendations = await Promise.all(topRecommendations.map(rec => prisma_1.prisma.courseRecommendation.create({
+        const savedRecommendations = await Promise.all(topRecommendations.map(rec => prisma_1.prisma.collectionRecommendation.create({
             data: rec,
             include: {
-                course: {
+                collection: {
                     include: {
                         instructor: {
                             select: { id: true, username: true }
@@ -61,26 +61,27 @@ class RecommendationService {
         const similarUsers = await prisma_1.prisma.enrollment.groupBy({
             by: ['studentId'],
             where: {
-                courseId: { in: enrolledCourseIds },
+                collectionId: { in: enrolledCourseIds },
                 studentId: { not: userId }
             },
-            _count: { courseId: true },
-            having: { courseId: { _count: { gte: Math.max(1, Math.floor(enrolledCourseIds.length * 0.3)) } } },
-            orderBy: { _count: { courseId: 'desc' } },
+            _count: { collectionId: true },
+            having: { collectionId: { _count: { gte: Math.max(1, Math.floor(enrolledCourseIds.length * 0.3)) } } },
+            orderBy: { _count: { collectionId: 'desc' } },
             take: 20
         });
         // Get courses enrolled by similar users that current user hasn't enrolled in
         const recommendedCourses = await prisma_1.prisma.enrollment.findMany({
             where: {
                 studentId: { in: similarUsers.map(u => u.studentId) },
-                courseId: { notIn: enrolledCourseIds }
+                collectionId: { notIn: enrolledCourseIds }
             },
-            include: { course: true },
-            distinct: ['courseId']
+            include: { collection: true },
+            distinct: ['collectionId']
         });
-        return recommendedCourses.slice(0, 5).map(enrollment => ({
+        return recommendedCourses.slice(0, 5).map((enrollment) => ({
             userId,
-            courseId: enrollment.courseId,
+            courseId: enrollment.collectionId,
+            collectionId: enrollment.collectionId,
             score: Math.min(0.9, 0.6 + (Math.random() * 0.3)), // Score between 0.6-0.9
             reason: 'Students with similar interests also enrolled in this course',
             algorithm: 'collaborative',
@@ -96,16 +97,17 @@ class RecommendationService {
         const enrolledCourseIds = userEnrollments.map(e => e.courseId);
         // For simplicity, recommend courses from the same instructors
         const instructorIds = [...new Set(userEnrollments.map(e => e.course.instructorId))];
-        const instructorCourses = await prisma_1.prisma.course.findMany({
+        const instructorCourses = await prisma_1.prisma.collection.findMany({
             where: {
                 instructorId: { in: instructorIds },
                 id: { notIn: enrolledCourseIds }
             },
             take: 5
         });
-        return instructorCourses.map(course => ({
+        return instructorCourses.map((course) => ({
             userId,
             courseId: course.id,
+            collectionId: course.id,
             score: Math.min(0.85, 0.5 + (Math.random() * 0.35)), // Score between 0.5-0.85
             reason: 'From instructors of courses you\'ve enrolled in',
             algorithm: 'content_based',
@@ -118,7 +120,7 @@ class RecommendationService {
     async getPopularityBasedRecommendations(userId, userEnrollments) {
         const enrolledCourseIds = userEnrollments.map(e => e.courseId);
         // Get most popular courses (by enrollment count) that user hasn't enrolled in
-        const popularCourses = await prisma_1.prisma.course.findMany({
+        const popularCourses = await prisma_1.prisma.collection.findMany({
             where: {
                 id: { notIn: enrolledCourseIds }
             },
@@ -135,6 +137,7 @@ class RecommendationService {
         return popularCourses.map((course, index) => ({
             userId,
             courseId: course.id,
+            collectionId: course.id,
             score: Math.max(0.3, 0.7 - (index * 0.1)), // Decreasing score based on popularity rank
             reason: `Popular course with ${course._count.enrollments} enrollments`,
             algorithm: 'popularity',
@@ -145,7 +148,7 @@ class RecommendationService {
      * Get user's recommendations
      */
     async getUserRecommendations(filters) {
-        const recommendations = await prisma_1.prisma.courseRecommendation.findMany({
+        const recommendations = await prisma_1.prisma.collectionRecommendation.findMany({
             where: {
                 userId: filters.userId,
                 ...(filters.algorithm && { algorithm: filters.algorithm }),
@@ -153,7 +156,7 @@ class RecommendationService {
                 ...(filters.excludeViewed && { isViewed: false })
             },
             include: {
-                course: {
+                collection: {
                     include: {
                         instructor: {
                             select: { id: true, username: true }
@@ -175,20 +178,20 @@ class RecommendationService {
         });
         // If user viewed a recommended course, mark it as viewed
         if (interaction.type === 'view' && interaction.courseId) {
-            await prisma_1.prisma.courseRecommendation.updateMany({
+            await prisma_1.prisma.collectionRecommendation.updateMany({
                 where: {
                     userId: interaction.userId,
-                    courseId: interaction.courseId
+                    collectionId: interaction.collectionId || interaction.courseId
                 },
                 data: { isViewed: true }
             });
         }
         // If user enrolled in a recommended course, mark it as clicked
         if (interaction.type === 'enroll' && interaction.courseId) {
-            await prisma_1.prisma.courseRecommendation.updateMany({
+            await prisma_1.prisma.collectionRecommendation.updateMany({
                 where: {
                     userId: interaction.userId,
-                    courseId: interaction.courseId
+                    collectionId: interaction.collectionId || interaction.courseId
                 },
                 data: { isClicked: true }
             });
@@ -198,18 +201,18 @@ class RecommendationService {
      * Get recommendation statistics for a user
      */
     async getRecommendationStats(userId) {
-        const stats = await prisma_1.prisma.courseRecommendation.aggregate({
+        const stats = await prisma_1.prisma.collectionRecommendation.aggregate({
             where: { userId },
             _count: { id: true },
             _avg: { score: true }
         });
-        const viewedCount = await prisma_1.prisma.courseRecommendation.count({
+        const viewedCount = await prisma_1.prisma.collectionRecommendation.count({
             where: { userId, isViewed: true }
         });
-        const clickedCount = await prisma_1.prisma.courseRecommendation.count({
+        const clickedCount = await prisma_1.prisma.collectionRecommendation.count({
             where: { userId, isClicked: true }
         });
-        const topAlgorithm = await prisma_1.prisma.courseRecommendation.groupBy({
+        const topAlgorithm = await prisma_1.prisma.collectionRecommendation.groupBy({
             by: ['algorithm'],
             where: { userId, isClicked: true },
             _count: { algorithm: true },

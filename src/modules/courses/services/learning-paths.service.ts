@@ -7,7 +7,7 @@ export interface CreateLearningPathDto {
   thumbnailUrl?: string;
   categoryId?: string;
   difficulty?: string;
-  courseIds: string[];
+  collectionIds: string[];
 }
 
 export interface LearningPathResponseDto {
@@ -23,7 +23,7 @@ export interface LearningPathResponseDto {
   };
   difficulty?: string;
   isActive: boolean;
-  courses: Array<{
+  collections: Array<{
     id: string;
     title: string;
     thumbnailUrl?: string;
@@ -39,13 +39,13 @@ export class LearningPathsService {
    * Create a learning path
    */
   async createPath(data: CreateLearningPathDto): Promise<LearningPathResponseDto> {
-    // Validate all courses exist
-    const courses = await prisma.course.findMany({
-      where: { id: { in: data.courseIds } },
+    // Validate all collections exist
+    const collections = await prisma.collection.findMany({
+      where: { id: { in: data.collectionIds } },
     });
 
-    if (courses.length !== data.courseIds.length) {
-      throw new Error('One or more courses not found');
+    if (collections.length !== data.collectionIds.length) {
+      throw new Error('One or more collections not found');
     }
 
     const path = await prisma.learningPath.create({
@@ -55,9 +55,9 @@ export class LearningPathsService {
         thumbnailUrl: data.thumbnailUrl,
         categoryId: data.categoryId,
         difficulty: data.difficulty,
-        courses: {
-          create: data.courseIds.map((courseId, index) => ({
-            courseId,
+        collections: {
+          create: data.collectionIds.map((collectionId, index) => ({
+            collectionId,
             order: index,
             isRequired: true,
           })),
@@ -71,9 +71,9 @@ export class LearningPathsService {
             slug: true,
           },
         },
-        courses: {
+        collections: {
           include: {
-            course: {
+            collection: {
               select: {
                 id: true,
                 title: true,
@@ -103,9 +103,9 @@ export class LearningPathsService {
             slug: true,
           },
         },
-        courses: {
+        collections: {
           include: {
-            course: {
+            collection: {
               select: {
                 id: true,
                 title: true,
@@ -136,9 +136,9 @@ export class LearningPathsService {
             slug: true,
           },
         },
-        courses: {
+        collections: {
           include: {
-            course: {
+            collection: {
               select: {
                 id: true,
                 title: true,
@@ -205,11 +205,11 @@ export class LearningPathsService {
   ): Promise<{
     path: LearningPathResponseDto;
     progress: number;
-    currentCourseId?: string;
-    completedCourses: number;
-    totalCourses: number;
-    courses: Array<{
-      courseId: string;
+    currentCollectionId?: string;
+    completedCollections: number;
+    totalCollections: number;
+    collections: Array<{
+      collectionId: string;
       title: string;
       progress: number;
       isCompleted: boolean;
@@ -233,48 +233,48 @@ export class LearningPathsService {
       throw new Error('Learning path not found');
     }
 
-    // Get progress for each course in the path
-    const courseIds = path.courses.map((c) => c.id);
+    // Get progress for each collection in the path
+    const collectionIds = path.collections.map((c: any) => c.collection.id);
     const certificates = await prisma.certificate.findMany({
       where: {
         studentId,
-        courseId: { in: courseIds },
+        collectionId: { in: collectionIds },
       },
       select: {
-        courseId: true,
+        collectionId: true,
       },
     });
 
-    const completedCourseIds = new Set(certificates.map((c) => c.courseId));
+    const completedCollectionIds = new Set(certificates.map((c: any) => c.collectionId));
 
-    const coursesProgress = await Promise.all(
-      path.courses.map(async (pathCourse) => {
+    const collectionsProgress = await Promise.all(
+      path.collections.map(async (pathCollection: any) => {
         const progress = await prisma.progress.findMany({
           where: {
             studentId,
-            courseId: pathCourse.id,
+            collectionId: pathCollection.collection.id,
           },
         });
 
         const completed = progress.filter(
-          (p) => p.status === 'completed' || p.status === 'passed'
+          (p: any) => p.status === 'completed' || p.status === 'passed'
         ).length;
         const total = progress.length;
-        const courseProgress = total > 0 ? (completed / total) * 100 : 0;
-        const isCompleted = completedCourseIds.has(pathCourse.id);
+        const collectionProgress = total > 0 ? (completed / total) * 100 : 0;
+        const isCompleted = completedCollectionIds.has(pathCollection.collection.id);
 
         return {
-          courseId: pathCourse.id,
-          title: pathCourse.title,
-          progress: Math.round(courseProgress),
+          collectionId: pathCollection.collection.id,
+          title: pathCollection.collection.title,
+          progress: Math.round(collectionProgress),
           isCompleted,
         };
       })
     );
 
-    const completedCourses = coursesProgress.filter((c) => c.isCompleted).length;
-    const overallProgress = path.courses.length > 0
-      ? (completedCourses / path.courses.length) * 100
+    const completedCollections = collectionsProgress.filter((c: any) => c.isCompleted).length;
+    const overallProgress = path.collections.length > 0
+      ? (completedCollections / path.collections.length) * 100
       : 0;
 
     // Update enrollment progress
@@ -284,17 +284,17 @@ export class LearningPathsService {
       },
       data: {
         progress: overallProgress,
-        currentCourseId: coursesProgress.find((c) => !c.isCompleted)?.courseId || null,
+        currentCollectionId: collectionsProgress.find((c: any) => !c.isCompleted)?.collectionId || null,
       },
     });
 
     return {
       path,
       progress: Math.round(overallProgress),
-      currentCourseId: enrollment.currentCourseId || undefined,
-      completedCourses,
-      totalCourses: path.courses.length,
-      courses: coursesProgress,
+      currentCollectionId: enrollment.currentCollectionId || undefined,
+      completedCollections,
+      totalCollections: path.collections.length,
+      collections: collectionsProgress,
     };
   }
 
@@ -314,10 +314,10 @@ export class LearningPathsService {
         : undefined,
       difficulty: path.difficulty || undefined,
       isActive: path.isActive,
-      courses: path.courses.map((pc: any) => ({
-        id: pc.course.id,
-        title: pc.course.title,
-        thumbnailUrl: pc.course.thumbnailUrl || undefined,
+      collections: path.collections.map((pc: any) => ({
+        id: pc.collection.id,
+        title: pc.collection.title,
+        thumbnailUrl: pc.collection.thumbnailUrl || undefined,
         order: pc.order,
         isRequired: pc.isRequired,
       })),

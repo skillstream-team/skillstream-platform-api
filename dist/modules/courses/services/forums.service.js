@@ -10,13 +10,13 @@ class ForumsService {
     async createPost(data) {
         const post = await prisma_1.prisma.forumPost.create({
             data: {
-                courseId: data.courseId,
+                collectionId: data.collectionId,
                 authorId: data.authorId,
                 title: data.title,
                 content: data.content,
             },
             include: {
-                course: {
+                collection: {
                     select: {
                         id: true,
                         title: true,
@@ -31,16 +31,16 @@ class ForumsService {
                 },
             },
         });
-        await (0, cache_1.deleteCache)(`course:${data.courseId}`);
+        await (0, cache_1.deleteCache)(`collection:${data.collectionId}`);
         return this.mapPostToDto(post);
     }
     /**
      * Get forum posts for a course
      */
-    async getCoursePosts(courseId, page = 1, limit = 20, search) {
+    async getCoursePosts(collectionId, page = 1, limit = 20, search) {
         const skip = (page - 1) * limit;
         const take = Math.min(limit, 100);
-        const where = { courseId };
+        const where = { collectionId };
         if (search) {
             where.OR = [
                 { title: { contains: search, mode: 'insensitive' } },
@@ -53,7 +53,7 @@ class ForumsService {
                 skip,
                 take,
                 include: {
-                    course: {
+                    collection: {
                         select: {
                             id: true,
                             title: true,
@@ -92,7 +92,7 @@ class ForumsService {
         const post = await prisma_1.prisma.forumPost.findUnique({
             where: { id: postId },
             include: {
-                course: {
+                collection: {
                     select: {
                         id: true,
                         title: true,
@@ -266,7 +266,7 @@ class ForumsService {
         const post = await prisma_1.prisma.forumPost.findUnique({
             where: { id: postId },
             include: {
-                course: {
+                collection: {
                     select: {
                         instructorId: true,
                     },
@@ -276,8 +276,8 @@ class ForumsService {
         if (!post) {
             throw new Error('Post not found');
         }
-        if (post.course.instructorId !== instructorId) {
-            throw new Error('Only the course instructor can mark best answer');
+        if (post.collection?.instructorId !== instructorId) {
+            throw new Error('Only the collection instructor can mark best answer');
         }
         const reply = await prisma_1.prisma.forumReply.findFirst({
             where: { id: replyId, postId },
@@ -315,7 +315,7 @@ class ForumsService {
             where: { id: postId },
             data: { isPinned },
             include: {
-                course: {
+                collection: {
                     select: {
                         id: true,
                         title: true,
@@ -340,7 +340,7 @@ class ForumsService {
             where: { id: postId },
             data: { isLocked },
             include: {
-                course: {
+                collection: {
                     select: {
                         id: true,
                         title: true,
@@ -363,8 +363,8 @@ class ForumsService {
     mapPostToDto(post) {
         return {
             id: post.id,
-            courseId: post.courseId,
-            course: post.course,
+            collectionId: post.collectionId,
+            collection: post.collection,
             authorId: post.authorId,
             author: post.author,
             title: post.title,

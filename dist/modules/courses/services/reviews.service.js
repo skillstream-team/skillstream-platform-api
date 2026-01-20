@@ -11,7 +11,7 @@ class ReviewsService {
         // Check if student is enrolled
         const enrollment = await prisma_1.prisma.enrollment.findFirst({
             where: {
-                courseId: data.courseId,
+                collectionId: data.courseId,
                 studentId: data.studentId,
             },
         });
@@ -19,9 +19,9 @@ class ReviewsService {
             throw new Error('You must be enrolled in the course to leave a review');
         }
         // Check if review already exists
-        const existing = await prisma_1.prisma.courseReview.findFirst({
+        const existing = await prisma_1.prisma.collectionReview.findFirst({
             where: {
-                courseId: data.courseId,
+                collectionId: data.courseId,
                 studentId: data.studentId,
             },
         });
@@ -32,9 +32,9 @@ class ReviewsService {
         if (data.rating < 1 || data.rating > 5) {
             throw new Error('Rating must be between 1 and 5');
         }
-        const review = await prisma_1.prisma.courseReview.create({
+        const review = await prisma_1.prisma.collectionReview.create({
             data: {
-                courseId: data.courseId,
+                collectionId: data.courseId,
                 studentId: data.studentId,
                 rating: data.rating,
                 title: data.title,
@@ -43,7 +43,7 @@ class ReviewsService {
                 isPublished: true,
             },
             include: {
-                course: {
+                collection: {
                     select: {
                         id: true,
                         title: true,
@@ -59,7 +59,7 @@ class ReviewsService {
             },
         });
         // Invalidate course cache
-        await (0, cache_1.deleteCache)(`course:${data.courseId}`);
+        await (0, cache_1.deleteCache)(`collection:${data.courseId}`);
         return this.mapToDto(review);
     }
     /**
@@ -76,12 +76,12 @@ class ReviewsService {
             where.rating = { gte: minRating };
         }
         const [reviews, total, allReviews] = await Promise.all([
-            prisma_1.prisma.courseReview.findMany({
+            prisma_1.prisma.collectionReview.findMany({
                 where,
                 skip,
                 take,
                 include: {
-                    course: {
+                    collection: {
                         select: {
                             id: true,
                             title: true,
@@ -100,9 +100,9 @@ class ReviewsService {
                     { createdAt: 'desc' },
                 ],
             }),
-            prisma_1.prisma.courseReview.count({ where }),
-            prisma_1.prisma.courseReview.findMany({
-                where: { courseId, isPublished: true },
+            prisma_1.prisma.collectionReview.count({ where }),
+            prisma_1.prisma.collectionReview.findMany({
+                where: { collectionId: courseId, isPublished: true },
                 select: { rating: true },
             }),
         ]);
@@ -131,10 +131,10 @@ class ReviewsService {
      * Get review by ID
      */
     async getReviewById(reviewId) {
-        const review = await prisma_1.prisma.courseReview.findUnique({
+        const review = await prisma_1.prisma.collectionReview.findUnique({
             where: { id: reviewId },
             include: {
-                course: {
+                collection: {
                     select: {
                         id: true,
                         title: true,
@@ -158,7 +158,7 @@ class ReviewsService {
      * Update review
      */
     async updateReview(reviewId, studentId, data) {
-        const review = await prisma_1.prisma.courseReview.findFirst({
+        const review = await prisma_1.prisma.collectionReview.findFirst({
             where: { id: reviewId, studentId },
         });
         if (!review) {
@@ -175,11 +175,11 @@ class ReviewsService {
             updateData.title = data.title;
         if (data.content !== undefined)
             updateData.content = data.content;
-        const updated = await prisma_1.prisma.courseReview.update({
+        const updated = await prisma_1.prisma.collectionReview.update({
             where: { id: reviewId },
             data: updateData,
             include: {
-                course: {
+                collection: {
                     select: {
                         id: true,
                         title: true,
@@ -194,29 +194,29 @@ class ReviewsService {
                 },
             },
         });
-        await (0, cache_1.deleteCache)(`course:${updated.courseId}`);
+        await (0, cache_1.deleteCache)(`collection:${updated.collectionId}`);
         return this.mapToDto(updated);
     }
     /**
      * Delete review
      */
     async deleteReview(reviewId, studentId) {
-        const review = await prisma_1.prisma.courseReview.findFirst({
+        const review = await prisma_1.prisma.collectionReview.findFirst({
             where: { id: reviewId, studentId },
         });
         if (!review) {
             throw new Error('Review not found or unauthorized');
         }
-        await prisma_1.prisma.courseReview.delete({
+        await prisma_1.prisma.collectionReview.delete({
             where: { id: reviewId },
         });
-        await (0, cache_1.deleteCache)(`course:${review.courseId}`);
+        await (0, cache_1.deleteCache)(`collection:${review.collectionId}`);
     }
     /**
      * Mark review as helpful
      */
     async markHelpful(reviewId, userId) {
-        const review = await prisma_1.prisma.courseReview.findUnique({
+        const review = await prisma_1.prisma.collectionReview.findUnique({
             where: { id: reviewId },
         });
         if (!review) {
@@ -249,7 +249,7 @@ class ReviewsService {
         const helpfulCount = await prisma_1.prisma.reviewHelpful.count({
             where: { reviewId, isHelpful: true },
         });
-        await prisma_1.prisma.courseReview.update({
+        await prisma_1.prisma.collectionReview.update({
             where: { id: reviewId },
             data: { helpfulCount },
         });
@@ -259,10 +259,10 @@ class ReviewsService {
      * Add instructor response
      */
     async addInstructorResponse(reviewId, instructorId, response) {
-        const review = await prisma_1.prisma.courseReview.findUnique({
+        const review = await prisma_1.prisma.collectionReview.findUnique({
             where: { id: reviewId },
             include: {
-                course: {
+                collection: {
                     select: {
                         instructorId: true,
                     },
@@ -272,17 +272,17 @@ class ReviewsService {
         if (!review) {
             throw new Error('Review not found');
         }
-        if (review.course.instructorId !== instructorId) {
-            throw new Error('Only the course instructor can respond to reviews');
+        if (review.collection.instructorId !== instructorId) {
+            throw new Error('Only the collection instructor can respond to reviews');
         }
-        const updated = await prisma_1.prisma.courseReview.update({
+        const updated = await prisma_1.prisma.collectionReview.update({
             where: { id: reviewId },
             data: {
                 instructorResponse: response,
                 instructorResponseAt: new Date(),
             },
             include: {
-                course: {
+                collection: {
                     select: {
                         id: true,
                         title: true,
@@ -305,8 +305,8 @@ class ReviewsService {
     mapToDto(review) {
         return {
             id: review.id,
-            courseId: review.courseId,
-            course: review.course,
+            courseId: review.collectionId,
+            course: review.collection,
             studentId: review.studentId,
             student: review.student,
             rating: review.rating,

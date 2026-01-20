@@ -17,11 +17,12 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.calendarSchema = exports.recommendationSchema = exports.mediaSchema = exports.enrollmentSchema = exports.coursesSchema = exports.CourseImportService = exports.ComparisonService = exports.ShareService = exports.ReferralService = exports.InstructorQAService = exports.TagsService = exports.LearningPathsService = exports.CouponsService = exports.BundlesService = exports.DashboardService = exports.PrerequisitesService = exports.WishlistService = exports.CategoryService = exports.TeacherEarningsService = exports.WhiteboardService = exports.PollService = exports.CalendarService = exports.RecommendationService = exports.RealtimeService = exports.CloudflareStreamService = exports.CloudflareR2Service = exports.MediaService = exports.PaymentService = exports.EnrollmentService = exports.CoursesService = void 0;
+exports.calendarSchema = exports.recommendationSchema = exports.mediaSchema = exports.enrollmentSchema = exports.coursesSchema = exports.MonetizationService = exports.CourseImportService = exports.ComparisonService = exports.ShareService = exports.ReferralService = exports.InstructorQAService = exports.TagsService = exports.LearningPathsService = exports.CouponsService = exports.BundlesService = exports.DashboardService = exports.PrerequisitesService = exports.WishlistService = exports.CategoryService = exports.TeacherEarningsService = exports.WhiteboardService = exports.PollService = exports.CalendarService = exports.RecommendationService = exports.RealtimeService = exports.CloudflareStreamService = exports.CloudflareR2Service = exports.MediaService = exports.PaymentService = exports.EnrollmentService = exports.CollectionsService = void 0;
 exports.registerCoursesModule = registerCoursesModule;
 const express_graphql_1 = require("express-graphql");
 const courses_routes_1 = __importDefault(require("./routes/rest/courses.routes"));
 const progress_routes_1 = __importDefault(require("./routes/rest/progress.routes"));
+const enrollments_routes_1 = __importDefault(require("./routes/rest/enrollments.routes"));
 const announcements_routes_1 = __importDefault(require("./routes/rest/announcements.routes"));
 const recommendations_user_routes_1 = __importDefault(require("./routes/rest/recommendations-user.routes"));
 const bookings_routes_1 = __importDefault(require("./routes/rest/bookings.routes"));
@@ -58,6 +59,8 @@ const share_routes_1 = __importDefault(require("./routes/rest/share.routes"));
 const comparison_routes_1 = __importDefault(require("./routes/rest/comparison.routes"));
 const course_import_routes_1 = __importDefault(require("./routes/rest/course-import.routes"));
 const lesson_payment_routes_1 = __importDefault(require("./routes/rest/lesson-payment.routes"));
+const lesson_purchase_routes_1 = __importDefault(require("./routes/rest/lesson-purchase.routes"));
+const monetization_routes_1 = __importDefault(require("./routes/rest/monetization.routes"));
 const course_resolver_1 = require("./routes/graphql/course.resolver");
 Object.defineProperty(exports, "coursesSchema", { enumerable: true, get: function () { return course_resolver_1.coursesSchema; } });
 const enrollment_resolver_1 = require("./routes/graphql/enrollment.resolver");
@@ -70,19 +73,22 @@ const calendar_resolver_1 = require("./routes/graphql/calendar.resolver");
 Object.defineProperty(exports, "calendarSchema", { enumerable: true, get: function () { return calendar_resolver_1.calendarSchema; } });
 function registerCoursesModule(app) {
     // REST routes
-    // Register main courses router FIRST to handle base routes like POST /, GET /, etc.
-    // This ensures POST /api/courses matches before parameterized routes
-    app.use('/api/courses', courses_routes_1.default);
-    // Register specific course sub-routes AFTER the main router
-    // These have parameterized routes like /:courseId/tags which won't conflict
-    app.use('/api/courses/wishlist', wishlist_routes_1.default);
-    app.use('/api/courses', prerequisites_routes_1.default);
-    app.use('/api/courses', tags_routes_1.default); // Course-specific tag routes
-    app.use('/api/courses', instructor_qa_routes_1.default);
-    app.use('/api/courses', share_routes_1.default);
-    app.use('/api/courses', comparison_routes_1.default);
-    app.use('/api/courses', course_import_routes_1.default);
+    // Register specific routes BEFORE the main collections router to ensure they match first
+    // This prevents /api/collections/:id from matching routes like /api/collections/wishlist
+    app.use('/api/collections/wishlist', wishlist_routes_1.default);
+    // Register main collections router AFTER specific routes
+    // This ensures POST /api/collections matches before parameterized routes
+    app.use('/api/collections', courses_routes_1.default);
+    // Register other specific collection sub-routes AFTER the main router
+    // These have parameterized routes like /:collectionId/tags which won't conflict
+    app.use('/api/collections', prerequisites_routes_1.default);
+    app.use('/api/collections', tags_routes_1.default); // Collection-specific tag routes
+    app.use('/api/collections', instructor_qa_routes_1.default);
+    app.use('/api/collections', share_routes_1.default);
+    app.use('/api/collections', comparison_routes_1.default);
+    app.use('/api/collections', course_import_routes_1.default);
     app.use('/api', progress_routes_1.default);
+    app.use('/api/enrollments', enrollments_routes_1.default);
     app.use('/api', announcements_routes_1.default);
     app.use('/api', recommendations_user_routes_1.default);
     app.use('/api', bookings_routes_1.default);
@@ -112,6 +118,8 @@ function registerCoursesModule(app) {
     app.use('/api/tags', tags_platform_routes_1.default); // Platform-wide tag routes
     app.use('/api/referrals', referral_routes_1.default);
     app.use('/api', lesson_payment_routes_1.default);
+    app.use('/api', lesson_purchase_routes_1.default);
+    app.use('/api', monetization_routes_1.default);
     // GraphQL endpoints
     app.use('/graphql/courses', (0, express_graphql_1.graphqlHTTP)({
         schema: course_resolver_1.coursesSchema,
@@ -135,7 +143,7 @@ function registerCoursesModule(app) {
     }));
 }
 var service_1 = require("./services/service");
-Object.defineProperty(exports, "CoursesService", { enumerable: true, get: function () { return service_1.CoursesService; } });
+Object.defineProperty(exports, "CollectionsService", { enumerable: true, get: function () { return service_1.CollectionsService; } });
 var enrollment_service_1 = require("./services/enrollment.service");
 Object.defineProperty(exports, "EnrollmentService", { enumerable: true, get: function () { return enrollment_service_1.EnrollmentService; } });
 var payment_service_1 = require("./services/payment.service");
@@ -184,6 +192,8 @@ var comparison_service_1 = require("./services/comparison.service");
 Object.defineProperty(exports, "ComparisonService", { enumerable: true, get: function () { return comparison_service_1.ComparisonService; } });
 var course_import_service_1 = require("./services/course-import.service");
 Object.defineProperty(exports, "CourseImportService", { enumerable: true, get: function () { return course_import_service_1.CourseImportService; } });
+var monetization_service_1 = require("./services/monetization.service");
+Object.defineProperty(exports, "MonetizationService", { enumerable: true, get: function () { return monetization_service_1.MonetizationService; } });
 __exportStar(require("./dtos/enrollment.dto"), exports);
 __exportStar(require("./dtos/payment.dto"), exports);
 __exportStar(require("./dtos/media.dto"), exports);

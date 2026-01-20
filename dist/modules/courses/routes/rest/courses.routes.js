@@ -43,7 +43,7 @@ const validation_1 = require("../../../../middleware/validation");
 const validation_schemas_1 = require("../../../../utils/validation-schemas");
 const prisma_1 = require("../../../../utils/prisma");
 const router = (0, express_1.Router)();
-const service = new service_1.CoursesService();
+const service = new service_1.CollectionsService();
 const enrollmentService = new enrollment_service_1.EnrollmentService();
 /**
  * @swagger
@@ -104,15 +104,15 @@ router.post('/', auth_1.requireAuth, (0, roles_1.requireRole)('TEACHER'), (0, va
         };
         // Auto-generate order if not provided (get max order + 1 for this instructor)
         if (payload.order == null) {
-            const maxOrderCourse = await prisma_1.prisma.course.findFirst({
+            const maxOrderCollection = await prisma_1.prisma.collection.findFirst({
                 where: { instructorId: payload.instructorId },
                 orderBy: { order: 'desc' },
                 select: { order: true },
             });
-            payload.order = (maxOrderCourse?.order ?? -1) + 1;
+            payload.order = (maxOrderCollection?.order ?? -1) + 1;
         }
-        const course = await service.createCourse(payload);
-        res.json(course);
+        const collection = await service.createCollection(payload);
+        res.json(collection);
     }
     catch (err) {
         const error = err;
@@ -194,7 +194,7 @@ router.post('/', auth_1.requireAuth, (0, roles_1.requireRole)('TEACHER'), (0, va
  */
 router.get('/:id/modules', auth_1.requireAuth, (0, validation_1.validate)({ params: validation_schemas_1.courseIdParamSchema }), async (req, res) => {
     try {
-        const modules = await service.getCourseModulesWithLessons(req.params.id);
+        const modules = await service.getCollectionModulesWithLessons(req.params.id);
         res.json(modules);
     }
     catch (err) {
@@ -203,8 +203,8 @@ router.get('/:id/modules', auth_1.requireAuth, (0, validation_1.validate)({ para
 });
 router.post('/:id/modules', auth_1.requireAuth, (0, roles_1.requireRole)('TEACHER'), (0, validation_1.validate)({ params: validation_schemas_1.courseIdParamSchema, body: validation_schemas_1.createModuleSchema }), async (req, res) => {
     try {
-        const courseModule = await service.addModuleToCourse(req.params.id, req.body);
-        res.json(courseModule);
+        const collectionModule = await service.addModuleToCollection(req.params.id, req.body);
+        res.json(collectionModule);
     }
     catch (err) {
         res.status(400).json({ error: err.message });
@@ -255,7 +255,7 @@ router.post('/:id/modules', auth_1.requireAuth, (0, roles_1.requireRole)('TEACHE
  */
 router.put('/:id/modules/:moduleId', auth_1.requireAuth, (0, roles_1.requireRole)('TEACHER'), (0, validation_1.validate)({ params: validation_schemas_1.courseIdParamSchema }), async (req, res) => {
     try {
-        const module = await service.updateModuleInCourse(req.params.id, req.params.moduleId, req.body);
+        const module = await service.updateModuleInCollection(req.params.id, req.params.moduleId, req.body);
         res.json(module);
     }
     catch (err) {
@@ -277,7 +277,7 @@ router.delete('/:id/modules/:moduleId', auth_1.requireAuth, (0, roles_1.requireR
         await service.deleteModule(req.params.moduleId);
         const { deleteCache } = await Promise.resolve().then(() => __importStar(require('../../../../utils/cache')));
         const { cacheKeys } = await Promise.resolve().then(() => __importStar(require('../../../../utils/cache')));
-        await deleteCache(cacheKeys.course(req.params.id));
+        await deleteCache(cacheKeys.collection(req.params.id));
         res.json({ success: true, message: 'Module deleted successfully' });
     }
     catch (err) {
@@ -344,10 +344,10 @@ router.delete('/:id/modules/:moduleId', auth_1.requireAuth, (0, roles_1.requireR
  */
 router.post('/:id/modules/:moduleId/lessons', auth_1.requireAuth, (0, roles_1.requireRole)('TEACHER'), async (req, res) => {
     try {
-        // Add courseId from route params to the request body
+        // Add collectionId from route params to the request body
         const lessonData = {
             ...req.body,
-            courseId: req.params.id,
+            collectionId: req.params.id,
         };
         const lesson = await service.addLessonToModule(req.params.moduleId, lessonData);
         res.json(lesson);
@@ -560,7 +560,7 @@ router.get('/', async (req, res) => {
         const tags = req.query.tags ? req.query.tags.split(',') : undefined;
         const sortBy = req.query.sortBy || 'createdAt';
         const sortOrder = req.query.sortOrder || 'desc';
-        const result = await service.getAllCourses(page, limit, search, minPrice, maxPrice, instructorId, categoryId, difficulty, minRating, maxRating, minDuration, maxDuration, language, tags, sortBy, sortOrder);
+        const result = await service.getAllCollections(page, limit, search, minPrice, maxPrice, instructorId, categoryId, difficulty, minRating, maxRating, minDuration, maxDuration, language, tags, sortBy, sortOrder);
         res.json(result);
     }
     catch (err) {
@@ -649,55 +649,59 @@ router.get('/', async (req, res) => {
  */
 router.get('/:id/preview', async (req, res) => {
     try {
-        const courseId = req.params.id;
-        const course = await service.getCourseById(courseId);
-        if (!course) {
-            return res.status(404).json({ error: 'Course not found' });
+        const collectionId = req.params.id;
+        const collection = await service.getCollectionById(collectionId);
+        if (!collection) {
+            return res.status(404).json({ error: 'Collection not found' });
         }
         // Get preview content
-        const [previewLessons, previewVideos] = await Promise.all([
-            prisma_1.prisma.lesson.findMany({
-                where: {
-                    courseId,
-                    isPreview: true,
+        // First get CollectionLesson records, then get the lessons
+        const collectionLessons = await prisma_1.prisma.collectionLesson.findMany({
+            where: { collectionId },
+            include: {
+                lesson: {
+                    select: {
+                        id: true,
+                        title: true,
+                        order: true,
+                        duration: true,
+                        createdAt: true,
+                        isPreview: true,
+                    },
                 },
-                select: {
-                    id: true,
-                    title: true,
-                    order: true,
-                    duration: true,
-                    createdAt: true,
-                },
-                orderBy: { order: 'asc' },
-            }),
-            prisma_1.prisma.video.findMany({
-                where: {
-                    courseId,
-                    isPreview: true,
-                },
-                select: {
-                    id: true,
-                    title: true,
-                    description: true,
-                    thumbnailUrl: true,
-                    duration: true,
-                    playbackUrl: true,
-                    createdAt: true,
-                },
-                orderBy: { createdAt: 'asc' },
-            }),
-        ]);
+            },
+            orderBy: { order: 'asc' },
+        });
+        const previewLessonsData = collectionLessons
+            .filter((cl) => cl.lesson && cl.lesson.isPreview)
+            .map((cl) => cl.lesson);
+        const previewVideos = await prisma_1.prisma.video.findMany({
+            where: {
+                collectionId,
+                isPreview: true,
+            },
+            select: {
+                id: true,
+                title: true,
+                description: true,
+                thumbnailUrl: true,
+                duration: true,
+                playbackUrl: true,
+                createdAt: true,
+            },
+            orderBy: { createdAt: 'asc' },
+        });
         res.json({
-            course: {
-                id: course.id,
-                title: course.title,
-                description: course.description,
-                thumbnailUrl: course.thumbnailUrl,
-                difficulty: course.difficulty,
-                instructor: course.instructor,
+            collection: {
+                id: collection.id,
+                title: collection.title,
+                description: collection.description,
+                thumbnailUrl: collection.thumbnailUrl,
+                difficulty: collection.difficulty,
+                instructor: collection.instructor,
             },
             previewContent: {
-                lessons: previewLessons,
+                lessons: previewLessonsData,
                 videos: previewVideos,
             },
         });
@@ -744,10 +748,10 @@ router.get('/:id/preview', async (req, res) => {
  */
 router.get('/:id', auth_1.requireAuth, subscription_1.requireSubscription, (0, validation_1.validate)({ params: validation_schemas_1.courseIdParamSchema }), async (req, res) => {
     try {
-        const course = await service.getCourseById(req.params.id);
-        if (!course)
+        const collection = await service.getCollectionById(req.params.id);
+        if (!collection)
             return res.status(404).json({ error: 'Not found' });
-        res.json(course);
+        res.json(collection);
     }
     catch (err) {
         res.status(500).json({ error: 'Failed to fetch course' });
@@ -819,8 +823,8 @@ router.get('/:id', auth_1.requireAuth, subscription_1.requireSubscription, (0, v
  */
 router.put('/:id', auth_1.requireAuth, (0, roles_1.requireRole)('TEACHER'), (0, validation_1.validate)({ params: validation_schemas_1.courseIdParamSchema, body: validation_schemas_1.updateCourseSchema }), async (req, res) => {
     try {
-        const course = await service.updateCourse(req.params.id, req.body);
-        res.json(course);
+        const collection = await service.updateCollection(req.params.id, req.body);
+        res.json(collection);
     }
     catch (err) {
         res.status(400).json({ error: err.message });
@@ -862,7 +866,7 @@ router.put('/:id', auth_1.requireAuth, (0, roles_1.requireRole)('TEACHER'), (0, 
  */
 router.delete('/:id', auth_1.requireAuth, (0, roles_1.requireRole)('TEACHER'), (0, validation_1.validate)({ params: validation_schemas_1.courseIdParamSchema }), async (req, res) => {
     try {
-        await service.deleteCourse(req.params.id);
+        await service.deleteCollection(req.params.id);
         res.json({ success: true });
     }
     catch (err) {
@@ -929,11 +933,11 @@ router.delete('/:id', auth_1.requireAuth, (0, roles_1.requireRole)('TEACHER'), (
  */
 router.get('/:id/active-users', auth_1.requireAuth, (0, roles_1.requireRole)('TEACHER'), (0, validation_1.validate)({ params: validation_schemas_1.courseIdParamSchema }), async (req, res) => {
     try {
-        const courseId = req.params.id;
+        const collectionId = req.params.id;
         const days = parseInt(req.query.days) || 7;
         const page = parseInt(req.query.page) || 1;
         const limit = parseInt(req.query.limit) || 20;
-        const result = await enrollmentService.getActiveUsersInCourse(courseId, days, page, limit);
+        const result = await enrollmentService.getActiveUsersInCollection(collectionId, days, page, limit);
         res.json(result);
     }
     catch (err) {
@@ -987,10 +991,10 @@ router.get('/:id/active-users', auth_1.requireAuth, (0, roles_1.requireRole)('TE
  */
 router.get('/:id/enrollments', auth_1.requireAuth, (0, roles_1.requireRole)('TEACHER'), (0, validation_1.validate)({ params: validation_schemas_1.courseIdParamSchema }), async (req, res) => {
     try {
-        const courseId = req.params.id;
+        const collectionId = req.params.id;
         const page = parseInt(req.query.page) || 1;
         const limit = parseInt(req.query.limit) || 20;
-        const result = await enrollmentService.getCourseEnrollments(courseId, page, limit);
+        const result = await enrollmentService.getCollectionEnrollments(collectionId, page, limit);
         res.json(result);
     }
     catch (err) {

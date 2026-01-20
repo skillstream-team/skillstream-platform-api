@@ -817,7 +817,7 @@ const learningMutations = {
     resolve: async (_: any, args: any) => {
       try {
         return await learningService.createCourseModule({
-          courseId: args.courseId,
+          collectionId: args.courseId,
           title: args.title,
           description: args.description,
           order: args.order,
@@ -887,7 +887,7 @@ const learningMutations = {
     resolve: async (_: any, args: any) => {
       try {
         return await learningService.createQuiz({
-          courseId: args.courseId,
+          collectionId: args.courseId,
           moduleId: args.moduleId,
           title: args.title,
           description: args.description,
@@ -1079,7 +1079,7 @@ const learningMutations = {
       try {
         return await learningService.updateProgress({
           studentId: args.studentId,
-          courseId: args.courseId,
+          collectionId: args.courseId,
           moduleId: args.moduleId,
           type: args.type as any,
           itemId: args.itemId,

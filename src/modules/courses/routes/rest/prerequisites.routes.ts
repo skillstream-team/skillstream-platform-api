@@ -104,6 +104,7 @@ router.post('/:courseId/prerequisites', requireRole('TEACHER'), async (req, res)
 
     const result = await prerequisitesService.addPrerequisite({
       courseId,
+      collectionId: courseId,
       prerequisiteId,
       isRequired,
     });

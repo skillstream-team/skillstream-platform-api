@@ -148,7 +148,7 @@ router.post('/lessons/:lessonId/resources/upload', requireAuth, async (req, res)
       file: fileBuffer,
       filename,
       contentType,
-      courseId: courseId.toString(),
+      collectionId: courseId.toString(),
       type: fileType,
     });
 

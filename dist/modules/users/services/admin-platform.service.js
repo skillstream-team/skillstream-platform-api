@@ -143,7 +143,7 @@ class AdminPlatformService {
             where.title = { contains: options.search, mode: 'insensitive' };
         }
         if (options.courseId) {
-            where.courseId = options.courseId;
+            where.collectionId = options.courseId;
         }
         if (options.status) {
             where.isPublished = options.status === 'PUBLISHED';
@@ -154,7 +154,7 @@ class AdminPlatformService {
                 skip,
                 take: limit,
                 include: {
-                    course: {
+                    collection: {
                         select: { id: true, title: true },
                     },
                     questions: {
@@ -176,8 +176,8 @@ class AdminPlatformService {
             return {
                 id: quiz.id,
                 title: quiz.title,
-                courseId: quiz.courseId,
-                courseName: quiz.course?.title || 'N/A',
+                courseId: quiz.collectionId,
+                courseName: quiz.collection?.title || 'N/A',
                 lessonId: quiz.lessonId,
                 questions: quiz.questions?.length || 0,
                 totalAttempts: attempts.length,
@@ -203,7 +203,7 @@ class AdminPlatformService {
         const quiz = await user_model_1.prisma.quiz.findUnique({
             where: { id },
             include: {
-                course: {
+                collection: {
                     select: { id: true, title: true },
                 },
                 questions: {
@@ -220,7 +220,7 @@ class AdminPlatformService {
                 id: quiz.id,
                 title: quiz.title,
                 description: quiz.description,
-                courseId: quiz.courseId,
+                courseId: quiz.collectionId,
                 lessonId: quiz.lessonId,
                 questions: quiz.questions,
                 settings: {
@@ -263,7 +263,7 @@ class AdminPlatformService {
                 id: quiz.id,
                 title: quiz.title,
                 description: quiz.description,
-                courseId: quiz.courseId,
+                courseId: quiz.collectionId,
                 lessonId: quiz.lessonId,
                 questions: quiz.questions,
                 settings: {
@@ -301,7 +301,7 @@ class AdminPlatformService {
             ];
         }
         if (options.courseId) {
-            where.courseId = options.courseId;
+            where.collectionId = options.courseId;
         }
         if (options.status) {
             if (options.status === 'HIDDEN') {
@@ -324,7 +324,7 @@ class AdminPlatformService {
                     author: {
                         select: { id: true, username: true, email: true, firstName: true, lastName: true },
                     },
-                    course: {
+                    collection: {
                         select: { id: true, title: true },
                     },
                     replies: {
@@ -344,8 +344,8 @@ class AdminPlatformService {
                 name: `${post.author?.firstName || ''} ${post.author?.lastName || ''}`.trim() || post.author?.username || 'Unknown',
                 email: post.author?.email,
             },
-            courseId: post.courseId,
-            courseName: post.course?.title || 'N/A',
+            courseId: post.collectionId,
+            courseName: post.collection?.title || 'N/A',
             replies: post.replies?.length || 0,
             views: post.views || 0,
             isPinned: post.isPinned || false,
@@ -475,7 +475,7 @@ class AdminPlatformService {
             where.question = { contains: options.search, mode: 'insensitive' };
         }
         if (options.courseId) {
-            where.courseId = options.courseId;
+            where.collectionId = options.courseId;
         }
         if (options.status) {
             if (options.status === 'HIDDEN') {
@@ -498,7 +498,7 @@ class AdminPlatformService {
                     student: {
                         select: { id: true, username: true, firstName: true, lastName: true },
                     },
-                    course: {
+                    collection: {
                         select: { id: true, title: true },
                     },
                     answers: {
@@ -516,8 +516,8 @@ class AdminPlatformService {
                 id: qa.studentId,
                 name: `${qa.student?.firstName || ''} ${qa.student?.lastName || ''}`.trim() || qa.student?.username || 'Unknown',
             },
-            courseId: qa.courseId,
-            courseName: qa.course?.title || 'N/A',
+            courseId: qa.collectionId,
+            courseName: qa.collection?.title || 'N/A',
             lessonId: qa.lessonId,
             answers: qa.answers?.length || 0,
             isResolved: qa.isResolved || false,
@@ -737,14 +737,14 @@ class AdminPlatformService {
             where.title = { contains: options.search, mode: 'insensitive' };
         }
         const [bundles, total] = await Promise.all([
-            user_model_1.prisma.courseBundle.findMany({
+            user_model_1.prisma.collectionBundle.findMany({
                 where,
                 skip,
                 take: limit,
                 include: {
                     items: {
                         include: {
-                            course: {
+                            collection: {
                                 select: { id: true, title: true, price: true },
                             },
                         },
@@ -753,11 +753,11 @@ class AdminPlatformService {
                 },
                 orderBy: { createdAt: 'desc' },
             }),
-            user_model_1.prisma.courseBundle.count({ where }),
+            user_model_1.prisma.collectionBundle.count({ where }),
         ]);
         const formattedBundles = bundles.map((bundle) => {
-            const courses = bundle.items.map((item) => item.course.id);
-            const totalPrice = bundle.items.reduce((sum, item) => sum + (item.course.price || 0), 0);
+            const courses = bundle.items.map((item) => item.collection.id);
+            const totalPrice = bundle.items.reduce((sum, item) => sum + (item.collection.price || 0), 0);
             const discount = totalPrice > 0 ? ((totalPrice - bundle.price) / totalPrice) * 100 : 0;
             return {
                 id: bundle.id,
@@ -786,12 +786,12 @@ class AdminPlatformService {
         };
     }
     async getBundle(id) {
-        const bundle = await user_model_1.prisma.courseBundle.findUnique({
+        const bundle = await user_model_1.prisma.collectionBundle.findUnique({
             where: { id },
             include: {
                 items: {
                     include: {
-                        course: {
+                        collection: {
                             select: { id: true, title: true, description: true, price: true },
                         },
                     },
@@ -809,10 +809,10 @@ class AdminPlatformService {
                 name: bundle.title,
                 description: bundle.description,
                 courses: bundle.items.map((item) => ({
-                    id: item.course.id,
-                    title: item.course.title,
-                    description: item.course.description,
-                    price: item.course.price,
+                    id: item.collection.id,
+                    title: item.collection.title,
+                    description: item.collection.description,
+                    price: item.collection.price,
                 })),
                 price: bundle.price,
                 isActive: bundle.isActive,
@@ -822,13 +822,13 @@ class AdminPlatformService {
     }
     async createBundle(data) {
         // Calculate discount if not provided
-        const courses = await user_model_1.prisma.course.findMany({
+        const courses = await user_model_1.prisma.collection.findMany({
             where: { id: { in: data.courseIds } },
             select: { id: true, price: true },
         });
         const totalPrice = courses.reduce((sum, c) => sum + (c.price || 0), 0);
         const finalPrice = data.price || (data.discount ? totalPrice * (1 - data.discount / 100) : totalPrice);
-        const bundle = await user_model_1.prisma.courseBundle.create({
+        const bundle = await user_model_1.prisma.collectionBundle.create({
             data: {
                 title: data.name,
                 description: data.description,
@@ -836,7 +836,7 @@ class AdminPlatformService {
                 isActive: data.isActive ?? true,
                 items: {
                     create: data.courseIds.map((courseId, index) => ({
-                        courseId,
+                        collectionId: courseId,
                         order: index,
                     })),
                 },
@@ -844,7 +844,7 @@ class AdminPlatformService {
             include: {
                 items: {
                     include: {
-                        course: true,
+                        collection: true,
                     },
                 },
             },
@@ -855,7 +855,7 @@ class AdminPlatformService {
                 id: bundle.id,
                 name: bundle.title,
                 description: bundle.description,
-                courses: bundle.items.map((item) => item.course.id),
+                courses: bundle.items.map((item) => item.collection.id),
                 price: bundle.price,
                 isActive: bundle.isActive,
                 createdAt: bundle.createdAt.toISOString(),
@@ -875,25 +875,25 @@ class AdminPlatformService {
         // Update courses if provided
         if (data.courseIds) {
             // Delete existing items
-            await user_model_1.prisma.courseBundleItem.deleteMany({
+            await user_model_1.prisma.collectionBundleItem.deleteMany({
                 where: { bundleId: id },
             });
             // Create new items
-            await user_model_1.prisma.courseBundleItem.createMany({
+            await user_model_1.prisma.collectionBundleItem.createMany({
                 data: data.courseIds.map((courseId, index) => ({
                     bundleId: id,
-                    courseId,
+                    collectionId: courseId,
                     order: index,
                 })),
             });
         }
-        const bundle = await user_model_1.prisma.courseBundle.update({
+        const bundle = await user_model_1.prisma.collectionBundle.update({
             where: { id },
             data: updateData,
             include: {
                 items: {
                     include: {
-                        course: true,
+                        collection: true,
                     },
                 },
             },
@@ -904,7 +904,7 @@ class AdminPlatformService {
                 id: bundle.id,
                 name: bundle.title,
                 description: bundle.description,
-                courses: bundle.items.map((item) => item.course.id),
+                courses: bundle.items.map((item) => item.collection.id),
                 price: bundle.price,
                 isActive: bundle.isActive,
                 createdAt: bundle.createdAt.toISOString(),
@@ -913,7 +913,7 @@ class AdminPlatformService {
         };
     }
     async deleteBundle(id) {
-        await user_model_1.prisma.courseBundle.delete({
+        await user_model_1.prisma.collectionBundle.delete({
             where: { id },
         });
         return {
@@ -1065,7 +1065,7 @@ class AdminPlatformService {
                 id: wb.createdBy,
                 name: `${wb.creator?.firstName || ''} ${wb.creator?.lastName || ''}`.trim() || wb.creator?.username || 'Unknown',
             },
-            courseId: wb.courseId,
+            courseId: wb.collectionId,
             size: 0, // Whiteboard size not available in schema
             createdAt: wb.createdAt.toISOString(),
             lastAccessed: wb.updatedAt.toISOString(),

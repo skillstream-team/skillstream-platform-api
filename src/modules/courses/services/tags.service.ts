@@ -11,16 +11,16 @@ export class TagsService {
 
     await prisma.$transaction(
       uniqueTags.map((tag) =>
-        prisma.courseTag.upsert({
+        prisma.collectionTag.upsert({
           where: {
-            courseId_name: {
-              courseId,
+            collectionId_name: {
+              collectionId: courseId,
               name: tag,
             },
           },
           update: {},
           create: {
-            courseId,
+            collectionId: courseId,
             name: tag,
           },
         })
@@ -35,9 +35,9 @@ export class TagsService {
    * Remove tags from a course
    */
   async removeTagsFromCourse(courseId: string, tags: string[]): Promise<void> {
-    await prisma.courseTag.deleteMany({
+    await prisma.collectionTag.deleteMany({
       where: {
-        courseId,
+        collectionId: courseId,
         name: { in: tags.map((t) => t.toLowerCase().trim()) },
       },
     });
@@ -50,8 +50,8 @@ export class TagsService {
    * Get all tags for a course
    */
   async getCourseTags(courseId: string): Promise<string[]> {
-    const tags = await prisma.courseTag.findMany({
-      where: { courseId },
+    const tags = await prisma.collectionTag.findMany({
+      where: { collectionId: courseId },
       select: { name: true },
       orderBy: { name: 'asc' },
     });
@@ -63,7 +63,7 @@ export class TagsService {
    * Get all unique tags across platform
    */
   async getAllTags(): Promise<Array<{ name: string; count: number }>> {
-    const tags = await prisma.courseTag.groupBy({
+    const tags = await prisma.collectionTag.groupBy({
       by: ['name'],
       _count: {
         name: true,
@@ -75,7 +75,7 @@ export class TagsService {
       },
     });
 
-    return tags.map((t) => ({
+    return tags.map((t: any) => ({
       name: t.name,
       count: t._count.name,
     }));
@@ -101,7 +101,7 @@ export class TagsService {
     const take = Math.min(limit, 100);
 
     const [courses, total] = await Promise.all([
-      prisma.course.findMany({
+      prisma.collection.findMany({
         where: {
           tags: {
             some: {
@@ -117,7 +117,7 @@ export class TagsService {
         skip,
         take,
       }),
-      prisma.course.count({
+      prisma.collection.count({
         where: {
           tags: {
             some: {
@@ -129,7 +129,7 @@ export class TagsService {
     ]);
 
     return {
-      data: courses.map(c => ({
+      data: courses.map((c: any) => ({
         id: c.id,
         title: c.title,
         thumbnailUrl: c.thumbnailUrl || undefined,

@@ -276,7 +276,7 @@ router.post('/admin/courses/:id/moderate',
 
     try {
       const adminId = (req as any).user.id;
-      const course = await adminService.moderateCourse(
+      const course = await adminService.moderateCollection(
         req.params.id,
         req.body.status,
         req.body.rejectionReason,

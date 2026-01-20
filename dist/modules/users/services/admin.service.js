@@ -31,17 +31,17 @@ class AdminService {
             prisma_1.prisma.user.count(),
             prisma_1.prisma.user.count({ where: { role: 'TEACHER' } }),
             prisma_1.prisma.user.count({ where: { role: 'STUDENT' } }),
-            prisma_1.prisma.course.count(),
-            prisma_1.prisma.course.count({ where: { isPublished: true } }),
-            prisma_1.prisma.course.count({ where: { isPublished: false } }),
+            prisma_1.prisma.collection.count(),
+            prisma_1.prisma.collection.count({ where: { isPublished: true } }),
+            prisma_1.prisma.collection.count({ where: { isPublished: false } }),
             prisma_1.prisma.payment.findMany({ where: { status: 'COMPLETED' } }),
             prisma_1.prisma.payment.findMany({
                 where: { status: 'COMPLETED', createdAt: { gte: startOfMonth } },
             }),
-            prisma_1.prisma.courseReview.count({ where: { isPublished: false } }),
+            prisma_1.prisma.collectionReview.count({ where: { isPublished: false } }),
             prisma_1.prisma.contentFlag.count({ where: { status: 'PENDING' } }),
             prisma_1.prisma.user.count({ where: { createdAt: { gte: thirtyDaysAgo } } }),
-            prisma_1.prisma.course.count({ where: { createdAt: { gte: startOfMonth } } }),
+            prisma_1.prisma.collection.count({ where: { createdAt: { gte: startOfMonth } } }),
         ]);
         const totalRevenue = allPayments.reduce((sum, p) => sum + (p.amount || 0), 0);
         const monthlyRevenue = monthlyPayments.reduce((sum, p) => sum + (p.amount || 0), 0);
@@ -228,7 +228,7 @@ class AdminService {
         const limit = Math.min(options.limit || 20, 100);
         const skip = (page - 1) * limit;
         const [courses, total] = await Promise.all([
-            prisma_1.prisma.course.findMany({
+            prisma_1.prisma.collection.findMany({
                 where: { isPublished: false },
                 skip,
                 take: limit,
@@ -245,7 +245,7 @@ class AdminService {
                     },
                 },
             }),
-            prisma_1.prisma.course.count({ where: { isPublished: false } }),
+            prisma_1.prisma.collection.count({ where: { isPublished: false } }),
         ]);
         return {
             courses,
@@ -260,10 +260,10 @@ class AdminService {
         };
     }
     /**
-     * Moderate course (approve/reject)
+     * Moderate collection (approve/reject)
      */
-    async moderateCourse(courseId, status, rejectionReason, adminId) {
-        const course = await prisma_1.prisma.course.findUnique({
+    async moderateCollection(courseId, status, rejectionReason, adminId) {
+        const course = await prisma_1.prisma.collection.findUnique({
             where: { id: courseId },
         });
         if (!course) {
@@ -276,7 +276,7 @@ class AdminService {
         if (status === 'APPROVED') {
             updateData.isPublished = true;
         }
-        const updatedCourse = await prisma_1.prisma.course.update({
+        const updatedCourse = await prisma_1.prisma.collection.update({
             where: { id: courseId },
             data: updateData,
             include: {
@@ -337,7 +337,7 @@ class AdminService {
             }
         }
         const [reviews, total] = await Promise.all([
-            prisma_1.prisma.courseReview.findMany({
+            prisma_1.prisma.collectionReview.findMany({
                 where,
                 skip,
                 take: limit,
@@ -353,7 +353,7 @@ class AdminService {
                             avatar: true,
                         },
                     },
-                    course: {
+                    collection: {
                         select: {
                             id: true,
                             title: true,
@@ -367,7 +367,7 @@ class AdminService {
                     },
                 },
             }),
-            prisma_1.prisma.courseReview.count({ where }),
+            prisma_1.prisma.collectionReview.count({ where }),
         ]);
         return {
             reviews,
@@ -385,7 +385,7 @@ class AdminService {
      * Moderate review (approve/reject/hide/delete)
      */
     async moderateReview(reviewId, action, reason, adminId) {
-        const review = await prisma_1.prisma.courseReview.findUnique({
+        const review = await prisma_1.prisma.collectionReview.findUnique({
             where: { id: reviewId },
         });
         if (!review) {
@@ -409,7 +409,7 @@ class AdminService {
             // Soft delete - unpublish
             updateData.isPublished = false;
         }
-        const updatedReview = await prisma_1.prisma.courseReview.update({
+        const updatedReview = await prisma_1.prisma.collectionReview.update({
             where: { id: reviewId },
             data: updateData,
             include: {
@@ -420,7 +420,7 @@ class AdminService {
                         email: true,
                     },
                 },
-                course: {
+                collection: {
                     select: {
                         id: true,
                         title: true,
@@ -486,7 +486,7 @@ class AdminService {
                             lastName: true,
                         },
                     },
-                    course: {
+                    collection: {
                         select: {
                             id: true,
                             title: true,
@@ -547,7 +547,7 @@ class AdminService {
                         email: true,
                     },
                 },
-                course: {
+                collection: {
                     select: {
                         id: true,
                         title: true,
@@ -815,7 +815,7 @@ class AdminService {
         }
         for (const courseId of courseIds) {
             try {
-                await prisma_1.prisma.course.update({
+                await prisma_1.prisma.collection.update({
                     where: { id: courseId },
                     data: updateData,
                 });
@@ -825,8 +825,8 @@ class AdminService {
                     try {
                         await this.activityLogService.logActivity({
                             userId: adminId,
-                            action: `course.bulk_${status.toLowerCase()}`,
-                            entity: 'course',
+                            action: `collection.bulk_${status.toLowerCase()}`,
+                            entity: 'collection',
                             entityId: courseId,
                             metadata: { status, rejectionReason },
                             ipAddress: requestInfo?.ipAddress,

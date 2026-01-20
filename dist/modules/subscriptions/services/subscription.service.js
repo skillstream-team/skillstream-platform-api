@@ -1,4 +1,37 @@
 "use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.SubscriptionService = void 0;
 const prisma_1 = require("../../../utils/prisma");
@@ -81,6 +114,48 @@ class SubscriptionService {
         catch (referralError) {
             console.warn('Failed to track referral activity:', referralError);
             // Don't fail subscription activation if referral tracking fails
+        }
+        // Grant access to all subscription-marked content
+        try {
+            const { SubscriptionAccessService } = await Promise.resolve().then(() => __importStar(require('./subscription-access.service')));
+            const accessService = new SubscriptionAccessService();
+            // Get all subscription-marked collections
+            const subscriptionCollections = await prisma_1.prisma.collection.findMany({
+                where: {
+                    monetizationType: 'SUBSCRIPTION',
+                    isPublished: true,
+                },
+                select: { id: true },
+            });
+            // Get all subscription-marked lessons
+            const subscriptionLessons = await prisma_1.prisma.lesson.findMany({
+                where: {
+                    monetizationType: 'SUBSCRIPTION',
+                },
+                select: { id: true },
+            });
+            // Grant access to collections
+            for (const collection of subscriptionCollections) {
+                try {
+                    await accessService.grantAccess(userId, collection.id, 'COLLECTION', 'SUBSCRIPTION', result.expiresAt || undefined);
+                }
+                catch (error) {
+                    console.warn(`Failed to grant access to collection ${collection.id}:`, error);
+                }
+            }
+            // Grant access to lessons
+            for (const lesson of subscriptionLessons) {
+                try {
+                    await accessService.grantAccess(userId, lesson.id, 'LESSON', 'SUBSCRIPTION', result.expiresAt || undefined);
+                }
+                catch (error) {
+                    console.warn(`Failed to grant access to lesson ${lesson.id}:`, error);
+                }
+            }
+        }
+        catch (accessError) {
+            console.warn('Failed to grant subscription access to content:', accessError);
+            // Don't fail subscription activation if access granting fails
         }
         // Invalidate cache
         await (0, cache_1.deleteCachePattern)(`subscription:*:${userId}*`);

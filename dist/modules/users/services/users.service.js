@@ -45,6 +45,7 @@ const jwt_1 = require("../../../utils/jwt");
 const email_service_1 = require("./email.service");
 const cache_1 = require("../../../utils/cache");
 const referral_service_1 = require("../../courses/services/referral.service");
+const firebase_1 = require("../../../utils/firebase");
 const JWT_SECRET = process.env.JWT_SECRET;
 if (!JWT_SECRET) {
     throw new Error('JWT_SECRET is not defined in your environment variables');
@@ -854,6 +855,114 @@ class UsersService {
         }
         catch (error) {
             throw new Error('Error updating user roles: ' + error.message);
+        }
+    }
+    /**
+     * Sync Firebase user with backend database
+     * Creates or updates user record with firebaseUid
+     * This is called when a user authenticates via Firebase
+     */
+    async syncFirebaseUser(data) {
+        try {
+            // Verify Firebase token
+            const auth = (0, firebase_1.getAuth)();
+            const decodedToken = await auth.verifyIdToken(data.firebaseToken);
+            // Check if user exists by firebaseUid (using findFirst since firebaseUid is not @unique in schema)
+            let user = await user_model_1.prisma.user.findFirst({
+                where: { firebaseUid: data.firebaseUid },
+            });
+            if (user) {
+                // Update existing user
+                user = await user_model_1.prisma.user.update({
+                    where: { id: user.id },
+                    data: {
+                        email: data.email,
+                        isVerified: data.emailVerified || false,
+                        avatar: data.photoURL || user.avatar,
+                        firstName: data.firstName || user.firstName,
+                        lastName: data.lastName || user.lastName,
+                        provider: data.provider || user.provider,
+                        providerId: data.firebaseUid,
+                        providerEmail: data.email,
+                    },
+                });
+            }
+            else {
+                // Check if user exists by email
+                const existingUser = await user_model_1.prisma.user.findUnique({
+                    where: { email: data.email },
+                });
+                if (existingUser) {
+                    // Link Firebase UID to existing user
+                    user = await user_model_1.prisma.user.update({
+                        where: { id: existingUser.id },
+                        data: {
+                            firebaseUid: data.firebaseUid,
+                            provider: data.provider || existingUser.provider,
+                            providerId: data.firebaseUid,
+                            providerEmail: data.email,
+                            avatar: data.photoURL || existingUser.avatar,
+                        },
+                    });
+                }
+                else {
+                    // Create new user
+                    // Generate username from email if not provided
+                    const username = data.username || data.email.split('@')[0] + '_' + Date.now();
+                    // Check username uniqueness
+                    let finalUsername = username;
+                    let counter = 1;
+                    while (await user_model_1.prisma.user.findUnique({ where: { username: finalUsername } })) {
+                        finalUsername = `${username}_${counter}`;
+                        counter++;
+                    }
+                    user = await user_model_1.prisma.user.create({
+                        data: {
+                            firebaseUid: data.firebaseUid,
+                            email: data.email,
+                            username: finalUsername,
+                            role: data.role || 'STUDENT',
+                            firstName: data.firstName || data.displayName?.split(' ')[0] || null,
+                            lastName: data.lastName || data.displayName?.split(' ').slice(1).join(' ') || null,
+                            avatar: data.photoURL || null,
+                            isVerified: data.emailVerified || false,
+                            provider: data.provider || 'firebase',
+                            providerId: data.firebaseUid,
+                            providerEmail: data.email,
+                            password: null, // No password for Firebase users
+                        },
+                    });
+                    // Create default settings for new user (same as regular registration)
+                    try {
+                        const { SettingsService } = await Promise.resolve().then(() => __importStar(require('./settings.service')));
+                        const settingsService = new SettingsService();
+                        await settingsService.createDefaultSettings(user.id);
+                    }
+                    catch (error) {
+                        console.error('Error creating default settings:', error);
+                        // Don't fail user creation if settings creation fails
+                    }
+                    // Apply referral code if provided (only for new users)
+                    if (data.referralCode) {
+                        try {
+                            const referralService = new referral_service_1.ReferralService();
+                            await referralService.applyReferralCode(data.referralCode, user.id);
+                        }
+                        catch (referralError) {
+                            console.warn('Failed to apply referral code:', referralError);
+                            // Don't fail user creation if referral fails
+                        }
+                    }
+                }
+            }
+            // Generate JWT token for backend
+            const { password: _, ...userWithoutPassword } = user;
+            const token = (0, jwt_1.generateToken)({ id: user.id, role: user.role });
+            return { token, user: userWithoutPassword };
+        }
+        catch (error) {
+            console.error('Firebase sync error:', error);
+            throw new Error('Error syncing Firebase user: ' + error.message);
         }
     }
 }

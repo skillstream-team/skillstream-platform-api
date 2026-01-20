@@ -41,7 +41,7 @@ const prisma_1 = require("../../../../utils/prisma");
 const email_service_1 = require("../../../users/services/email.service");
 const service_1 = require("../../services/service");
 const router = (0, express_1.Router)();
-const service = new service_1.CoursesService();
+const service = new service_1.CollectionsService();
 /**
  * @swagger
  * /api/lessons/quick:
@@ -163,6 +163,56 @@ router.post('/lessons/quick', auth_1.requireAuth, (0, roles_1.requireRole)('TEAC
 });
 /**
  * @swagger
+ * /api/lessons:
+ *   post:
+ *     summary: Create a standalone lesson
+ *     tags: [Lessons]
+ */
+router.post('/lessons', auth_1.requireAuth, (0, roles_1.requireRole)('TEACHER'), async (req, res) => {
+    try {
+        const userId = req.user?.id;
+        const { title, description, duration, price, isPreview, content } = req.body;
+        if (!title || !title.trim()) {
+            return res.status(400).json({ error: 'Title is required' });
+        }
+        if (price === undefined || price === null) {
+            return res.status(400).json({ error: 'Price is required' });
+        }
+        if (typeof price !== 'number' || price < 0) {
+            return res.status(400).json({ error: 'Price must be a non-negative number' });
+        }
+        // Build content JSON
+        const lessonContent = content || {};
+        if (description) {
+            lessonContent.description = description;
+        }
+        // Create standalone lesson
+        const lesson = await prisma_1.prisma.lesson.create({
+            data: {
+                title: title.trim(),
+                content: lessonContent,
+                duration: duration || null,
+                price: price || 0,
+                isPreview: isPreview || false,
+                teacherId: userId,
+                order: 0,
+                status: 'scheduled', // Default status for content lessons
+            },
+        });
+        // Extract description from content for response
+        const responseContent = lesson.content;
+        res.status(201).json({
+            ...lesson,
+            description: responseContent?.description || '',
+        });
+    }
+    catch (error) {
+        console.error('Error creating lesson:', error);
+        res.status(500).json({ error: 'Failed to create lesson' });
+    }
+});
+/**
+ * @swagger
  * /api/lessons/{id}:
  *   get:
  *     summary: Get a single lesson by ID
@@ -176,13 +226,13 @@ router.get('/lessons/:id', auth_1.requireAuth, async (req, res) => {
             where: { id },
             select: {
                 id: true,
-                courseId: true,
                 title: true,
                 content: true,
                 order: true,
                 scheduledAt: true,
                 teacherId: true,
                 duration: true,
+                price: true,
                 joinLink: true,
                 meetingId: true,
                 status: true,
@@ -252,8 +302,11 @@ router.get('/lessons', auth_1.requireAuth, subscription_1.requireSubscription, a
         if (status === 'upcoming') {
             whereQuick.scheduledAt = { gte: new Date() };
             whereQuick.status = 'scheduled';
-            whereRegular.scheduledAt = { gte: new Date() };
-            whereRegular.status = 'scheduled';
+            // For regular lessons, include both scheduled lessons with future dates AND standalone lessons (no scheduledAt)
+            whereRegular.OR = [
+                { scheduledAt: { gte: new Date() }, status: 'scheduled' },
+                { scheduledAt: null, status: 'scheduled' } // Standalone content lessons
+            ];
         }
         else if (status === 'past') {
             whereQuick.scheduledAt = { lt: new Date() };
@@ -275,22 +328,11 @@ router.get('/lessons', auth_1.requireAuth, subscription_1.requireSubscription, a
             },
             orderBy: { scheduledAt: 'asc' }
         });
-        // Get regular lessons (from courses) - only if scheduledAt exists
+        // Get regular lessons (standalone or from collections)
         const regularLessonsQuery = {
             where: whereRegular,
-            include: {
-                course: {
-                    select: { id: true, title: true }
-                }
-            }
+            orderBy: { createdAt: 'desc' }, // Sort by creation date (newest first)
         };
-        // Only add orderBy if scheduledAt field exists
-        try {
-            regularLessonsQuery.orderBy = { scheduledAt: 'asc' };
-        }
-        catch (e) {
-            // Field doesn't exist, skip ordering
-        }
         const regularLessons = await prisma_1.prisma.lesson.findMany(regularLessonsQuery).catch(() => []);
         res.json({
             success: true,
@@ -315,11 +357,11 @@ router.get('/lessons', auth_1.requireAuth, subscription_1.requireSubscription, a
 router.put('/lessons/:id', auth_1.requireAuth, (0, roles_1.requireRole)('TEACHER'), async (req, res) => {
     try {
         const { id } = req.params;
-        const { title, description, order, duration, isPreview, moduleId } = req.body;
-        // Get lesson to find courseId for cache invalidation
+        const { title, description, order, duration, price, isPreview, moduleId } = req.body;
+        // Get lesson to check if it exists
         const existingLesson = await prisma_1.prisma.lesson.findUnique({
             where: { id },
-            select: { courseId: true, content: true },
+            select: { content: true },
         });
         if (!existingLesson) {
             return res.status(404).json({ error: 'Lesson not found' });
@@ -332,6 +374,12 @@ router.put('/lessons/:id', auth_1.requireAuth, (0, roles_1.requireRole)('TEACHER
             updateData.order = order;
         if (duration !== undefined)
             updateData.duration = duration;
+        if (price !== undefined) {
+            if (typeof price !== 'number' || price < 0) {
+                return res.status(400).json({ error: 'Price must be a non-negative number' });
+            }
+            updateData.price = price;
+        }
         if (isPreview !== undefined)
             updateData.isPreview = isPreview;
         // Handle content JSON (description and moduleId)
@@ -342,11 +390,8 @@ router.put('/lessons/:id', auth_1.requireAuth, (0, roles_1.requireRole)('TEACHER
         if (moduleId !== undefined)
             contentUpdate.moduleId = moduleId;
         updateData.content = contentUpdate;
-        // Update lesson using service
+        // Update lesson using service (this will handle cache invalidation for collections)
         const updatedLesson = await service.updateLesson(id, updateData);
-        // Invalidate cache
-        const { deleteCache, cacheKeys } = await Promise.resolve().then(() => __importStar(require('../../../../utils/cache')));
-        await deleteCache(cacheKeys.course(existingLesson.courseId));
         // Extract description and moduleId from content for response
         const content = updatedLesson.content;
         res.json({
@@ -370,19 +415,21 @@ router.put('/lessons/:id', auth_1.requireAuth, (0, roles_1.requireRole)('TEACHER
 router.delete('/lessons/:id', auth_1.requireAuth, (0, roles_1.requireRole)('TEACHER'), async (req, res) => {
     try {
         const { id } = req.params;
-        // Get lesson to find courseId for cache invalidation
+        // Check if lesson exists and get collections it belongs to for cache invalidation
+        const collectionLessons = await prisma_1.prisma.collectionLesson.findMany({
+            where: { lessonId: id },
+            select: { collectionId: true },
+        });
         const lesson = await prisma_1.prisma.lesson.findUnique({
             where: { id },
-            select: { courseId: true },
         });
         if (!lesson) {
             return res.status(404).json({ error: 'Lesson not found' });
         }
         await prisma_1.prisma.lesson.delete({ where: { id } });
-        // Invalidate cache
-        const { deleteCache } = await Promise.resolve().then(() => __importStar(require('../../../../utils/cache')));
-        const { cacheKeys } = await Promise.resolve().then(() => __importStar(require('../../../../utils/cache')));
-        await deleteCache(cacheKeys.course(lesson.courseId));
+        // Invalidate cache for all collections this lesson belonged to
+        const { deleteCache, cacheKeys } = await Promise.resolve().then(() => __importStar(require('../../../../utils/cache')));
+        await Promise.all(collectionLessons.map(cl => deleteCache(cacheKeys.collection(cl.collectionId))));
         res.json({ success: true, message: 'Lesson deleted successfully' });
     }
     catch (error) {

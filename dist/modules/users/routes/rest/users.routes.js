@@ -442,4 +442,67 @@ router.get('/search', auth_1.requireAuth, rate_limit_1.generalRateLimiter, (0, v
         });
     }
 });
+/**
+ * @swagger
+ * /api/users/auth/firebase-sync:
+ *   post:
+ *     summary: Sync Firebase user with backend
+ *     description: Creates or updates user record with Firebase UID and returns backend JWT token
+ *     tags: [Authentication]
+ *     security: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - firebaseUid
+ *               - firebaseToken
+ *               - email
+ *             properties:
+ *               firebaseUid:
+ *                 type: string
+ *               firebaseToken:
+ *                 type: string
+ *               email:
+ *                 type: string
+ *               displayName:
+ *                 type: string
+ *               photoURL:
+ *                 type: string
+ *               emailVerified:
+ *                 type: boolean
+ *               username:
+ *                 type: string
+ *               firstName:
+ *                 type: string
+ *               lastName:
+ *                 type: string
+ *               role:
+ *                 type: string
+ *                 enum: [STUDENT, TEACHER]
+ *               provider:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: User synced successfully
+ *       400:
+ *         description: Invalid request
+ */
+router.post('/auth/firebase-sync', rate_limit_1.generalRateLimiter, async (req, res) => {
+    try {
+        const result = await service.syncFirebaseUser(req.body);
+        res.json({
+            success: true,
+            ...result,
+        });
+    }
+    catch (error) {
+        console.error('Firebase sync error:', error);
+        res.status(400).json({
+            error: error.message || 'Failed to sync Firebase user',
+        });
+    }
+});
 exports.default = router;

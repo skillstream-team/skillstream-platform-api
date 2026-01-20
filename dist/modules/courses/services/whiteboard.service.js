@@ -7,13 +7,13 @@ class WhiteboardService {
      * Create a new whiteboard
      */
     async createWhiteboard(data, userId) {
-        // Validate course or liveStream exists
+        // Validate collection or liveStream exists
         if (data.courseId) {
-            const course = await prisma_1.prisma.course.findUnique({
+            const course = await prisma_1.prisma.collection.findUnique({
                 where: { id: data.courseId },
             });
             if (!course) {
-                throw new Error('Course not found');
+                throw new Error('Collection not found');
             }
         }
         if (data.liveStreamId) {
@@ -26,7 +26,7 @@ class WhiteboardService {
         }
         const whiteboard = await prisma_1.prisma.whiteboard.create({
             data: {
-                courseId: data.courseId,
+                collectionId: data.courseId,
                 liveStreamId: data.liveStreamId,
                 title: data.title,
                 description: data.description,
@@ -103,12 +103,12 @@ class WhiteboardService {
     /**
      * Get whiteboards for a course
      */
-    async getCourseWhiteboards(courseId, page = 1, limit = 20) {
+    async getCollectionWhiteboards(courseId, page = 1, limit = 20) {
         const skip = (page - 1) * limit;
         const take = Math.min(limit, 100);
         const [whiteboards, total] = await Promise.all([
             prisma_1.prisma.whiteboard.findMany({
-                where: { courseId },
+                where: { collectionId: courseId },
                 skip,
                 take,
                 include: {
@@ -127,7 +127,7 @@ class WhiteboardService {
                 },
                 orderBy: { createdAt: 'desc' },
             }),
-            prisma_1.prisma.whiteboard.count({ where: { courseId } }),
+            prisma_1.prisma.whiteboard.count({ where: { collectionId: courseId } }),
         ]);
         return {
             data: whiteboards.map(this.mapToResponseDto),
@@ -293,7 +293,7 @@ class WhiteboardService {
     mapToResponseDto(whiteboard) {
         return {
             id: whiteboard.id,
-            courseId: whiteboard.courseId,
+            courseId: whiteboard.collectionId,
             liveStreamId: whiteboard.liveStreamId,
             title: whiteboard.title,
             description: whiteboard.description,

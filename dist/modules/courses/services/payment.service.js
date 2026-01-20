@@ -3,6 +3,13 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.PaymentService = void 0;
 const prisma_1 = require("../../../utils/prisma");
 class PaymentService {
+    mapPaymentToDto(payment) {
+        return {
+            ...payment,
+            courseId: payment.collectionId,
+            course: payment.collection,
+        };
+    }
     /**
      * @swagger
      * /payments:
@@ -27,7 +34,7 @@ class PaymentService {
         const payment = await prisma_1.prisma.payment.create({
             data: {
                 studentId: data.studentId,
-                courseId: data.courseId,
+                collectionId: data.courseId,
                 amount: data.amount,
                 currency: data.currency || 'USD',
                 status: data.status,
@@ -36,10 +43,10 @@ class PaymentService {
             },
             include: {
                 student: { select: { id: true, username: true, email: true } },
-                course: { select: { id: true, title: true, price: true } },
+                collection: { select: { id: true, title: true, price: true } },
             },
         });
-        return payment;
+        return this.mapPaymentToDto(payment);
     }
     /**
      * @swagger
@@ -77,10 +84,10 @@ class PaymentService {
             },
             include: {
                 student: { select: { id: true, username: true, email: true } },
-                course: { select: { id: true, title: true, price: true } },
+                collection: { select: { id: true, title: true, price: true } },
             },
         });
-        return payment;
+        return this.mapPaymentToDto(payment);
     }
     /**
      * @swagger
@@ -110,10 +117,10 @@ class PaymentService {
             where: { id: paymentId },
             include: {
                 student: { select: { id: true, username: true, email: true } },
-                course: { select: { id: true, title: true, price: true } },
+                collection: { select: { id: true, title: true, price: true } },
             },
         });
-        return payment;
+        return payment ? this.mapPaymentToDto(payment) : null;
     }
     /**
      * @swagger
@@ -143,11 +150,11 @@ class PaymentService {
             where: { studentId },
             include: {
                 student: { select: { id: true, username: true, email: true } },
-                course: { select: { id: true, title: true, price: true } },
+                collection: { select: { id: true, title: true, price: true } },
             },
             orderBy: { createdAt: 'desc' },
         });
-        return payments;
+        return payments.map(p => this.mapPaymentToDto(p));
     }
     /**
      * @swagger
@@ -174,14 +181,14 @@ class PaymentService {
      */
     async getPaymentsByCourse(courseId) {
         const payments = await prisma_1.prisma.payment.findMany({
-            where: { courseId },
+            where: { collectionId: courseId },
             include: {
                 student: { select: { id: true, username: true, email: true } },
-                course: { select: { id: true, title: true, price: true } },
+                collection: { select: { id: true, title: true, price: true } },
             },
             orderBy: { createdAt: 'desc' },
         });
-        return payments;
+        return payments.map(p => this.mapPaymentToDto(p));
     }
     /**
      * @swagger
@@ -206,16 +213,20 @@ class PaymentService {
      *               items:
      *                 $ref: '#/components/schemas/PaymentResponseDto'
      */
-    async getCompletedPaymentsByCourse(courseId) {
+    async getCompletedPaymentsByCollection(courseId) {
         const payments = await prisma_1.prisma.payment.findMany({
-            where: { courseId, status: 'COMPLETED' },
+            where: { collectionId: courseId, status: 'COMPLETED' },
             include: {
                 student: { select: { id: true, username: true, email: true } },
-                course: { select: { id: true, title: true, price: true } },
+                collection: { select: { id: true, title: true, price: true } },
             },
             orderBy: { createdAt: 'desc' },
         });
-        return payments;
+        return payments.map((p) => ({
+            ...p,
+            courseId: p.collectionId,
+            course: p.collection,
+        }));
     }
 }
 exports.PaymentService = PaymentService;

@@ -232,7 +232,7 @@ const mediaMutations = {
         },
         resolve: async (_, args) => {
             return await mediaService.createVideo({
-                courseId: args.courseId,
+                collectionId: args.courseId,
                 title: args.title,
                 description: args.description,
                 type: args.type,
@@ -276,7 +276,7 @@ const mediaMutations = {
         },
         resolve: async (_, args) => {
             return await mediaService.createLiveStream({
-                courseId: args.courseId,
+                collectionId: args.courseId,
                 title: args.title,
                 description: args.description,
                 createdBy: args.createdBy,

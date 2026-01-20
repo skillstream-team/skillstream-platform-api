@@ -14,7 +14,7 @@ const revenueService = new SubscriptionRevenueService();
  *   get:
  *     summary: Get teacher earnings breakdown
  */
-router.get('/breakdown', requireAuth, requireRole('TEACHER', 'ADMIN'), async (req, res) => {
+router.get('/breakdown', requireAuth, requireRole('TEACHER'), async (req, res) => {
   try {
     const userId = (req as any).user?.id;
     const { period } = req.query;
@@ -36,7 +36,7 @@ router.get('/breakdown', requireAuth, requireRole('TEACHER', 'ADMIN'), async (re
  *   get:
  *     summary: Get upcoming payout information
  */
-router.get('/upcoming-payout', requireAuth, requireRole('TEACHER', 'ADMIN'), async (req, res) => {
+router.get('/upcoming-payout', requireAuth, requireRole('TEACHER'), async (req, res) => {
   try {
     const userId = (req as any).user?.id;
     const payout = await earningsService.getUpcomingPayout(userId);
@@ -52,7 +52,7 @@ router.get('/upcoming-payout', requireAuth, requireRole('TEACHER', 'ADMIN'), asy
  *   get:
  *     summary: Get earnings history
  */
-router.get('/history', requireAuth, requireRole('TEACHER', 'ADMIN'), async (req, res) => {
+router.get('/history', requireAuth, requireRole('TEACHER'), async (req, res) => {
   try {
     const userId = (req as any).user?.id;
     const limit = parseInt(req.query.limit as string) || 50;
@@ -70,7 +70,7 @@ router.get('/history', requireAuth, requireRole('TEACHER', 'ADMIN'), async (req,
  *   get:
  *     summary: Get earnings by revenue source
  */
-router.get('/by-source', requireAuth, requireRole('TEACHER', 'ADMIN'), async (req, res) => {
+router.get('/by-source', requireAuth, requireRole('TEACHER'), async (req, res) => {
   try {
     const userId = (req as any).user?.id;
     const { source, period } = req.query;

@@ -1,7 +1,7 @@
 import axios, { AxiosInstance } from 'axios';
 
 export interface CreateVideoDto {
-  courseId: string;
+  collectionId: string;
   title: string;
   description?: string;
   type: 'on-demand' | 'live';
@@ -26,7 +26,7 @@ export interface VideoResponseDto {
 
 export interface LiveStreamDto {
   streamId: string;
-  courseId: string;
+  collectionId: string;
   title: string;
   description?: string;
   scheduledAt?: Date;
@@ -81,7 +81,7 @@ export class CloudflareStreamService {
         maxDurationSeconds: data.duration || 3600,
         expiry: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(), // 7 days
         metadata: {
-          courseId: data.courseId,
+          collectionId: data.collectionId,
           title: data.title,
           description: data.description,
           type: data.type,
@@ -97,7 +97,7 @@ export class CloudflareStreamService {
         streamId: response.data.result.uid,
         playbackUrl: response.data.result.playback?.hls,
         createdAt: new Date(),
-        courseId: data.courseId,
+        courseId: data.collectionId,
         scheduledAt: data.scheduledAt,
       };
     } catch (error) {
@@ -122,7 +122,7 @@ export class CloudflareStreamService {
         thumbnailUrl: video.thumbnail,
         duration: video.duration,
         createdAt: new Date(video.created),
-        courseId: video.meta?.courseId,
+        courseId: video.meta?.collectionId,
         scheduledAt: video.meta?.scheduledAt ? new Date(video.meta.scheduledAt) : undefined,
       };
     } catch (error) {
@@ -144,7 +144,7 @@ export class CloudflareStreamService {
     try {
       const response = await this.apiClient.post('/live_inputs', {
         meta: {
-          courseId: data.courseId,
+          collectionId: data.collectionId,
           title: data.title,
           description: data.description,
           type: 'live',
@@ -166,7 +166,7 @@ export class CloudflareStreamService {
         streamId: response.data.result.uid,
         playbackUrl: response.data.result.playback?.hls,
         createdAt: new Date(),
-        courseId: data.courseId,
+        courseId: data.collectionId,
         scheduledAt: data.scheduledAt,
       };
     } catch (error) {

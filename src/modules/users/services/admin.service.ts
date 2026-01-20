@@ -47,17 +47,17 @@ export class AdminService {
       prisma.user.count(),
       prisma.user.count({ where: { role: 'TEACHER' } }),
       prisma.user.count({ where: { role: 'STUDENT' } }),
-      prisma.course.count(),
-      prisma.course.count({ where: { isPublished: true } }),
-      prisma.course.count({ where: { isPublished: false } }),
+      prisma.collection.count(),
+      prisma.collection.count({ where: { isPublished: true } }),
+      prisma.collection.count({ where: { isPublished: false } }),
       prisma.payment.findMany({ where: { status: 'COMPLETED' } }),
       prisma.payment.findMany({
         where: { status: 'COMPLETED', createdAt: { gte: startOfMonth } },
       }),
-      prisma.courseReview.count({ where: { isPublished: false } }),
+      prisma.collectionReview.count({ where: { isPublished: false } }),
       prisma.contentFlag.count({ where: { status: 'PENDING' } }),
       prisma.user.count({ where: { createdAt: { gte: thirtyDaysAgo } } }),
-      prisma.course.count({ where: { createdAt: { gte: startOfMonth } } }),
+      prisma.collection.count({ where: { createdAt: { gte: startOfMonth } } }),
     ]);
 
     const totalRevenue = allPayments.reduce((sum, p) => sum + (p.amount || 0), 0);
@@ -277,7 +277,7 @@ export class AdminService {
     const skip = (page - 1) * limit;
 
     const [courses, total] = await Promise.all([
-      prisma.course.findMany({
+      prisma.collection.findMany({
         where: { isPublished: false },
         skip,
         take: limit,
@@ -294,7 +294,7 @@ export class AdminService {
           },
         },
       }),
-      prisma.course.count({ where: { isPublished: false } }),
+      prisma.collection.count({ where: { isPublished: false } }),
     ]);
 
     return {
@@ -311,15 +311,15 @@ export class AdminService {
   }
 
   /**
-   * Moderate course (approve/reject)
+   * Moderate collection (approve/reject)
    */
-  async moderateCourse(
+  async moderateCollection(
     courseId: string,
     status: 'APPROVED' | 'REJECTED' | 'PENDING',
     rejectionReason?: string,
     adminId?: string
   ) {
-    const course = await prisma.course.findUnique({
+    const course = await prisma.collection.findUnique({
       where: { id: courseId },
     });
 
@@ -335,7 +335,7 @@ export class AdminService {
       updateData.isPublished = true;
     }
 
-    const updatedCourse = await prisma.course.update({
+    const updatedCourse = await prisma.collection.update({
       where: { id: courseId },
       data: updateData,
       include: {
@@ -407,7 +407,7 @@ export class AdminService {
     }
 
     const [reviews, total] = await Promise.all([
-      prisma.courseReview.findMany({
+      prisma.collectionReview.findMany({
         where,
         skip,
         take: limit,
@@ -423,7 +423,7 @@ export class AdminService {
               avatar: true,
             },
           },
-          course: {
+          collection: {
             select: {
               id: true,
               title: true,
@@ -437,7 +437,7 @@ export class AdminService {
           },
         },
       }),
-      prisma.courseReview.count({ where }),
+      prisma.collectionReview.count({ where }),
     ]);
 
     return {
@@ -462,7 +462,7 @@ export class AdminService {
     reason?: string,
     adminId?: string
   ) {
-    const review = await prisma.courseReview.findUnique({
+    const review = await prisma.collectionReview.findUnique({
       where: { id: reviewId },
     });
 
@@ -486,7 +486,7 @@ export class AdminService {
       updateData.isPublished = false;
     }
 
-    const updatedReview = await prisma.courseReview.update({
+    const updatedReview = await prisma.collectionReview.update({
       where: { id: reviewId },
       data: updateData,
       include: {
@@ -497,7 +497,7 @@ export class AdminService {
             email: true,
           },
         },
-        course: {
+        collection: {
           select: {
             id: true,
             title: true,
@@ -573,7 +573,7 @@ export class AdminService {
               lastName: true,
             },
           },
-          course: {
+          collection: {
             select: {
               id: true,
               title: true,
@@ -644,7 +644,7 @@ export class AdminService {
             email: true,
           },
         },
-        course: {
+        collection: {
           select: {
             id: true,
             title: true,
@@ -967,7 +967,7 @@ export class AdminService {
 
     for (const courseId of courseIds) {
       try {
-        await prisma.course.update({
+        await prisma.collection.update({
           where: { id: courseId },
           data: updateData,
         });
@@ -979,8 +979,8 @@ export class AdminService {
           try {
             await this.activityLogService.logActivity({
               userId: adminId,
-              action: `course.bulk_${status.toLowerCase()}`,
-              entity: 'course',
+              action: `collection.bulk_${status.toLowerCase()}`,
+              entity: 'collection',
               entityId: courseId,
               metadata: { status, rejectionReason },
               ipAddress: requestInfo?.ipAddress,

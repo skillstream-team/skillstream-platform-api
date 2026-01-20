@@ -12,7 +12,7 @@ class AnalyticsService {
         // Overview stats
         const [totalUsers, totalCourses, totalEnrollments, activeUsers, allPayments, usersByRole,] = await Promise.all([
             prisma_1.prisma.user.count(),
-            prisma_1.prisma.course.count(),
+            prisma_1.prisma.collection.count(),
             prisma_1.prisma.enrollment.count(),
             prisma_1.prisma.user.count({
                 where: {
@@ -24,7 +24,7 @@ class AnalyticsService {
             }),
             prisma_1.prisma.payment.findMany({
                 where: { status: 'COMPLETED' },
-                include: { course: { select: { id: true, title: true } } },
+                include: { collection: { select: { id: true, title: true } } },
             }),
             prisma_1.prisma.user.groupBy({
                 by: ['role'],
@@ -47,8 +47,8 @@ class AnalyticsService {
                 count,
             });
         }
-        // Course stats
-        const courses = await prisma_1.prisma.course.findMany({
+        // Collection stats
+        const courses = await prisma_1.prisma.collection.findMany({
             include: {
                 enrollments: true,
                 payments: { where: { status: 'COMPLETED' } },
@@ -104,7 +104,7 @@ class AnalyticsService {
         const allProgress = await prisma_1.prisma.progress.findMany({
             where: { status: 'completed' },
             include: {
-                course: { select: { id: true, title: true } },
+                collection: { select: { id: true, title: true } },
             },
         });
         const allQuizAttempts = await prisma_1.prisma.quizAttempt.findMany({
@@ -164,11 +164,11 @@ class AnalyticsService {
         };
     }
     /**
-     * Get course-specific analytics
+     * Get collection-specific analytics
      */
-    async getCourseAnalytics(courseId) {
-        const course = await prisma_1.prisma.course.findUnique({
-            where: { id: courseId },
+    async getCollectionAnalytics(collectionId) {
+        const course = await prisma_1.prisma.collection.findUnique({
+            where: { id: collectionId },
             include: {
                 enrollments: {
                     include: { student: { select: { id: true, username: true } } },

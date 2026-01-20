@@ -5,7 +5,7 @@ export interface UploadFileDto {
   file: Buffer;
   filename: string;
   contentType: string;
-  courseId: string;
+  collectionId: string;
   type: 'pdf' | 'image' | 'document' | 'zip' | 'other';
 }
 
@@ -36,7 +36,7 @@ export class CloudflareR2Service {
   }
 
   async uploadFile(data: UploadFileDto): Promise<FileResponseDto> {
-    const key = this.generateKey(data.courseId, data.type, data.filename);
+    const key = this.generateKey(data.collectionId, data.type, data.filename);
     
     const command = new PutObjectCommand({
       Bucket: this.bucketName,
@@ -44,7 +44,7 @@ export class CloudflareR2Service {
       Body: data.file,
       ContentType: data.contentType,
       Metadata: {
-        courseId: data.courseId.toString(),
+        collectionId: data.collectionId.toString(),
         type: data.type,
         originalFilename: data.filename,
       },

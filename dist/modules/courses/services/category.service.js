@@ -27,7 +27,7 @@ class CategoryService {
             include: {
                 _count: {
                     select: {
-                        courses: true,
+                        collections: true,
                     },
                 },
             },
@@ -41,7 +41,7 @@ class CategoryService {
             color: cat.color || undefined,
             order: cat.order,
             isActive: cat.isActive,
-            courseCount: cat._count.courses,
+            courseCount: cat._count.collections,
             createdAt: cat.createdAt,
             updatedAt: cat.updatedAt,
         }));
@@ -63,7 +63,7 @@ class CategoryService {
             include: {
                 _count: {
                     select: {
-                        courses: true,
+                        collections: true,
                     },
                 },
             },
@@ -80,7 +80,7 @@ class CategoryService {
             color: category.color || undefined,
             order: category.order,
             isActive: category.isActive,
-            courseCount: category._count.courses,
+            courseCount: category._count.collections,
             createdAt: category.createdAt,
             updatedAt: category.updatedAt,
         };
@@ -111,7 +111,7 @@ class CategoryService {
             include: {
                 _count: {
                     select: {
-                        courses: true,
+                        collections: true,
                     },
                 },
             },
@@ -127,7 +127,7 @@ class CategoryService {
             color: category.color || undefined,
             order: category.order,
             isActive: category.isActive,
-            courseCount: category._count.courses,
+            courseCount: category._count.collections,
             createdAt: category.createdAt,
             updatedAt: category.updatedAt,
         };
@@ -166,7 +166,7 @@ class CategoryService {
             include: {
                 _count: {
                     select: {
-                        courses: true,
+                        collections: true,
                     },
                 },
             },
@@ -182,7 +182,7 @@ class CategoryService {
             color: category.color || undefined,
             order: category.order,
             isActive: category.isActive,
-            courseCount: category._count.courses,
+            courseCount: category._count.collections,
             createdAt: category.createdAt,
             updatedAt: category.updatedAt,
         };
@@ -196,7 +196,7 @@ class CategoryService {
             include: {
                 _count: {
                     select: {
-                        courses: true,
+                        collections: true,
                     },
                 },
             },
@@ -204,8 +204,8 @@ class CategoryService {
         if (!category) {
             throw new Error('Category not found');
         }
-        if (category._count.courses > 0) {
-            throw new Error(`Cannot delete category. It has ${category._count.courses} course(s) associated with it. Please reassign or delete courses first.`);
+        if (category._count.collections > 0) {
+            throw new Error(`Cannot delete category. It has ${category._count.collections} collection(s) associated with it. Please reassign or delete collections first.`);
         }
         await prisma_1.prisma.category.delete({
             where: { id },
@@ -358,7 +358,7 @@ class CategoryService {
                     include: {
                         _count: {
                             select: {
-                                courses: true,
+                                collections: true,
                             },
                         },
                     },
@@ -372,7 +372,7 @@ class CategoryService {
                     color: category.color || undefined,
                     order: category.order,
                     isActive: category.isActive,
-                    courseCount: category._count.courses,
+                    courseCount: category._count.collections,
                     createdAt: category.createdAt,
                     updatedAt: category.updatedAt,
                 });

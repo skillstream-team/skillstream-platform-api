@@ -10,7 +10,7 @@ class ComparisonService {
         if (courseIds.length < 2 || courseIds.length > 5) {
             throw new Error('Can compare between 2 and 5 courses');
         }
-        const courses = await prisma_1.prisma.course.findMany({
+        const courses = await prisma_1.prisma.collection.findMany({
             where: { id: { in: courseIds } },
             include: {
                 category: {
@@ -28,7 +28,7 @@ class ComparisonService {
                 _count: {
                     select: {
                         enrollments: true,
-                        lessons: true,
+                        collectionLessons: true,
                         modules: true,
                         reviews: true,
                         certificates: true,
@@ -52,19 +52,19 @@ class ComparisonService {
             },
         });
         // Calculate average ratings
-        const reviews = await prisma_1.prisma.courseReview.findMany({
+        const reviews = await prisma_1.prisma.collectionReview.findMany({
             where: {
-                courseId: { in: courseIds },
+                collectionId: { in: courseIds },
                 isPublished: true,
             },
             select: {
-                courseId: true,
+                collectionId: true,
                 rating: true,
             },
         });
         const ratingsMap = new Map();
         for (const courseId of courseIds) {
-            const courseReviews = reviews.filter((r) => r.courseId === courseId);
+            const courseReviews = reviews.filter((r) => r.collectionId === courseId);
             const average = courseReviews.length > 0
                 ? courseReviews.reduce((sum, r) => sum + r.rating, 0) / courseReviews.length
                 : 0;
@@ -93,7 +93,7 @@ class ComparisonService {
                 averageRating: ratingsMap.get(course.id) || 0,
                 reviewCount: course._count.reviews,
                 enrollmentCount: course._count.enrollments,
-                lessonCount: course._count.lessons,
+                lessonCount: course._count.collectionLessons,
                 moduleCount: course._count.modules,
                 hasCertificate: course._count.certificates > 0,
                 prerequisites: course.prerequisites.map((p) => ({

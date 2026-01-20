@@ -4,7 +4,7 @@ exports.coursesSchema = void 0;
 const graphql_1 = require("graphql");
 const service_1 = require("../../services/service");
 const enrollment_service_1 = require("../../services/enrollment.service");
-const service = new service_1.CoursesService();
+const service = new service_1.CollectionsService();
 const enrollmentService = new enrollment_service_1.EnrollmentService();
 const UserType = new graphql_1.GraphQLObjectType({
     name: 'User',
@@ -55,7 +55,7 @@ const coursesQuery = {
             limit: { type: graphql_1.GraphQLInt },
         },
         resolve: async (_, args) => {
-            const result = await service.getAllCourses(args.page || 1, args.limit || 20);
+            const result = await service.getAllCollections(args.page || 1, args.limit || 20);
             return result.data.map((course) => ({
                 ...course,
                 id: Number(course.id),
@@ -78,7 +78,7 @@ const coursesQuery = {
         type: CourseType,
         args: { id: { type: (0, graphql_1.GraphQLNonNull)(graphql_1.GraphQLInt) } },
         resolve: async (_, args) => {
-            const course = await service.getCourseById(String(args.id));
+            const course = await service.getCollectionById(String(args.id));
             if (!course)
                 return null;
             return {
@@ -102,20 +102,20 @@ const coursesQuery = {
     courseEnrollments: {
         type: new graphql_1.GraphQLList(CourseEnrollmentType),
         args: {
-            courseId: { type: new graphql_1.GraphQLNonNull(graphql_1.GraphQLInt) },
+            collectionId: { type: new graphql_1.GraphQLNonNull(graphql_1.GraphQLString) },
             page: { type: graphql_1.GraphQLInt },
             limit: { type: graphql_1.GraphQLInt },
         },
         resolve: async (_, args) => {
-            const result = await enrollmentService.getCourseEnrollments(String(args.courseId), args.page || 1, args.limit || 20);
+            const result = await enrollmentService.getCollectionEnrollments(args.collectionId, args.page || 1, args.limit || 20);
             return result.data;
         },
     },
     courseStats: {
         type: CourseStatsType,
-        args: { courseId: { type: new graphql_1.GraphQLNonNull(graphql_1.GraphQLInt) } },
+        args: { collectionId: { type: new graphql_1.GraphQLNonNull(graphql_1.GraphQLString) } },
         resolve: async (_, args) => {
-            return await enrollmentService.getCourseStats(String(args.courseId));
+            return await enrollmentService.getCollectionStats(args.collectionId);
         },
     },
 };
@@ -129,7 +129,7 @@ const coursesMutation = {
             instructorId: { type: (0, graphql_1.GraphQLNonNull)(graphql_1.GraphQLInt) },
         },
         resolve: async (_, args) => {
-            const created = await service.createCourse(args);
+            const created = await service.createCollection(args);
             return { ...created, id: Number(created.id) };
         }
     },
@@ -142,7 +142,7 @@ const coursesMutation = {
             price: { type: graphql_1.GraphQLFloat },
         },
         resolve: async (_, args) => {
-            const updated = await service.updateCourse(String(args.id), args);
+            const updated = await service.updateCollection(String(args.id), args);
             return { ...updated, id: Number(updated.id) };
         }
     },
@@ -150,15 +150,15 @@ const coursesMutation = {
         type: graphql_1.GraphQLString,
         args: { id: { type: (0, graphql_1.GraphQLNonNull)(graphql_1.GraphQLInt) } },
         resolve: async (_, args) => {
-            await service.deleteCourse(String(args.id));
-            return 'Course deleted';
+            await service.deleteCollection(String(args.id));
+            return 'Collection deleted';
         },
     },
     enrollCourse: {
         type: graphql_1.GraphQLString,
         args: {
-            courseId: { type: (0, graphql_1.GraphQLNonNull)(graphql_1.GraphQLInt) },
-            studentId: { type: (0, graphql_1.GraphQLNonNull)(graphql_1.GraphQLInt) },
+            collectionId: { type: (0, graphql_1.GraphQLNonNull)(graphql_1.GraphQLString) },
+            studentId: { type: (0, graphql_1.GraphQLNonNull)(graphql_1.GraphQLString) },
             amount: { type: (0, graphql_1.GraphQLNonNull)(graphql_1.GraphQLFloat) },
             currency: { type: graphql_1.GraphQLString },
             provider: { type: (0, graphql_1.GraphQLNonNull)(graphql_1.GraphQLString) },
@@ -167,17 +167,17 @@ const coursesMutation = {
         resolve: async (_, args) => {
             try {
                 await enrollmentService.enrollStudent({
-                    courseId: String(args.courseId),
-                    studentId: String(args.studentId),
+                    collectionId: args.collectionId,
+                    studentId: args.studentId,
                     amount: args.amount,
                     currency: args.currency,
                     provider: args.provider,
                     transactionId: args.transactionId,
                 });
-                return 'Successfully enrolled in course';
+                return 'Successfully enrolled in collection';
             }
             catch (error) {
-                throw new Error(error instanceof Error ? error.message : 'Failed to enroll in course');
+                throw new Error(error instanceof Error ? error.message : 'Failed to enroll in collection');
             }
         },
     },

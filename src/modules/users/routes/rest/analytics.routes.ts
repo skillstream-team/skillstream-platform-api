@@ -60,7 +60,7 @@ router.get('/analytics/courses/:courseId',
         }
       }
 
-      const analytics = await analyticsService.getCourseAnalytics(courseId);
+      const analytics = await analyticsService.getCollectionAnalytics(courseId);
       
       res.json({
         success: true,

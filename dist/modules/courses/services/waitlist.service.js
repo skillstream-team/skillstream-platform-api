@@ -13,7 +13,7 @@ class WaitlistService {
         // Check if already on waitlist
         const existing = await prisma_1.prisma.waitlistEntry.findFirst({
             where: {
-                ...(data.courseId ? { courseId: data.courseId } : { eventId: data.eventId }),
+                ...(data.courseId ? { collectionId: data.courseId } : { eventId: data.eventId }),
                 userId: data.userId,
             },
         });
@@ -22,11 +22,11 @@ class WaitlistService {
         }
         // Get current position
         const count = await prisma_1.prisma.waitlistEntry.count({
-            where: data.courseId ? { courseId: data.courseId } : { eventId: data.eventId },
+            where: data.courseId ? { collectionId: data.courseId } : { eventId: data.eventId },
         });
         const entry = await prisma_1.prisma.waitlistEntry.create({
             data: {
-                courseId: data.courseId,
+                collectionId: data.courseId,
                 eventId: data.eventId,
                 userId: data.userId,
                 position: count + 1,
@@ -51,7 +51,7 @@ class WaitlistService {
             throw new Error('Either courseId or eventId must be provided');
         }
         const entries = await prisma_1.prisma.waitlistEntry.findMany({
-            where: courseId ? { courseId } : { eventId },
+            where: courseId ? { collectionId: courseId } : { eventId },
             include: {
                 user: {
                     select: {
@@ -120,7 +120,7 @@ class WaitlistService {
     mapToDto(entry) {
         return {
             id: entry.id,
-            courseId: entry.courseId || undefined,
+            courseId: entry.collectionId || undefined,
             eventId: entry.eventId || undefined,
             userId: entry.userId,
             user: entry.user,

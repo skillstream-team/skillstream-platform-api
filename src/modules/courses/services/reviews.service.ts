@@ -42,7 +42,7 @@ export class ReviewsService {
     // Check if student is enrolled
     const enrollment = await prisma.enrollment.findFirst({
       where: {
-        courseId: data.courseId,
+        collectionId: data.courseId,
         studentId: data.studentId,
       },
     });
@@ -52,9 +52,9 @@ export class ReviewsService {
     }
 
     // Check if review already exists
-    const existing = await prisma.courseReview.findFirst({
+    const existing = await prisma.collectionReview.findFirst({
       where: {
-        courseId: data.courseId,
+        collectionId: data.courseId,
         studentId: data.studentId,
       },
     });
@@ -68,9 +68,9 @@ export class ReviewsService {
       throw new Error('Rating must be between 1 and 5');
     }
 
-    const review = await prisma.courseReview.create({
+    const review = await prisma.collectionReview.create({
       data: {
-        courseId: data.courseId,
+        collectionId: data.courseId,
         studentId: data.studentId,
         rating: data.rating,
         title: data.title,
@@ -79,7 +79,7 @@ export class ReviewsService {
         isPublished: true,
       },
       include: {
-        course: {
+        collection: {
           select: {
             id: true,
             title: true,
@@ -96,7 +96,7 @@ export class ReviewsService {
     });
 
     // Invalidate course cache
-    await deleteCache(`course:${data.courseId}`);
+    await deleteCache(`collection:${data.courseId}`);
 
     return this.mapToDto(review);
   }
@@ -133,12 +133,12 @@ export class ReviewsService {
     }
 
     const [reviews, total, allReviews] = await Promise.all([
-      prisma.courseReview.findMany({
+      prisma.collectionReview.findMany({
         where,
         skip,
         take,
         include: {
-          course: {
+          collection: {
             select: {
               id: true,
               title: true,
@@ -157,9 +157,9 @@ export class ReviewsService {
           { createdAt: 'desc' },
         ],
       }),
-      prisma.courseReview.count({ where }),
-      prisma.courseReview.findMany({
-        where: { courseId, isPublished: true },
+      prisma.collectionReview.count({ where }),
+      prisma.collectionReview.findMany({
+        where: { collectionId: courseId, isPublished: true },
         select: { rating: true },
       }),
     ]);
@@ -193,10 +193,10 @@ export class ReviewsService {
    * Get review by ID
    */
   async getReviewById(reviewId: string): Promise<ReviewResponseDto> {
-    const review = await prisma.courseReview.findUnique({
+    const review = await prisma.collectionReview.findUnique({
       where: { id: reviewId },
       include: {
-        course: {
+        collection: {
           select: {
             id: true,
             title: true,
@@ -227,7 +227,7 @@ export class ReviewsService {
     studentId: string,
     data: Partial<CreateReviewDto>
   ): Promise<ReviewResponseDto> {
-    const review = await prisma.courseReview.findFirst({
+    const review = await prisma.collectionReview.findFirst({
       where: { id: reviewId, studentId },
     });
 
@@ -245,11 +245,11 @@ export class ReviewsService {
     if (data.title !== undefined) updateData.title = data.title;
     if (data.content !== undefined) updateData.content = data.content;
 
-    const updated = await prisma.courseReview.update({
+    const updated = await prisma.collectionReview.update({
       where: { id: reviewId },
       data: updateData,
       include: {
-        course: {
+        collection: {
           select: {
             id: true,
             title: true,
@@ -265,7 +265,7 @@ export class ReviewsService {
       },
     });
 
-    await deleteCache(`course:${updated.courseId}`);
+    await deleteCache(`collection:${updated.collectionId}`);
 
     return this.mapToDto(updated);
   }
@@ -274,7 +274,7 @@ export class ReviewsService {
    * Delete review
    */
   async deleteReview(reviewId: string, studentId: string): Promise<void> {
-    const review = await prisma.courseReview.findFirst({
+    const review = await prisma.collectionReview.findFirst({
       where: { id: reviewId, studentId },
     });
 
@@ -282,18 +282,18 @@ export class ReviewsService {
       throw new Error('Review not found or unauthorized');
     }
 
-    await prisma.courseReview.delete({
+    await prisma.collectionReview.delete({
       where: { id: reviewId },
     });
 
-    await deleteCache(`course:${review.courseId}`);
+    await deleteCache(`collection:${review.collectionId}`);
   }
 
   /**
    * Mark review as helpful
    */
   async markHelpful(reviewId: string, userId: string): Promise<number> {
-    const review = await prisma.courseReview.findUnique({
+    const review = await prisma.collectionReview.findUnique({
       where: { id: reviewId },
     });
 
@@ -330,7 +330,7 @@ export class ReviewsService {
       where: { reviewId, isHelpful: true },
     });
 
-    await prisma.courseReview.update({
+    await prisma.collectionReview.update({
       where: { id: reviewId },
       data: { helpfulCount },
     });
@@ -346,10 +346,10 @@ export class ReviewsService {
     instructorId: string,
     response: string
   ): Promise<ReviewResponseDto> {
-    const review = await prisma.courseReview.findUnique({
+    const review = await prisma.collectionReview.findUnique({
       where: { id: reviewId },
       include: {
-        course: {
+        collection: {
           select: {
             instructorId: true,
           },
@@ -361,18 +361,18 @@ export class ReviewsService {
       throw new Error('Review not found');
     }
 
-    if (review.course.instructorId !== instructorId) {
-      throw new Error('Only the course instructor can respond to reviews');
+    if (review.collection.instructorId !== instructorId) {
+      throw new Error('Only the collection instructor can respond to reviews');
     }
 
-    const updated = await prisma.courseReview.update({
+    const updated = await prisma.collectionReview.update({
       where: { id: reviewId },
       data: {
         instructorResponse: response,
         instructorResponseAt: new Date(),
       },
       include: {
-        course: {
+        collection: {
           select: {
             id: true,
             title: true,
@@ -397,8 +397,8 @@ export class ReviewsService {
   private mapToDto(review: any): ReviewResponseDto {
     return {
       id: review.id,
-      courseId: review.courseId,
-      course: review.course,
+      courseId: review.collectionId,
+      course: review.collection,
       studentId: review.studentId,
       student: review.student,
       rating: review.rating,

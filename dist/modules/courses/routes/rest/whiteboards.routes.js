@@ -80,7 +80,7 @@ router.get('/courses/:courseId', auth_1.requireAuth, (0, validation_1.validate)(
     try {
         const page = parseInt(req.query.page) || 1;
         const limit = parseInt(req.query.limit) || 20;
-        const result = await whiteboardService.getCourseWhiteboards(req.params.courseId, page, limit);
+        const result = await whiteboardService.getCollectionWhiteboards(req.params.courseId, page, limit);
         res.json({
             success: true,
             ...result

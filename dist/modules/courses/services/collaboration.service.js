@@ -9,7 +9,7 @@ class CollaborationService {
     async createStudyGroup(data) {
         const group = await prisma_1.prisma.studyGroup.create({
             data: {
-                courseId: data.courseId,
+                collectionId: data.collectionId,
                 name: data.name,
                 description: data.description,
                 createdBy: data.createdBy,
@@ -17,7 +17,7 @@ class CollaborationService {
                 isPublic: data.isPublic !== false,
             },
             include: {
-                course: {
+                collection: {
                     select: {
                         id: true,
                         title: true,
@@ -45,12 +45,12 @@ class CollaborationService {
     /**
      * Get study groups
      */
-    async getStudyGroups(courseId, userId, page = 1, limit = 20) {
+    async getStudyGroups(collectionId, userId, page = 1, limit = 20) {
         const skip = (page - 1) * limit;
         const take = Math.min(limit, 100);
         const where = {};
-        if (courseId)
-            where.courseId = courseId;
+        if (collectionId)
+            where.collectionId = collectionId;
         if (userId) {
             where.OR = [
                 { isPublic: true },
@@ -67,7 +67,7 @@ class CollaborationService {
                 skip,
                 take,
                 include: {
-                    course: {
+                    collection: {
                         select: {
                             id: true,
                             title: true,
@@ -175,7 +175,7 @@ class CollaborationService {
         const workspace = await prisma_1.prisma.sharedWorkspace.create({
             data: {
                 groupId: data.groupId,
-                courseId: data.courseId,
+                collectionId: data.collectionId,
                 userId: data.userId,
                 name: data.name,
                 description: data.description,
@@ -197,12 +197,12 @@ class CollaborationService {
     /**
      * Get shared workspaces
      */
-    async getSharedWorkspaces(groupId, courseId, userId) {
+    async getSharedWorkspaces(groupId, collectionId, userId) {
         const where = {};
         if (groupId)
             where.groupId = groupId;
-        if (courseId)
-            where.courseId = courseId;
+        if (collectionId)
+            where.collectionId = collectionId;
         if (userId) {
             where.OR = [
                 { userId },
@@ -261,8 +261,8 @@ class CollaborationService {
     mapGroupToDto(group) {
         return {
             id: group.id,
-            courseId: group.courseId || undefined,
-            course: group.course || undefined,
+            collectionId: group.collectionId || undefined,
+            collection: group.collection || undefined,
             name: group.name,
             description: group.description || undefined,
             createdBy: group.createdBy,
@@ -291,7 +291,7 @@ class CollaborationService {
         return {
             id: workspace.id,
             groupId: workspace.groupId || undefined,
-            courseId: workspace.courseId || undefined,
+            collectionId: workspace.collectionId || undefined,
             userId: workspace.userId,
             user: workspace.user,
             name: workspace.name,

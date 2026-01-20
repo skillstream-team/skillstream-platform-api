@@ -49,7 +49,7 @@ router.get('/analytics/courses/:courseId', auth_1.requireAuth, (0, validation_1.
                 return res.status(403).json({ error: 'Unauthorized' });
             }
         }
-        const analytics = await analyticsService.getCourseAnalytics(courseId);
+        const analytics = await analyticsService.getCollectionAnalytics(courseId);
         res.json({
             success: true,
             data: analytics

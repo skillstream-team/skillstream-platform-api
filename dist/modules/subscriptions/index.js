@@ -17,12 +17,16 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.SubscriptionService = exports.registerSubscriptionRoutes = void 0;
+exports.SubscriptionAccessService = exports.SubscriptionService = exports.registerSubscriptionRoutes = void 0;
 const subscription_routes_1 = __importDefault(require("./routes/rest/subscription.routes"));
+const subscription_access_routes_1 = __importDefault(require("./routes/rest/subscription-access.routes"));
 const registerSubscriptionRoutes = (app) => {
     app.use('/api/subscriptions', subscription_routes_1.default);
+    app.use('/api/subscriptions/access', subscription_access_routes_1.default);
 };
 exports.registerSubscriptionRoutes = registerSubscriptionRoutes;
 var subscription_service_1 = require("./services/subscription.service");
 Object.defineProperty(exports, "SubscriptionService", { enumerable: true, get: function () { return subscription_service_1.SubscriptionService; } });
+var subscription_access_service_1 = require("./services/subscription-access.service");
+Object.defineProperty(exports, "SubscriptionAccessService", { enumerable: true, get: function () { return subscription_access_service_1.SubscriptionAccessService; } });
 __exportStar(require("./dtos/subscription.dto"), exports);

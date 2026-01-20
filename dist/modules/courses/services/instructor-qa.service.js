@@ -11,21 +11,21 @@ class InstructorQAService {
         // Verify student is enrolled
         const enrollment = await prisma_1.prisma.enrollment.findFirst({
             where: {
-                courseId: data.courseId,
+                collectionId: data.collectionId,
                 studentId: data.studentId,
             },
         });
         if (!enrollment) {
-            throw new Error('You must be enrolled in the course to ask questions');
+            throw new Error('You must be enrolled in the collection to ask questions');
         }
         const qa = await prisma_1.prisma.instructorQA.create({
             data: {
-                courseId: data.courseId,
+                collectionId: data.collectionId,
                 studentId: data.studentId,
                 question: data.question,
             },
             include: {
-                course: {
+                collection: {
                     select: {
                         id: true,
                         title: true,
@@ -61,7 +61,7 @@ class InstructorQAService {
         const qa = await prisma_1.prisma.instructorQA.findUnique({
             where: { id: data.qaId },
             include: {
-                course: {
+                collection: {
                     select: {
                         id: true,
                         title: true,
@@ -73,9 +73,9 @@ class InstructorQAService {
         if (!qa) {
             throw new Error('Question not found');
         }
-        // Verify instructor is the course instructor
-        if (qa.course.instructorId !== data.instructorId) {
-            throw new Error('Only the course instructor can answer questions');
+        // Verify instructor is the collection instructor
+        if (qa.collection.instructorId !== data.instructorId) {
+            throw new Error('Only the collection instructor can answer questions');
         }
         const answer = await prisma_1.prisma.instructorQAAnswer.create({
             data: {
@@ -92,7 +92,7 @@ class InstructorQAService {
             },
         });
         // Invalidate cache
-        await (0, cache_1.deleteCache)(`course:${qa.courseId}`);
+        await (0, cache_1.deleteCache)(`collection:${qa.collectionId}`);
         return this.getQuestionById(data.qaId);
     }
     /**
@@ -102,7 +102,7 @@ class InstructorQAService {
         const qa = await prisma_1.prisma.instructorQA.findUnique({
             where: { id: qaId },
             include: {
-                course: {
+                collection: {
                     select: {
                         id: true,
                         title: true,
@@ -135,12 +135,12 @@ class InstructorQAService {
         return this.mapToDto(qa);
     }
     /**
-     * Get questions for a course
+     * Get questions for a collection
      */
-    async getCourseQuestions(courseId, page = 1, limit = 20, answeredOnly) {
+    async getCourseQuestions(collectionId, page = 1, limit = 20, answeredOnly) {
         const skip = (page - 1) * limit;
         const take = Math.min(limit, 100);
-        const where = { courseId };
+        const where = { collectionId };
         if (answeredOnly !== undefined) {
             where.isAnswered = answeredOnly;
         }
@@ -150,7 +150,7 @@ class InstructorQAService {
                 skip,
                 take,
                 include: {
-                    course: {
+                    collection: {
                         select: {
                             id: true,
                             title: true,
@@ -202,7 +202,7 @@ class InstructorQAService {
                 skip,
                 take,
                 include: {
-                    course: {
+                    collection: {
                         select: {
                             id: true,
                             title: true,
@@ -245,10 +245,10 @@ class InstructorQAService {
     mapToDto(qa) {
         return {
             id: qa.id,
-            courseId: qa.courseId,
-            course: {
-                id: qa.course.id,
-                title: qa.course.title,
+            collectionId: qa.collectionId,
+            collection: {
+                id: qa.collection.id,
+                title: qa.collection.title,
             },
             studentId: qa.studentId,
             student: {

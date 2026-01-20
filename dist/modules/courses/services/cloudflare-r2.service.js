@@ -16,14 +16,14 @@ class CloudflareR2Service {
         });
     }
     async uploadFile(data) {
-        const key = this.generateKey(data.courseId, data.type, data.filename);
+        const key = this.generateKey(data.collectionId, data.type, data.filename);
         const command = new client_s3_1.PutObjectCommand({
             Bucket: this.bucketName,
             Key: key,
             Body: data.file,
             ContentType: data.contentType,
             Metadata: {
-                courseId: data.courseId.toString(),
+                collectionId: data.collectionId.toString(),
                 type: data.type,
                 originalFilename: data.filename,
             },

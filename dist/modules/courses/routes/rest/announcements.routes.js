@@ -18,17 +18,17 @@ const router = (0, express_1.Router)();
  *           enum: [global, course, user]
  *         description: Scope of announcements
  *       - in: query
- *         name: courseId
+ *         name: collectionId
  *         schema:
  *           type: string
- *         description: Course ID for course-scoped announcements
+ *         description: Collection ID for collection-scoped announcements
  *     responses:
  *       200:
  *         description: Announcements retrieved successfully
  */
 router.get('/', auth_1.requireAuth, async (req, res) => {
     try {
-        const { scope = 'global', courseId } = req.query;
+        const { scope = 'global', collectionId } = req.query;
         const userId = req.user?.id;
         const where = {
             isActive: true,
@@ -44,17 +44,17 @@ router.get('/', auth_1.requireAuth, async (req, res) => {
         if (scope === 'global') {
             where.scope = 'global';
         }
-        else if (scope === 'course' && courseId) {
+        else if (scope === 'course' && collectionId) {
             where.scope = 'course';
-            where.courseId = courseId;
+            where.collectionId = collectionId;
         }
         else if (scope === 'user' && userId) {
-            const courseIds = await getUserCourseIds(userId);
+            const collectionIds = await getUserCollectionIds(userId);
             where.AND.push({
                 OR: [
                     { scope: 'global' },
                     { scope: 'user', targetUserId: userId },
-                    { scope: 'course', courseId: { in: courseIds } }
+                    { scope: 'course', collectionId: { in: collectionIds } }
                 ]
             });
         }
@@ -70,7 +70,7 @@ router.get('/', auth_1.requireAuth, async (req, res) => {
                     creator: {
                         select: { id: true, username: true, email: true }
                     },
-                    course: {
+                    collection: {
                         select: { id: true, title: true }
                     }
                 },
@@ -106,8 +106,8 @@ router.get('/', auth_1.requireAuth, async (req, res) => {
 router.get('/users/:userId/announcements', auth_1.requireAuth, async (req, res) => {
     try {
         const { userId } = req.params;
-        // Get user's enrolled course IDs
-        const courseIds = await getUserCourseIds(userId);
+        // Get user's enrolled collection IDs
+        const collectionIds = await getUserCollectionIds(userId);
         const page = parseInt(req.query.page) || 1;
         const limit = Math.min(parseInt(req.query.limit) || 20, 100);
         const skip = (page - 1) * limit;
@@ -118,7 +118,7 @@ router.get('/users/:userId/announcements', auth_1.requireAuth, async (req, res) 
                     OR: [
                         { scope: 'global' },
                         { scope: 'user', targetUserId: userId },
-                        { scope: 'course', courseId: { in: courseIds } }
+                        { scope: 'course', collectionId: { in: collectionIds } }
                     ]
                 },
                 {
@@ -138,7 +138,7 @@ router.get('/users/:userId/announcements', auth_1.requireAuth, async (req, res) 
                     creator: {
                         select: { id: true, username: true, email: true }
                     },
-                    course: {
+                    collection: {
                         select: { id: true, title: true }
                     }
                 },
@@ -166,19 +166,19 @@ router.get('/users/:userId/announcements', auth_1.requireAuth, async (req, res) 
 });
 /**
  * @swagger
- * /api/courses/{courseId}/announcements:
+ * /api/collections/{collectionId}/announcements:
  *   get:
- *     summary: Get announcements for a specific course
+ *     summary: Get announcements for a specific collection
  *     tags: [Announcements]
  */
-router.get('/courses/:courseId/announcements', auth_1.requireAuth, async (req, res) => {
+router.get('/collections/:collectionId/announcements', auth_1.requireAuth, async (req, res) => {
     try {
-        const { courseId } = req.params;
+        const { collectionId } = req.params;
         const page = parseInt(req.query.page) || 1;
         const limit = Math.min(parseInt(req.query.limit) || 20, 100);
         const skip = (page - 1) * limit;
         const where = {
-            courseId,
+            collectionId,
             isActive: true,
             OR: [
                 { expiresAt: null },
@@ -194,7 +194,7 @@ router.get('/courses/:courseId/announcements', auth_1.requireAuth, async (req, r
                     creator: {
                         select: { id: true, username: true, email: true }
                     },
-                    course: {
+                    collection: {
                         select: { id: true, title: true }
                     }
                 },
@@ -216,15 +216,15 @@ router.get('/courses/:courseId/announcements', auth_1.requireAuth, async (req, r
         });
     }
     catch (error) {
-        console.error('Error fetching course announcements:', error);
-        res.status(500).json({ error: 'Failed to fetch course announcements' });
+        console.error('Error fetching collection announcements:', error);
+        res.status(500).json({ error: 'Failed to fetch collection announcements' });
     }
 });
-async function getUserCourseIds(userId) {
+async function getUserCollectionIds(userId) {
     const enrollments = await prisma_1.prisma.enrollment.findMany({
         where: { studentId: userId },
-        select: { courseId: true }
+        select: { collectionId: true }
     });
-    return enrollments.map(e => e.courseId);
+    return enrollments.map(e => e.collectionId);
 }
 exports.default = router;

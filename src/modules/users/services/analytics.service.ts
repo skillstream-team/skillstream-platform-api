@@ -86,7 +86,7 @@ export class AnalyticsService {
       usersByRole,
     ] = await Promise.all([
       prisma.user.count(),
-      prisma.course.count(),
+      prisma.collection.count(),
       prisma.enrollment.count(),
       prisma.user.count({
         where: {
@@ -98,7 +98,7 @@ export class AnalyticsService {
       }),
       prisma.payment.findMany({
         where: { status: 'COMPLETED' },
-        include: { course: { select: { id: true, title: true } } },
+        include: { collection: { select: { id: true, title: true } } },
       }),
       prisma.user.groupBy({
         by: ['role'],
@@ -106,7 +106,7 @@ export class AnalyticsService {
       }),
     ]);
 
-    const totalRevenue = allPayments.reduce((sum, p) => sum + p.amount, 0);
+    const totalRevenue = allPayments.reduce((sum: number, p: any) => sum + p.amount, 0);
 
     // User growth (last 12 months)
     const userGrowth = [];
@@ -124,8 +124,8 @@ export class AnalyticsService {
       });
     }
 
-    // Course stats
-    const courses = await prisma.course.findMany({
+    // Collection stats
+    const courses = await prisma.collection.findMany({
       include: {
         enrollments: true,
         payments: { where: { status: 'COMPLETED' } },
@@ -142,7 +142,7 @@ export class AnalyticsService {
         enrollments: c.enrollments.length,
         revenue: c.payments.reduce((sum: number, p: any) => sum + p.amount, 0),
       }))
-      .sort((a, b) => b.enrollments - a.enrollments)
+      .sort((a: any, b: any) => b.enrollments - a.enrollments)
       .slice(0, 10);
 
     // Revenue analytics
@@ -151,11 +151,11 @@ export class AnalyticsService {
     const lastMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0);
 
     const thisMonthRevenue = allPayments
-      .filter((p) => p.createdAt >= thisMonthStart)
-      .reduce((sum, p) => sum + p.amount, 0);
+      .filter((p: any) => p.createdAt >= thisMonthStart)
+      .reduce((sum: number, p: any) => sum + p.amount, 0);
     const lastMonthRevenue = allPayments
-      .filter((p) => p.createdAt >= lastMonthStart && p.createdAt <= lastMonthEnd)
-      .reduce((sum, p) => sum + p.amount, 0);
+      .filter((p: any) => p.createdAt >= lastMonthStart && p.createdAt <= lastMonthEnd)
+      .reduce((sum: number, p: any) => sum + p.amount, 0);
     const revenueGrowth =
       lastMonthRevenue > 0
         ? ((thisMonthRevenue - lastMonthRevenue) / lastMonthRevenue) * 100
@@ -167,8 +167,8 @@ export class AnalyticsService {
       const monthStart = new Date(now.getFullYear(), now.getMonth() - i, 1);
       const monthEnd = new Date(now.getFullYear(), now.getMonth() - i + 1, 0);
       const revenue = allPayments
-        .filter((p) => p.createdAt >= monthStart && p.createdAt <= monthEnd)
-        .reduce((sum, p) => sum + p.amount, 0);
+        .filter((p: any) => p.createdAt >= monthStart && p.createdAt <= monthEnd)
+        .reduce((sum: number, p: any) => sum + p.amount, 0);
       revenueByMonth.push({
         month: monthStart.toISOString().substring(0, 7),
         revenue,
@@ -182,14 +182,14 @@ export class AnalyticsService {
         courseTitle: c.title,
         revenue: c.payments.reduce((sum: number, p: any) => sum + p.amount, 0),
       }))
-      .sort((a, b) => b.revenue - a.revenue)
+      .sort((a: any, b: any) => b.revenue - a.revenue)
       .slice(0, 10);
 
     // Engagement metrics
     const allProgress = await prisma.progress.findMany({
       where: { status: 'completed' },
       include: {
-        course: { select: { id: true, title: true } },
+        collection: { select: { id: true, title: true } },
       },
     });
 
@@ -233,7 +233,7 @@ export class AnalyticsService {
         activeUsers,
       },
       users: {
-        byRole: usersByRole.map((r) => ({ role: r.role, count: r._count.id })),
+        byRole: usersByRole.map((r: any) => ({ role: r.role, count: r._count.id })),
         growth: userGrowth,
         activeUsers,
       },
@@ -257,18 +257,18 @@ export class AnalyticsService {
         averageQuizScore: Math.round(averageQuizScore * 100) / 100,
         averageTimeSpent: 0, // Would need time tracking
         completionByCourse: completionByCourse.sort(
-          (a, b) => b.completionRate - a.completionRate
+          (a: any, b: any) => b.completionRate - a.completionRate
         ),
       },
     };
   }
 
   /**
-   * Get course-specific analytics
+   * Get collection-specific analytics
    */
-  async getCourseAnalytics(courseId: string): Promise<CourseAnalyticsDto> {
-    const course = await prisma.course.findUnique({
-      where: { id: courseId },
+  async getCollectionAnalytics(collectionId: string): Promise<CourseAnalyticsDto> {
+    const course = await prisma.collection.findUnique({
+      where: { id: collectionId },
       include: {
         enrollments: {
           include: { student: { select: { id: true, username: true } } },
@@ -302,23 +302,23 @@ export class AnalyticsService {
     // Overview
     const totalEnrollments = course.enrollments.length;
     const activeStudents = course.enrollments.filter(
-      (e) => e.createdAt >= thirtyDaysAgo
+      (e: any) => e.createdAt >= thirtyDaysAgo
     ).length;
     const completedProgress = course.progress.filter(
-      (p) => p.type === 'course' && p.status === 'completed'
+      (p: any) => p.type === 'course' && p.status === 'completed'
     );
     const completionRate =
       totalEnrollments > 0 ? (completedProgress.length / totalEnrollments) * 100 : 0;
 
-    const allQuizScores = course.quizzes.flatMap((q) =>
-      q.attempts.map((a) => a.percentage || 0)
+    const allQuizScores = course.quizzes.flatMap((q: any) =>
+      q.attempts.map((a: any) => a.percentage || 0)
     );
     const averageScore =
       allQuizScores.length > 0
-        ? allQuizScores.reduce((sum, s) => sum + s, 0) / allQuizScores.length
+        ? allQuizScores.reduce((sum: number, s: number) => sum + s, 0) / allQuizScores.length
         : 0;
 
-    const totalRevenue = course.payments.reduce((sum, p) => sum + p.amount, 0);
+    const totalRevenue = course.payments.reduce((sum: number, p: any) => sum + p.amount, 0);
 
     // Enrollments by month
     const enrollmentsByMonth = [];
@@ -326,7 +326,7 @@ export class AnalyticsService {
       const monthStart = new Date(now.getFullYear(), now.getMonth() - i, 1);
       const monthEnd = new Date(now.getFullYear(), now.getMonth() - i + 1, 0);
       const count = course.enrollments.filter(
-        (e) => e.createdAt >= monthStart && e.createdAt <= monthEnd
+        (e: any) => e.createdAt >= monthStart && e.createdAt <= monthEnd
       ).length;
       enrollmentsByMonth.push({
         month: monthStart.toISOString().substring(0, 7),
@@ -349,38 +349,38 @@ export class AnalyticsService {
 
     // Progress breakdown
     const notStarted = course.progress.filter(
-      (p) => p.type === 'course' && p.status === 'not_started'
+      (p: any) => p.type === 'course' && p.status === 'not_started'
     ).length;
     const inProgress = course.progress.filter(
-      (p) => p.type === 'course' && p.status === 'in_progress'
+      (p: any) => p.type === 'course' && p.status === 'in_progress'
     ).length;
     const completed = completedProgress.length;
 
     const averageProgress =
       totalEnrollments > 0
         ? course.progress
-            .filter((p) => p.type === 'course')
-            .reduce((sum, p) => sum + (p.progress || 0), 0) / totalEnrollments
+            .filter((p: any) => p.type === 'course')
+            .reduce((sum: number, p: any) => sum + (p.progress || 0), 0) / totalEnrollments
         : 0;
 
     // Performance
-    const allAssignmentScores = course.assignments.flatMap((a) =>
-      a.submissions.map((s) => s.grade || 0)
+    const allAssignmentScores = course.assignments.flatMap((a: any) =>
+      a.submissions.map((s: any) => s.grade || 0)
     );
     const averageAssignmentScore =
       allAssignmentScores.length > 0
-        ? allAssignmentScores.reduce((sum, s) => sum + s, 0) / allAssignmentScores.length
+        ? allAssignmentScores.reduce((sum: number, s: any) => sum + s, 0) / allAssignmentScores.length
         : 0;
 
     // Top performers (students with highest average scores)
     const studentScores = new Map<string, { scores: number[]; name: string }>();
-    course.enrollments.forEach((e) => {
+    course.enrollments.forEach((e: any) => {
       const studentProgress = course.progress.filter(
-        (p) => p.studentId === e.studentId
+        (p: any) => p.studentId === e.studentId
       );
       const scores = studentProgress
-        .map((p) => p.score || 0)
-        .filter((s) => s > 0);
+        .map((p: any) => p.score || 0)
+        .filter((s: any) => s > 0);
       if (scores.length > 0) {
         studentScores.set(e.studentId, {
           scores,
@@ -405,8 +405,8 @@ export class AnalyticsService {
       const monthStart = new Date(now.getFullYear(), now.getMonth() - i, 1);
       const monthEnd = new Date(now.getFullYear(), now.getMonth() - i + 1, 0);
       const revenue = course.payments
-        .filter((p) => p.createdAt >= monthStart && p.createdAt <= monthEnd)
-        .reduce((sum, p) => sum + p.amount, 0);
+        .filter((p: any) => p.createdAt >= monthStart && p.createdAt <= monthEnd)
+        .reduce((sum: number, p: any) => sum + p.amount, 0);
       revenueByMonth.push({
         month: monthStart.toISOString().substring(0, 7),
         revenue,

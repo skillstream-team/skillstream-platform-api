@@ -46,13 +46,13 @@ export class MediaService {
             file: data.file,
             filename: data.filename,
             contentType: data.mimeType,
-            courseId: data.courseId,
+            collectionId: data.collectionId,
             type: data.type,
         });
 
         const material = await prisma.material.create({
             data: {
-                courseId: data.courseId,
+                collectionId: data.collectionId,
                 type: data.type,
                 key: uploadResult.key,
                 filename: data.filename,
@@ -76,9 +76,9 @@ export class MediaService {
      *     summary: Get all materials for a specific course
      *     tags: [Materials]
      */
-    async getMaterialsByCourse(courseId: string): Promise<MaterialResponseDto[]> {
+    async getMaterialsByCourse(collectionId: string): Promise<MaterialResponseDto[]> {
         const materials = await prisma.material.findMany({
-            where: { courseId },
+            where: { collectionId },
             include: { uploader: { select: { id: true, username: true, email: true } } },
             orderBy: { createdAt: 'desc' },
         });
@@ -144,9 +144,9 @@ export class MediaService {
      *     summary: Get all videos by course
      *     tags: [Videos]
      */
-    async getVideosByCourse(courseId: string): Promise<VideoResponseDto[]> {
+    async getVideosByCourse(collectionId: string): Promise<VideoResponseDto[]> {
         const videos = await prisma.video.findMany({
-            where: { courseId },
+            where: { collectionId },
             include: { uploader: { select: { id: true, username: true, email: true } } },
             orderBy: { createdAt: 'desc' },
         });
@@ -260,9 +260,9 @@ export class MediaService {
      *     summary: Get all live streams for a course
      *     tags: [Live Streams]
      */
-    async getLiveStreamsByCourse(courseId: string): Promise<LiveStreamResponseDto[]> {
+    async getLiveStreamsByCourse(collectionId: string): Promise<LiveStreamResponseDto[]> {
         const liveStreams = await prisma.liveStream.findMany({
-            where: { courseId },
+            where: { collectionId },
             include: { creator: { select: { id: true, username: true, email: true } } },
             orderBy: { createdAt: 'desc' },
         });

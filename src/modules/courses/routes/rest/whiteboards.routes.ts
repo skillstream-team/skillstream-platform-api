@@ -96,7 +96,7 @@ router.get('/courses/:courseId',
       const page = parseInt(req.query.page as string) || 1;
       const limit = parseInt(req.query.limit as string) || 20;
       
-      const result = await whiteboardService.getCourseWhiteboards(req.params.courseId, page, limit);
+      const result = await whiteboardService.getCollectionWhiteboards(req.params.courseId, page, limit);
       
       res.json({
         success: true,

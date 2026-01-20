@@ -13,13 +13,13 @@ export class WhiteboardService {
    * Create a new whiteboard
    */
   async createWhiteboard(data: CreateWhiteboardDto, userId: string): Promise<WhiteboardResponseDto> {
-    // Validate course or liveStream exists
+    // Validate collection or liveStream exists
     if (data.courseId) {
-      const course = await prisma.course.findUnique({
+      const course = await prisma.collection.findUnique({
         where: { id: data.courseId },
       });
       if (!course) {
-        throw new Error('Course not found');
+        throw new Error('Collection not found');
       }
     }
 
@@ -34,7 +34,7 @@ export class WhiteboardService {
 
     const whiteboard = await prisma.whiteboard.create({
       data: {
-        courseId: data.courseId,
+        collectionId: data.courseId,
         liveStreamId: data.liveStreamId,
         title: data.title,
         description: data.description,
@@ -118,7 +118,7 @@ export class WhiteboardService {
   /**
    * Get whiteboards for a course
    */
-  async getCourseWhiteboards(courseId: string, page: number = 1, limit: number = 20): Promise<{
+  async getCollectionWhiteboards(courseId: string, page: number = 1, limit: number = 20): Promise<{
     data: WhiteboardResponseDto[];
     pagination: {
       page: number;
@@ -134,7 +134,7 @@ export class WhiteboardService {
 
     const [whiteboards, total] = await Promise.all([
       prisma.whiteboard.findMany({
-        where: { courseId },
+        where: { collectionId: courseId },
         skip,
         take,
         include: {
@@ -153,7 +153,7 @@ export class WhiteboardService {
         },
         orderBy: { createdAt: 'desc' },
       }),
-      prisma.whiteboard.count({ where: { courseId } }),
+      prisma.whiteboard.count({ where: { collectionId: courseId } }),
     ]);
 
     return {
@@ -341,7 +341,7 @@ export class WhiteboardService {
   private mapToResponseDto(whiteboard: any): WhiteboardResponseDto {
     return {
       id: whiteboard.id,
-      courseId: whiteboard.courseId,
+      courseId: whiteboard.collectionId,
       liveStreamId: whiteboard.liveStreamId,
       title: whiteboard.title,
       description: whiteboard.description,

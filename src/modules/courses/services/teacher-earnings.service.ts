@@ -25,11 +25,11 @@ export class TeacherEarningsService {
         // Get course videos and forum posts for filtering
         const [courseVideos, courseForumPosts] = await Promise.all([
             prisma.video.findMany({
-                where: { courseId },
+                where: { collectionId: courseId },
                 select: { id: true },
             }),
             prisma.forumPost.findMany({
-                where: { courseId },
+                where: { collectionId: courseId },
                 select: { id: true },
             }),
         ]);
@@ -47,7 +47,7 @@ export class TeacherEarningsService {
         ] = await Promise.all([
             prisma.progress.findMany({
                 where: {
-                    courseId,
+                    collectionId: courseId,
                     studentId: userId,
                     lastAccessed: { gte: cutoffDate, lte: endDate },
                 },
@@ -64,7 +64,7 @@ export class TeacherEarningsService {
             }),
             prisma.userInteraction.findMany({
                 where: {
-                    courseId,
+                    collectionId: courseId,
                     userId,
                     createdAt: { gte: cutoffDate, lte: endDate },
                 },
@@ -72,7 +72,7 @@ export class TeacherEarningsService {
             }),
             prisma.forumPost.findMany({
                 where: {
-                    courseId,
+                    collectionId: courseId,
                     authorId: userId,
                     createdAt: { gte: cutoffDate, lte: endDate },
                 },
@@ -143,13 +143,11 @@ export class TeacherEarningsService {
         const period = `${year}-${String(month).padStart(2, '0')}`;
 
         // Check if earnings already calculated
-        const existing = await prisma.teacherEarnings.findUnique({
+        const existing = await prisma.teacherEarnings.findFirst({
             where: {
-                teacherId_courseId_period: {
-                    teacherId,
-                    courseId,
-                    period,
-                },
+                teacherId,
+                collectionId: courseId,
+                period,
             },
         });
 
@@ -165,9 +163,9 @@ export class TeacherEarningsService {
             };
         }
 
-        // Get all enrolled students for the course
+        // Get all enrolled students for the collection
         const enrollments = await prisma.enrollment.findMany({
-            where: { courseId },
+            where: { collectionId: courseId },
             select: { studentId: true },
         });
 
@@ -187,34 +185,45 @@ export class TeacherEarningsService {
         const activeUserCount = activeUserCounts.reduce((sum: number, count) => sum + count, 0);
         const amount = activeUserCount * RATE_PER_ACTIVE_USER;
 
-        // Upsert earnings record
-        const earnings = await prisma.teacherEarnings.upsert({
+        // Find existing earnings record
+        const existingEarnings = await prisma.teacherEarnings.findFirst({
             where: {
-                teacherId_courseId_period: {
-                    teacherId,
-                    courseId,
-                    period,
-                },
-            },
-            update: {
-                activeUserCount,
-                amount,
-                status: 'AVAILABLE',
-                updatedAt: new Date(),
-            },
-            create: {
                 teacherId,
-                courseId,
-                periodStart,
-                periodEnd,
+                collectionId: courseId,
                 period,
-                activeUserCount,
-                ratePerUser: RATE_PER_ACTIVE_USER,
-                amount,
-                currency: 'USD',
-                status: 'AVAILABLE',
             },
         });
+
+        let earnings;
+        if (existingEarnings) {
+            // Update existing record
+            earnings = await prisma.teacherEarnings.update({
+                where: { id: existingEarnings.id },
+                data: {
+                    activeUserCount,
+                    amount,
+                    status: 'AVAILABLE',
+                    updatedAt: new Date(),
+                },
+            });
+        } else {
+            // Create new record
+            earnings = await prisma.teacherEarnings.create({
+                data: {
+                    teacherId,
+                    collectionId: courseId,
+                    periodStart,
+                    periodEnd,
+                    period,
+                    activeUserCount,
+                    ratePerUser: RATE_PER_ACTIVE_USER,
+                    amount,
+                    netAmount: amount, // Added required field
+                    currency: 'USD',
+                    status: 'AVAILABLE',
+                },
+            });
+        }
 
         // Update teacher earnings summary
         await this.updateTeacherEarningsSummary(teacherId);
@@ -250,7 +259,7 @@ export class TeacherEarningsService {
                 status: 'AVAILABLE',
             },
             include: {
-                course: {
+                collection: {
                     select: {
                         id: true,
                         title: true,
@@ -266,10 +275,10 @@ export class TeacherEarningsService {
 
         return {
             totalAvailable,
-            earnings: availableEarnings.map((e) => ({
+            earnings: availableEarnings.map((e: any) => ({
                 id: e.id,
-                courseId: e.courseId,
-                courseTitle: e.course.title,
+                courseId: e.collectionId,
+                courseTitle: e.collection?.title || 'N/A',
                 period: e.period,
                 activeUserCount: e.activeUserCount,
                 amount: e.amount,
@@ -480,7 +489,7 @@ export class TeacherEarningsService {
                 include: {
                     earnings: {
                         include: {
-                            course: {
+                            collection: {
                                 select: {
                                     id: true,
                                     title: true,
@@ -524,8 +533,8 @@ export class TeacherEarningsService {
             amount: number;
         }>;
     }> {
-        // Get all courses for the teacher
-        const courses = await prisma.course.findMany({
+        // Get all collections for the teacher
+        const courses = await prisma.collection.findMany({
             where: { instructorId: teacherId },
             select: {
                 id: true,
@@ -534,7 +543,7 @@ export class TeacherEarningsService {
         });
 
         const results = await Promise.all(
-            courses.map(async (course) => {
+            courses.map(async (course: any) => {
                 try {
                     const result = await this.calculateMonthlyEarnings(
                         teacherId,
@@ -560,7 +569,7 @@ export class TeacherEarningsService {
             })
         );
 
-        const totalEarnings = results.reduce((sum, r) => sum + r.amount, 0);
+        const totalEarnings = results.reduce((sum: number, r: any) => sum + r.amount, 0);
 
         return {
             totalEarnings,
@@ -594,7 +603,7 @@ export class TeacherEarningsService {
         const earnings = await prisma.teacherEarnings.findMany({
             where,
             include: {
-                course: {
+                collection: {
                     select: {
                         id: true,
                         title: true,
@@ -606,10 +615,10 @@ export class TeacherEarningsService {
             },
         });
 
-        return earnings.map((e) => ({
+        return earnings.map((e: any) => ({
             period: e.period,
-            courseId: e.courseId,
-            courseTitle: e.course.title,
+            courseId: e.collectionId,
+            courseTitle: e.collection?.title || 'N/A',
             activeUserCount: e.activeUserCount,
             amount: e.amount,
             status: e.status,

@@ -9,7 +9,7 @@
  */
 import { Prisma } from '@prisma/client';
 export interface CreateCourseModuleDto {
-  courseId: string;
+  collectionId: string;
   title: string;
   description?: string;
   content?: Prisma.InputJsonValue;
@@ -33,7 +33,7 @@ export interface UpdateCourseModuleDto {
 
 export interface CourseModuleResponseDto {
   id: string;
-  courseId: string;
+  collectionId: string;
   title: string;
   description?: string;
   order: number;
@@ -58,7 +58,7 @@ export interface CourseModuleResponseDto {
  * Advanced assessment and testing capabilities
  */
 export interface CreateQuizDto {
-  courseId: string;
+  collectionId: string;
   moduleId?: string;
   title: string;
   description?: string;
@@ -83,7 +83,7 @@ export interface UpdateQuizDto {
 
 export interface QuizResponseDto {
   id: string;
-  courseId: string;
+  collectionId: string;
   moduleId?: string;
   title: string;
   description?: string;
@@ -176,7 +176,7 @@ export interface QuizAttemptResponseDto {
  * Various assignment types with detailed tracking
  */
 export interface CreateAssignmentDto {
-  courseId: string;
+  collectionId: string;
   moduleId?: string;
   title: string;
   description?: string;
@@ -199,7 +199,7 @@ export interface UpdateAssignmentDto {
 
 export interface AssignmentResponseDto {
   id: string;
-  courseId: string;
+  collectionId: string;
   moduleId?: string;
   title: string;
   description?: string;
@@ -226,7 +226,7 @@ export interface AssignmentResponseDto {
  */
 export interface CreateProgressDto {
   studentId: string;
-  courseId: string;
+  collectionId: string;
   moduleId?: string;
   type: 'module' | 'quiz' | 'assignment' | 'video' | 'material';
   itemId: string;
@@ -252,8 +252,8 @@ export interface ProgressResponseDto {
     username: string;
     email: string;
   };
-  courseId: string;
-  course: {
+  collectionId: string;
+  collection: {
     id: string;
     title: string;
   };
@@ -310,8 +310,8 @@ export interface AchievementResponseDto {
   };
   badgeId: string;
   badge: BadgeResponseDto;
-  courseId?: string;
-  course?: {
+  collectionId?: string;
+  collection?: {
     id: string;
     title: string;
   };
@@ -321,7 +321,7 @@ export interface AchievementResponseDto {
 
 export interface CreateCertificateDto {
   studentId: string;
-  courseId: string;
+  collectionId: string;
   title: string;
   description?: string;
   template?: string;
@@ -336,8 +336,8 @@ export interface CertificateResponseDto {
     username: string;
     email: string;
   };
-  courseId: string;
-  course: {
+  collectionId: string;
+  collection: {
     id: string;
     title: string;
   };
@@ -357,7 +357,7 @@ export interface CertificateResponseDto {
  * Learning analytics and insights
  */
 export interface LearningAnalyticsDto {
-  courseId: string;
+  collectionId: string;
   totalStudents: number;
   completionRate: number;
   averageScore: number;
@@ -407,7 +407,7 @@ export interface EngagementMetricsDto {
  */
 export interface LessonResponseDto {
   id: string;
-  courseId: string;
+  collectionId: string;
   moduleId?: string;
   title: string;
   content?: any;

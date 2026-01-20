@@ -2,7 +2,8 @@ import { prisma } from '../../../utils/prisma';
 import { deleteCache } from '../../../utils/cache';
 
 export interface CreatePrerequisiteDto {
-  courseId: string;
+  courseId: string; // API compatibility - maps to collectionId
+  collectionId: string;
   prerequisiteId: string;
   isRequired?: boolean;
 }
@@ -35,22 +36,22 @@ export class PrerequisitesService {
       throw new Error('A course cannot be a prerequisite of itself');
     }
 
-    // Check if prerequisite course exists
-    const prerequisiteCourse = await prisma.course.findUnique({
+    // Check if prerequisite collection exists
+    const prerequisiteCourse = await prisma.collection.findUnique({
       where: { id: data.prerequisiteId },
     });
 
     if (!prerequisiteCourse) {
-      throw new Error('Prerequisite course not found');
+      throw new Error('Prerequisite collection not found');
     }
 
-    // Check if course exists
-    const course = await prisma.course.findUnique({
-      where: { id: data.courseId },
+    // Check if collection exists
+    const course = await prisma.collection.findUnique({
+      where: { id: data.collectionId || data.courseId },
     });
 
     if (!course) {
-      throw new Error('Course not found');
+      throw new Error('Collection not found');
     }
 
     // Check for circular dependencies
@@ -64,10 +65,10 @@ export class PrerequisitesService {
     }
 
     // Check if prerequisite already exists
-    const existing = await prisma.coursePrerequisite.findUnique({
+    const existing = await prisma.collectionPrerequisite.findUnique({
       where: {
-        courseId_prerequisiteId: {
-          courseId: data.courseId,
+        collectionId_prerequisiteId: {
+          collectionId: data.collectionId || data.courseId,
           prerequisiteId: data.prerequisiteId,
         },
       },
@@ -77,14 +78,14 @@ export class PrerequisitesService {
       throw new Error('This prerequisite already exists');
     }
 
-    const prerequisite = await prisma.coursePrerequisite.create({
+    const prerequisite = await prisma.collectionPrerequisite.create({
       data: {
-        courseId: data.courseId,
+        collectionId: data.collectionId || data.courseId,
         prerequisiteId: data.prerequisiteId,
         isRequired: data.isRequired ?? true,
       },
       include: {
-        course: {
+        collection: {
           select: {
             id: true,
             title: true,
@@ -101,8 +102,8 @@ export class PrerequisitesService {
     });
 
     // Invalidate cache
-    await deleteCache(`course:${data.courseId}`);
-    await deleteCache(`course:${data.prerequisiteId}`);
+    await deleteCache(`collection:${data.collectionId || data.courseId}`);
+    await deleteCache(`collection:${data.prerequisiteId}`);
 
     return this.mapToDto(prerequisite);
   }
@@ -111,10 +112,10 @@ export class PrerequisitesService {
    * Remove a prerequisite from a course
    */
   async removePrerequisite(courseId: string, prerequisiteId: string): Promise<void> {
-    const prerequisite = await prisma.coursePrerequisite.findUnique({
+    const prerequisite = await prisma.collectionPrerequisite.findUnique({
       where: {
-        courseId_prerequisiteId: {
-          courseId,
+        collectionId_prerequisiteId: {
+          collectionId: courseId,
           prerequisiteId,
         },
       },
@@ -124,24 +125,24 @@ export class PrerequisitesService {
       throw new Error('Prerequisite not found');
     }
 
-    await prisma.coursePrerequisite.delete({
+    await prisma.collectionPrerequisite.delete({
       where: {
         id: prerequisite.id,
       },
     });
 
     // Invalidate cache
-    await deleteCache(`course:${courseId}`);
+    await deleteCache(`collection:${courseId}`);
   }
 
   /**
    * Get all prerequisites for a course
    */
   async getCoursePrerequisites(courseId: string): Promise<PrerequisiteResponseDto[]> {
-    const prerequisites = await prisma.coursePrerequisite.findMany({
-      where: { courseId },
+    const prerequisites = await prisma.collectionPrerequisite.findMany({
+      where: { collectionId: courseId },
       include: {
-        course: {
+        collection: {
           select: {
             id: true,
             title: true,
@@ -165,10 +166,10 @@ export class PrerequisitesService {
    * Get all courses that require this course as a prerequisite
    */
   async getDependentCourses(courseId: string): Promise<PrerequisiteResponseDto[]> {
-    const dependents = await prisma.coursePrerequisite.findMany({
+    const dependents = await prisma.collectionPrerequisite.findMany({
       where: { prerequisiteId: courseId },
       include: {
-        course: {
+        collection: {
           select: {
             id: true,
             title: true,
@@ -199,9 +200,9 @@ export class PrerequisitesService {
       isRequired: boolean;
     }>;
   }> {
-    const prerequisites = await prisma.coursePrerequisite.findMany({
+    const prerequisites = await prisma.collectionPrerequisite.findMany({
       where: {
-        courseId,
+        collectionId: courseId,
         isRequired: true,
       },
       include: {
@@ -226,14 +227,14 @@ export class PrerequisitesService {
     const completedCourses = await prisma.certificate.findMany({
       where: {
         studentId,
-        courseId: { in: prerequisiteIds },
+        collectionId: { in: prerequisiteIds },
       },
       select: {
-        courseId: true,
+        collectionId: true,
       },
     });
 
-    const completedCourseIds = new Set(completedCourses.map((c) => c.courseId));
+    const completedCourseIds = new Set(completedCourses.map((c: any) => c.collectionId));
     const missingPrerequisites = prerequisites
       .filter((p) => !completedCourseIds.has(p.prerequisiteId))
       .map((p) => ({
@@ -274,8 +275,8 @@ export class PrerequisitesService {
       visited.add(currentId);
 
       // Get all prerequisites of the current course
-      const prereqs = await prisma.coursePrerequisite.findMany({
-        where: { courseId: currentId },
+      const prereqs = await prisma.collectionPrerequisite.findMany({
+        where: { collectionId: currentId },
         select: { prerequisiteId: true },
       });
 
@@ -292,10 +293,10 @@ export class PrerequisitesService {
   private mapToDto(prerequisite: any): PrerequisiteResponseDto {
     return {
       id: prerequisite.id,
-      courseId: prerequisite.courseId,
+      courseId: prerequisite.collectionId,
       course: {
-        id: prerequisite.course.id,
-        title: prerequisite.course.title,
+        id: prerequisite.collection.id,
+        title: prerequisite.collection.title,
       },
       prerequisiteId: prerequisite.prerequisiteId,
       prerequisite: {

@@ -125,16 +125,17 @@ const CourseStatsType = new graphql_1.GraphQLObjectType({
 const enrollmentQueries = {
     courseEnrollments: {
         type: new graphql_1.GraphQLList(CourseEnrollmentType),
-        args: { courseId: { type: new graphql_1.GraphQLNonNull(graphql_1.GraphQLInt) } },
+        args: { collectionId: { type: new graphql_1.GraphQLNonNull(graphql_1.GraphQLString) } },
         resolve: async (_, args) => {
-            return await enrollmentService.getCourseEnrollments(args.courseId);
+            const result = await enrollmentService.getCollectionEnrollments(args.collectionId, 1, 100);
+            return result.data;
         },
     },
     courseStats: {
         type: CourseStatsType,
-        args: { courseId: { type: new graphql_1.GraphQLNonNull(graphql_1.GraphQLInt) } },
+        args: { collectionId: { type: new graphql_1.GraphQLNonNull(graphql_1.GraphQLString) } },
         resolve: async (_, args) => {
-            return await enrollmentService.getCourseStats(args.courseId);
+            return await enrollmentService.getCollectionStats(args.collectionId);
         },
     },
     studentEnrollments: {
@@ -168,13 +169,13 @@ const enrollmentQueries = {
     activeUsersInCourse: {
         type: ActiveUsersResponseType,
         args: {
-            courseId: { type: new graphql_1.GraphQLNonNull(graphql_1.GraphQLString) },
+            collectionId: { type: new graphql_1.GraphQLNonNull(graphql_1.GraphQLString) },
             days: { type: graphql_1.GraphQLInt, defaultValue: 7 },
             page: { type: graphql_1.GraphQLInt, defaultValue: 1 },
             limit: { type: graphql_1.GraphQLInt, defaultValue: 20 },
         },
         resolve: async (_, args) => {
-            const result = await enrollmentService.getActiveUsersInCourse(args.courseId, args.days || 7, args.page || 1, args.limit || 20);
+            const result = await enrollmentService.getActiveUsersInCollection(args.collectionId, args.days || 7, args.page || 1, args.limit || 20);
             return {
                 data: result.data.map((user) => ({
                     ...user,
@@ -189,11 +190,11 @@ const enrollmentQueries = {
     activeUserCount: {
         type: graphql_1.GraphQLInt,
         args: {
-            courseId: { type: new graphql_1.GraphQLNonNull(graphql_1.GraphQLString) },
+            collectionId: { type: new graphql_1.GraphQLNonNull(graphql_1.GraphQLString) },
             days: { type: graphql_1.GraphQLInt, defaultValue: 7 },
         },
         resolve: async (_, args) => {
-            return await enrollmentService.getActiveUserCount(args.courseId, args.days || 7);
+            return await enrollmentService.getActiveUserCount(args.collectionId, args.days || 7);
         },
     },
 };
@@ -202,8 +203,8 @@ const enrollmentMutations = {
     enrollCourse: {
         type: EnrollmentType,
         args: {
-            courseId: { type: new graphql_1.GraphQLNonNull(graphql_1.GraphQLInt) },
-            studentId: { type: new graphql_1.GraphQLNonNull(graphql_1.GraphQLInt) },
+            collectionId: { type: new graphql_1.GraphQLNonNull(graphql_1.GraphQLString) },
+            studentId: { type: new graphql_1.GraphQLNonNull(graphql_1.GraphQLString) },
             amount: { type: new graphql_1.GraphQLNonNull(graphql_1.GraphQLFloat) },
             currency: { type: graphql_1.GraphQLString },
             provider: { type: new graphql_1.GraphQLNonNull(graphql_1.GraphQLString) },
@@ -211,7 +212,7 @@ const enrollmentMutations = {
         },
         resolve: async (_, args) => {
             return await enrollmentService.enrollStudent({
-                courseId: args.courseId,
+                collectionId: args.collectionId,
                 studentId: args.studentId,
                 amount: args.amount,
                 currency: args.currency,

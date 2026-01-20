@@ -383,7 +383,7 @@ export class CollectionsService {
         
         // For popularity sorting, we need to sort by enrollment count
         if (sortBy === 'popularity') {
-            coursesWithRatings.sort((a, b) => {
+            collectionsWithRatings.sort((a, b) => {
                 const aCount = a.enrollmentCount;
                 const bCount = b.enrollmentCount;
                 return sortOrder === 'desc' ? bCount - aCount : aCount - bCount;
@@ -392,7 +392,7 @@ export class CollectionsService {
         
         // For rating sorting
         if (sortBy === 'rating') {
-            coursesWithRatings.sort((a, b) => {
+            collectionsWithRatings.sort((a, b) => {
                 return sortOrder === 'desc' 
                     ? b.averageRating - a.averageRating 
                     : a.averageRating - b.averageRating;
@@ -400,7 +400,7 @@ export class CollectionsService {
         }
 
         // Recalculate total after rating filter
-        const filteredTotal = coursesWithRatings.length;
+        const filteredTotal = collectionsWithRatings.length;
         const actualTotal = minRating !== undefined || maxRating !== undefined 
             ? filteredTotal 
             : total;
@@ -614,8 +614,8 @@ export class CollectionsService {
                 modules: {
                     select: { id: true, title: true, order: true }
                 },
-                lessons: {
-                    select: { id: true, title: true, order: true }
+                collectionLessons: {
+                    include: { lesson: { select: { id: true, title: true, order: true } } }
                 },
                 quizzes: {
                     select: { id: true, title: true }
@@ -678,10 +678,10 @@ export class CollectionsService {
             },
         });
         
-        // Invalidate both course and modules cache
+        // Invalidate both collection and modules cache
         await Promise.all([
-            deleteCache(cacheKeys.course(courseId)),
-            deleteCache(cacheKeys.courseModules(courseId))
+            deleteCache(cacheKeys.collection(collectionId)),
+            deleteCache(cacheKeys.collectionModules(collectionId))
         ]);
         
         return module;
@@ -701,7 +701,7 @@ export class CollectionsService {
                 quizzes: true,
                 assignments: true,
                 progress: true,
-                course: { include: { lessons: true } },
+                collection: { include: { collectionLessons: { include: { lesson: true } } } },
             },
         });
     }
@@ -817,10 +817,10 @@ export class CollectionsService {
             where: { id: moduleId },
             data,
         });
-        // Invalidate both course and modules cache
+        // Invalidate both collection and modules cache
         await Promise.all([
-            deleteCache(cacheKeys.course(courseId)),
-            deleteCache(cacheKeys.courseModules(courseId))
+            deleteCache(cacheKeys.collection(collectionId)),
+            deleteCache(cacheKeys.collectionModules(collectionId))
         ]);
         return updated;
     }
@@ -1104,7 +1104,7 @@ export class CollectionsService {
         dueDate?: Date;
         isPublished?: boolean;
         createdBy: string;
-        courseId: string;
+        collectionId: string;
     }) {
         return prisma.assignment.create({ data: { ...data, moduleId } });
     }

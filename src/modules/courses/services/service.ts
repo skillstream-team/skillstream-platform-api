@@ -638,11 +638,135 @@ export class CollectionsService {
      *     tags: [Courses]
      */
     async deleteCollection(id: string) {
-        await prisma.collection.delete({ where: { id } });
+        // Check if collection exists first
+        const collection = await prisma.collection.findUnique({ where: { id } });
+        if (!collection) {
+            throw new Error('Collection not found');
+        }
         
-        // Invalidate caches
-        await deleteCache(cacheKeys.collection(id));
-        await deleteCachePattern('collections:list:*');
+        // Delete related records that don't have cascade delete
+        // Use a transaction to ensure all deletions succeed or none do
+        await prisma.$transaction(async (tx) => {
+            // Delete enrollments (no cascade, required relation)
+            await tx.enrollment.deleteMany({ where: { collectionId: id } });
+            
+            // Delete collection modules (no cascade, required relation)
+            await tx.collectionModule.deleteMany({ where: { collectionId: id } });
+            
+            // Delete quizzes (no cascade, required relation)
+            await tx.quiz.deleteMany({ where: { collectionId: id } });
+            
+            // Delete polls (no cascade, required relation)
+            await tx.poll.deleteMany({ where: { collectionId: id } });
+            
+            // Delete assignments (no cascade, required relation)
+            await tx.assignment.deleteMany({ where: { collectionId: id } });
+            
+            // Delete materials (no cascade, required relation)
+            await tx.material.deleteMany({ where: { collectionId: id } });
+            
+            // Delete videos (no cascade, required relation)
+            await tx.video.deleteMany({ where: { collectionId: id } });
+            
+            // Delete live streams (no cascade, required relation)
+            await tx.liveStream.deleteMany({ where: { collectionId: id } });
+            
+            // Delete progress records (no cascade, required relation)
+            await tx.progress.deleteMany({ where: { collectionId: id } });
+            
+            // Delete certificates (no cascade, required relation)
+            await tx.certificate.deleteMany({ where: { collectionId: id } });
+            
+            // Delete recommendations (no cascade, required relation)
+            await tx.collectionRecommendation.deleteMany({ where: { collectionId: id } });
+            
+            // Update optional relations to null (SetNull or no cascade on optional fields)
+            await tx.payment.updateMany({ 
+                where: { collectionId: id },
+                data: { collectionId: null }
+            });
+            
+            await tx.achievement.updateMany({ 
+                where: { collectionId: id },
+                data: { collectionId: null }
+            });
+            
+            await tx.userInteraction.updateMany({ 
+                where: { collectionId: id },
+                data: { collectionId: null }
+            });
+            
+            await tx.calendarEvent.updateMany({ 
+                where: { collectionId: id },
+                data: { collectionId: null }
+            });
+            
+            await tx.collectionImport.updateMany({ 
+                where: { importedCollectionId: id },
+                data: { importedCollectionId: null }
+            });
+            
+            await tx.coupon.updateMany({ 
+                where: { collectionId: id },
+                data: { collectionId: null }
+            });
+            
+            await tx.interaction.updateMany({ 
+                where: { collectionId: id },
+                data: { collectionId: null }
+            });
+            
+            await tx.announcement.updateMany({ 
+                where: { collectionId: id },
+                data: { collectionId: null }
+            });
+            
+            await tx.whiteboard.updateMany({ 
+                where: { collectionId: id },
+                data: { collectionId: null }
+            });
+            
+            // Now delete the collection itself
+            // Records with onDelete: Cascade will be automatically deleted:
+            // - CollectionLesson
+            // - CollectionReview
+            // - CollectionTag
+            // - CollectionWishlist
+            // - CollectionPrerequisite
+            // - CollectionBundleItem
+            // - CollectionShare
+            // - InstructorQA
+            // - LearningPathCollection
+            // - TeacherEarnings
+            // - StudentEngagement
+            // - SubscriptionAccess
+            // - LeaderboardEntry (optional, but has cascade)
+            // - StudyGroup (optional, but has cascade)
+            // - SharedWorkspace (optional, but has cascade)
+            // - WaitlistEntry (optional, but has cascade)
+            // Records with onDelete: Cascade will be automatically deleted:
+            // - CollectionLesson
+            // - CollectionReview
+            // - CollectionTag
+            // - CollectionWishlist
+            // - CollectionPrerequisite
+            // - CollectionBundleItem
+            // - CollectionShare
+            // - InstructorQA
+            // - LearningPathCollection
+            // - TeacherEarnings
+            // - StudentEngagement
+            // - SubscriptionAccess
+            await tx.collection.delete({ where: { id } });
+        });
+        
+        // Invalidate all related caches
+        await Promise.all([
+            deleteCache(cacheKeys.collection(id)),
+            deleteCachePattern('collections:list:*'),
+            // Also clear any collection module caches
+            deleteCache(cacheKeys.collectionModules(id)),
+        ]);
     }
 
     // ============================================================

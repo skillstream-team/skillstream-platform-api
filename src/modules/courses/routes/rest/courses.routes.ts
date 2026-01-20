@@ -578,6 +578,12 @@ router.get('/', async (req, res) => {
             sortBy,
             sortOrder
         );
+        
+        // Add cache-control headers to prevent stale data
+        res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+        res.setHeader('Pragma', 'no-cache');
+        res.setHeader('Expires', '0');
+        
         res.json(result);
     } catch (err) {
         res.status(500).json({ error: 'Failed to fetch courses' });

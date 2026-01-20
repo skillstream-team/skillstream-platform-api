@@ -62,6 +62,9 @@ export async function deleteCachePattern(pattern: string): Promise<void> {
     const keys = await redisClient.keys(pattern);
     if (keys.length > 0) {
       await redisClient.del(...keys);
+      console.log(`[Cache] Deleted ${keys.length} keys matching pattern: ${pattern}`);
+    } else {
+      console.log(`[Cache] No keys found matching pattern: ${pattern}`);
     }
   } catch (error) {
     console.error('Cache pattern delete error:', error);

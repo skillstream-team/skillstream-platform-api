@@ -712,13 +712,28 @@ export class CollectionsService {
             timeout: 30000, // Maximum time the transaction can run (30 seconds)
         });
         
-        // Invalidate all related caches
-        await Promise.all([
-            deleteCache(cacheKeys.collection(id)),
-            deleteCachePattern('collections:list:*'),
-            // Also clear any collection module caches
-            deleteCache(cacheKeys.collectionModules(id)),
-        ]);
+        // Aggressively invalidate all related caches BEFORE returning
+        // This ensures cache is cleared before any subsequent requests
+        console.log(`[Cache] Invalidating caches for deleted collection: ${id}`);
+        
+        // Clear individual collection cache
+        await deleteCache(cacheKeys.collection(id));
+        await deleteCache(cacheKeys.collectionModules(id));
+        
+        // Clear all collection list patterns - Redis pattern matching
+        // Pattern 'collections:list:*' should match all keys like:
+        // - collections:list:1:20
+        // - collections:list:1:20:instructor:xxx
+        // - collections:list:1:20:instructor:xxx:category:yyy
+        // etc.
+        await deleteCachePattern('collections:list:*');
+        
+        // Also clear any potential variations
+        await deleteCachePattern('collections:list:*:*');
+        await deleteCachePattern('collections:list:*:*:*');
+        await deleteCachePattern('collections:list:*:*:*:*');
+        
+        console.log(`[Cache] Cache invalidation completed for collection: ${id}`);
     }
 
     // ============================================================

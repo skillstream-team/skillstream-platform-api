@@ -102,7 +102,7 @@ router.get('/teachers/students', requireAuth, requireRole('TEACHER'), async (req
             email: true,
             firstName: true,
             lastName: true,
-            avatarUrl: true,
+            avatar: true,
             createdAt: true,
           },
         },
@@ -117,9 +117,9 @@ router.get('/teachers/students', requireAuth, requireRole('TEACHER'), async (req
     });
 
     // Get unique students
-    const uniqueStudentsMap = new Map();
-    enrollments.forEach((enrollment) => {
-      if (!uniqueStudentsMap.has(enrollment.studentId)) {
+    const uniqueStudentsMap = new Map<string, any>();
+    enrollments.forEach((enrollment: any) => {
+      if (!uniqueStudentsMap.has(enrollment.studentId) && enrollment.student) {
         uniqueStudentsMap.set(enrollment.studentId, enrollment.student);
       }
     });

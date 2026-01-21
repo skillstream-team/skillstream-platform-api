@@ -582,7 +582,8 @@ export class CollectionsService {
         };
 
         // Cache result
-        await setCache(cacheKey, collectionWithRating, CACHE_TTL.MEDIUM);
+        // Use short cache TTL for individual collection queries
+        await setCache(cacheKey, collectionWithRating, CACHE_TTL.SHORT);
 
         return collectionWithRating;
     }

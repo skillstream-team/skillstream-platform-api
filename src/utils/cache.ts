@@ -3,19 +3,27 @@ import redisClient from './redis';
 /**
  * Cache utilities using Redis
  * Falls back to no-op if Redis is not available
+ * 
+ * Caching is enabled with very short TTLs (5-30 seconds) for immediate updates
  */
 
+// Caching is enabled with very short TTLs for immediate updates
+const CACHE_DISABLED = false;
+
+// Very short cache TTLs - data is fresh for only a few seconds
 const CACHE_TTL = {
-  SHORT: 300, // 5 minutes
-  MEDIUM: 1800, // 30 minutes
-  LONG: 3600, // 1 hour
+  SHORT: 5, // 5 seconds - for frequently changing data
+  MEDIUM: 10, // 10 seconds - for moderately changing data
+  LONG: 30, // 30 seconds - for rarely changing data
+  DISABLED: 0,
 };
 
 /**
  * Get value from cache
+ * Returns cached value if available and not expired
  */
 export async function getCache(key: string): Promise<any | null> {
-  if (!redisClient) return null;
+  if (CACHE_DISABLED || !redisClient) return null;
   
   try {
     const value = await redisClient.get(key);
@@ -28,9 +36,10 @@ export async function getCache(key: string): Promise<any | null> {
 
 /**
  * Set value in cache
+ * Caches value with specified TTL (default: MEDIUM = 10 seconds)
  */
 export async function setCache(key: string, value: any, ttl: number = CACHE_TTL.MEDIUM): Promise<void> {
-  if (!redisClient) return;
+  if (CACHE_DISABLED || !redisClient) return;
   
   try {
     await redisClient.setex(key, ttl, JSON.stringify(value));
@@ -63,8 +72,6 @@ export async function deleteCachePattern(pattern: string): Promise<void> {
     if (keys.length > 0) {
       await redisClient.del(...keys);
       console.log(`[Cache] Deleted ${keys.length} keys matching pattern: ${pattern}`);
-    } else {
-      console.log(`[Cache] No keys found matching pattern: ${pattern}`);
     }
   } catch (error) {
     console.error('Cache pattern delete error:', error);

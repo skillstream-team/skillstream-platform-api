@@ -17,6 +17,7 @@ import { errorHandler } from "./middleware/error-handler";
 import { securityHeaders, corsOptions } from "./middleware/security";
 import { requestLogger } from "./middleware/logger";
 import { requestId } from "./middleware/request-id";
+import { noCache } from "./middleware/no-cache";
 import { testDatabaseConnection, prisma } from "./utils/prisma";
 import redisClient from "./utils/redis";
 import { initSentry } from "./utils/sentry";
@@ -90,6 +91,9 @@ app.use(compression());
 
 // Security middleware
 app.use(securityHeaders);
+
+// No-cache middleware - prevent all caching
+app.use(noCache);
 
 // CORS
 app.use(cors(corsOptions));

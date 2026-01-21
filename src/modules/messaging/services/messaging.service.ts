@@ -225,6 +225,9 @@ export class MessagingService {
           where,
           include: {
             participants: {
+              where: {
+                leftAt: null, // Only include active participants in the response
+              },
               include: {
                 user: {
                   select: {
@@ -607,6 +610,77 @@ export class MessagingService {
     } catch (error) {
       throw new Error(
         `Failed to remove participant: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
+    }
+  }
+
+  /**
+   * Delete a conversation (soft delete by marking all participants as left)
+   * Any participant can delete a conversation - for direct messages, this removes it for both users
+   */
+  async deleteConversation(
+    conversationId: string,
+    userId: string
+  ): Promise<void> {
+    try {
+      // Check if user is a participant in the conversation
+      const participant = await prisma.conversationParticipant.findFirst({
+        where: {
+          conversationId,
+          userId,
+          leftAt: null, // Must be an active participant
+        },
+        include: {
+          conversation: {
+            include: {
+              participants: true,
+            },
+          },
+        },
+      });
+
+      if (!participant) {
+        throw new Error('Conversation not found or you are not a participant');
+      }
+
+      const conversation = participant.conversation;
+
+      // For direct messages, mark all participants as left (removes for both users)
+      // For group messages, only creator or admin can delete for everyone
+      if (conversation.type === 'direct') {
+        // Direct message: mark all participants as left
+        await prisma.conversationParticipant.updateMany({
+          where: {
+            conversationId,
+            leftAt: null, // Only update active participants
+          },
+          data: {
+            leftAt: new Date(),
+          },
+        });
+      } else {
+        // Group message: only creator or admin can delete
+        const isCreator = conversation.createdBy === userId;
+        const isAdmin = participant.role === 'admin';
+
+        if (!isCreator && !isAdmin) {
+          throw new Error('Only the creator or an admin can delete group conversations');
+        }
+
+        // Mark all participants as left
+        await prisma.conversationParticipant.updateMany({
+          where: {
+            conversationId,
+            leftAt: null, // Only update active participants
+          },
+          data: {
+            leftAt: new Date(),
+          },
+        });
+      }
+    } catch (error) {
+      throw new Error(
+        `Failed to delete conversation: ${error instanceof Error ? error.message : 'Unknown error'}`
       );
     }
   }

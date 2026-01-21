@@ -32,9 +32,19 @@ export const corsOptions = {
       ? env.FRONTEND_URL.split(',').map(url => url.trim())
       : [];
 
-    // In development, allow localhost
+    // In development, allow localhost on various ports
     if (env.NODE_ENV === 'development') {
-      allowedOrigins.push('http://localhost:3000', 'http://localhost:3001', 'http://127.0.0.1:3000');
+      allowedOrigins.push(
+        'http://localhost:3000',
+        'http://localhost:3001',
+        'http://localhost:5173',
+        'http://localhost:5174',
+        'http://localhost:5175',
+        'http://127.0.0.1:3000',
+        'http://127.0.0.1:5173',
+        'http://127.0.0.1:5174',
+        'http://127.0.0.1:5175'
+      );
     }
 
     if (allowedOrigins.length === 0 || allowedOrigins.includes(origin)) {

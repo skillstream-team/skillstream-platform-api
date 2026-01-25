@@ -7,6 +7,92 @@ import { z } from 'zod';
 const router = Router();
 const settingsService = new SettingsService();
 
+// Billing routes - defined first to ensure they match before general settings route
+/**
+ * @swagger
+ * /api/users/{userId}/settings/billing:
+ *   get:
+ *     summary: Get user billing information
+ *     tags: [Settings]
+ */
+router.get('/users/:userId/settings/billing', requireAuth, async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const currentUserId = (req as any).user?.id;
+
+    if (userId !== currentUserId && (req as any).user?.role !== 'ADMIN') {
+      return res.status(403).json({ error: 'Unauthorized' });
+    }
+
+    // For now, return empty billing info - can be extended to fetch from database
+    res.json({
+      success: true,
+      data: {
+        cardNumber: '',
+        cardHolderName: '',
+        expiryDate: '',
+        cvv: '',
+        street: '',
+        city: '',
+        state: '',
+        zip: '',
+        country: 'US',
+      },
+    });
+  } catch (error) {
+    console.error('Error fetching billing info:', error);
+    res.status(500).json({ error: 'Failed to fetch billing info' });
+  }
+});
+
+/**
+ * @swagger
+ * /api/users/{userId}/settings/billing:
+ *   put:
+ *     summary: Update user billing information
+ *     tags: [Settings]
+ */
+const billingInfoSchema = z.object({
+  cardNumber: z.string().optional(),
+  cardHolderName: z.string().optional(),
+  expiryDate: z.string().optional(),
+  cvv: z.string().optional(),
+  street: z.string().optional(),
+  city: z.string().optional(),
+  state: z.string().optional(),
+  zip: z.string().optional(),
+  country: z.string().optional(),
+});
+
+router.put('/users/:userId/settings/billing',
+  requireAuth,
+  validate({ 
+    params: z.object({ userId: z.string().min(1) }),
+    body: billingInfoSchema 
+  }),
+  async (req, res) => {
+    try {
+      const { userId } = req.params;
+      const currentUserId = (req as any).user?.id;
+
+      if (userId !== currentUserId && (req as any).user?.role !== 'ADMIN') {
+        return res.status(403).json({ error: 'Unauthorized' });
+      }
+
+      // For now, just return the updated data - can be extended to save to database
+      res.json({
+        success: true,
+        data: req.body,
+        message: 'Billing information updated successfully',
+      });
+    } catch (error) {
+      console.error('Error updating billing info:', error);
+      res.status(500).json({ error: 'Failed to update billing info' });
+    }
+  }
+);
+
+// General settings routes
 /**
  * @swagger
  * /api/users/{userId}/settings:

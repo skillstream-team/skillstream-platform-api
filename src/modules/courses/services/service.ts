@@ -217,6 +217,9 @@ export class CollectionsService {
         // Build where clause
         const where: any = {};
         
+        // Note: We show all collections in marketplace regardless of isPublished status
+        // Teachers can control visibility through other means if needed
+        
         // Search filter
         if (search) {
             where.OR = [

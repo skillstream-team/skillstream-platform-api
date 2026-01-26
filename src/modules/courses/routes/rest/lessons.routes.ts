@@ -3,6 +3,7 @@ import { requireAuth } from '../../../../middleware/auth';
 import { requireRole } from '../../../../middleware/roles';
 import { requireSubscription } from '../../../../middleware/subscription';
 import { prisma } from '../../../../utils/prisma';
+import { logger } from '../../../../utils/logger';
 import { emailService } from '../../../users/services/email.service';
 import { CollectionsService } from '../../services/service';
 
@@ -139,7 +140,7 @@ router.post('/lessons/quick', requireAuth, requireRole('TEACHER'), async (req, r
           );
         }
       } catch (error) {
-        console.error('Error sending invitation emails:', error);
+        logger.error('Error sending invitation emails', error);
         // Don't fail the request if email fails
       }
     }
@@ -149,7 +150,7 @@ router.post('/lessons/quick', requireAuth, requireRole('TEACHER'), async (req, r
       data: quickLesson
     });
   } catch (error) {
-    console.error('Error creating quick lesson:', error);
+    logger.error('Error creating quick lesson', error);
     res.status(500).json({ error: 'Failed to create quick lesson' });
   }
 });
@@ -212,7 +213,7 @@ router.post('/lessons', requireAuth, requireRole('TEACHER'), async (req, res) =>
       description: responseContent?.description || '',
     });
   } catch (error) {
-    console.error('Error creating lesson:', error);
+    logger.error('Error creating lesson', error);
     res.status(500).json({ error: 'Failed to create lesson' });
   }
 });
@@ -227,7 +228,7 @@ router.post('/lessons', requireAuth, requireRole('TEACHER'), async (req, res) =>
 router.get('/lessons/:id', requireAuth, async (req, res) => {
   try {
     const { id } = req.params;
-    console.log('GET /api/lessons/:id called with id:', id);
+    logger.info(`GET /api/lessons/:id called with id: ${id}`);
     
     const lesson = await prisma.lesson.findUnique({
       where: { id },
@@ -271,7 +272,7 @@ router.get('/lessons/:id', requireAuth, async (req, res) => {
       moduleId,
     });
   } catch (error) {
-    console.error('Error fetching lesson:', error);
+    logger.error('Error fetching lesson', error);
     res.status(500).json({ error: 'Failed to fetch lesson' });
   }
 });
@@ -283,7 +284,7 @@ router.get('/lessons/:id', requireAuth, async (req, res) => {
  *     summary: Get lessons (for teacher or student)
  *     tags: [Lessons]
  */
-router.get('/lessons', requireAuth, requireSubscription, async (req, res) => {
+router.get('/lessons', requireAuth, async (req, res) => {
   try {
     const userId = (req as any).user?.id;
     const { role, status } = req.query;
@@ -308,7 +309,33 @@ router.get('/lessons', requireAuth, requireSubscription, async (req, res) => {
           slot: true
         }
       });
-      // Can filter by booking slots if needed
+      
+      // Also get lessons from collections the student is enrolled in
+      const enrollments = await prisma.enrollment.findMany({
+        where: { 
+          studentId: userId,
+          status: 'ACTIVE'
+        },
+        select: { collectionId: true }
+      });
+      
+      const enrolledCollectionIds = enrollments.map(e => e.collectionId);
+      
+      // Get lessons from enrolled collections
+      if (enrolledCollectionIds.length > 0) {
+        const collectionLessons = await prisma.collectionLesson.findMany({
+          where: {
+            collectionId: { in: enrolledCollectionIds }
+          },
+          select: { lessonId: true }
+        });
+        
+        const lessonIds = collectionLessons.map(cl => cl.lessonId);
+        if (lessonIds.length > 0) {
+          // Store lesson IDs for later use in query
+          (whereRegular as any).enrolledLessonIds = lessonIds;
+        }
+      }
     }
 
     // Apply status filters
@@ -316,18 +343,60 @@ router.get('/lessons', requireAuth, requireSubscription, async (req, res) => {
       whereQuick.scheduledAt = { gte: new Date() };
       whereQuick.status = 'scheduled';
       // For regular lessons, include both scheduled lessons with future dates AND standalone lessons (no scheduledAt)
-      whereRegular.OR = [
+      const statusConditions = [
         { scheduledAt: { gte: new Date() }, status: 'scheduled' },
         { scheduledAt: null, status: 'scheduled' } // Standalone content lessons
       ];
+      
+      // If student has enrolled lessons, add them to OR conditions
+      if ((whereRegular as any).enrolledLessonIds) {
+        statusConditions.push({ id: { in: (whereRegular as any).enrolledLessonIds } });
+        delete (whereRegular as any).enrolledLessonIds;
+      }
+      
+      whereRegular.OR = statusConditions;
     } else if (status === 'past') {
       whereQuick.scheduledAt = { lt: new Date() };
       whereQuick.status = { in: ['completed', 'cancelled'] };
-      whereRegular.scheduledAt = { lt: new Date() };
-      whereRegular.status = { in: ['completed', 'cancelled'] };
+      const statusConditions: any[] = [
+        { scheduledAt: { lt: new Date() }, status: { in: ['completed', 'cancelled'] } }
+      ];
+      
+      // If student has enrolled lessons, add them to OR conditions
+      if ((whereRegular as any).enrolledLessonIds) {
+        statusConditions.push({ id: { in: (whereRegular as any).enrolledLessonIds } });
+        delete (whereRegular as any).enrolledLessonIds;
+      }
+      
+      if (statusConditions.length > 1) {
+        whereRegular.OR = statusConditions;
+      } else {
+        whereRegular.scheduledAt = { lt: new Date() };
+        whereRegular.status = { in: ['completed', 'cancelled'] };
+      }
     } else if (status) {
       whereQuick.status = status;
-      whereRegular.status = status;
+      const statusConditions: any[] = [{ status }];
+      
+      // If student has enrolled lessons, add them to OR conditions
+      if ((whereRegular as any).enrolledLessonIds) {
+        statusConditions.push({ id: { in: (whereRegular as any).enrolledLessonIds } });
+        delete (whereRegular as any).enrolledLessonIds;
+      }
+      
+      if (statusConditions.length > 1) {
+        whereRegular.OR = statusConditions;
+      } else {
+        whereRegular.status = status;
+      }
+    } else {
+      // No status filter - if student has enrolled lessons, use OR to include them
+      if ((whereRegular as any).enrolledLessonIds) {
+        whereRegular.OR = [
+          { id: { in: (whereRegular as any).enrolledLessonIds } }
+        ];
+        delete (whereRegular as any).enrolledLessonIds;
+      }
     }
 
     // Get quick lessons
@@ -343,7 +412,7 @@ router.get('/lessons', requireAuth, requireSubscription, async (req, res) => {
 
     // Get regular lessons (standalone or from collections)
     const regularLessonsQuery: any = {
-      where: whereRegular,
+      where: Object.keys(whereRegular).length > 0 ? whereRegular : undefined,
       orderBy: { createdAt: 'desc' }, // Sort by creation date (newest first)
     };
 
@@ -357,7 +426,7 @@ router.get('/lessons', requireAuth, requireSubscription, async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Error fetching lessons:', error);
+    logger.error('Error fetching lessons', error);
     res.status(500).json({ error: 'Failed to fetch lessons' });
   }
 });
@@ -415,7 +484,7 @@ router.put('/lessons/:id', requireAuth, requireRole('TEACHER'), async (req, res)
       moduleId: content?.moduleId || '',
     });
   } catch (error) {
-    console.error('Error updating lesson:', error);
+    logger.error('Error updating lesson', error);
     res.status(500).json({ error: 'Failed to update lesson' });
   }
 });
@@ -457,7 +526,7 @@ router.delete('/lessons/:id', requireAuth, requireRole('TEACHER'), async (req, r
     
     res.json({ success: true, message: 'Lesson deleted successfully' });
   } catch (error) {
-    console.error('Error deleting lesson:', error);
+    logger.error('Error deleting lesson', error);
     res.status(500).json({ error: 'Failed to delete lesson' });
   }
 });

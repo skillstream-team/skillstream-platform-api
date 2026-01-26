@@ -311,10 +311,10 @@ router.get('/lessons', requireAuth, async (req, res) => {
       });
       
       // Also get lessons from collections the student is enrolled in
+      // Note: Enrollment model doesn't have a status field, so we get all enrollments
       const enrollments = await prisma.enrollment.findMany({
         where: { 
-          studentId: userId,
-          status: 'ACTIVE'
+          studentId: userId
         },
         select: { collectionId: true }
       });
@@ -343,7 +343,7 @@ router.get('/lessons', requireAuth, async (req, res) => {
       whereQuick.scheduledAt = { gte: new Date() };
       whereQuick.status = 'scheduled';
       // For regular lessons, include both scheduled lessons with future dates AND standalone lessons (no scheduledAt)
-      const statusConditions = [
+      const statusConditions: any[] = [
         { scheduledAt: { gte: new Date() }, status: 'scheduled' },
         { scheduledAt: null, status: 'scheduled' } // Standalone content lessons
       ];

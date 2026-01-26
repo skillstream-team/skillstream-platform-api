@@ -287,15 +287,20 @@ router.get('/lessons/:id', requireAuth, async (req, res) => {
 router.get('/lessons', requireAuth, async (req, res) => {
   try {
     const userId = (req as any).user?.id;
+    const userRole = (req as any).user?.role;
     const { role, status } = req.query;
+
+    // Use role from query param if provided, otherwise use authenticated user's role
+    const effectiveRole = role || userRole;
 
     const whereQuick: any = {};
     const whereRegular: any = {};
 
-    if (role === 'TEACHER') {
+    if (effectiveRole === 'TEACHER') {
       whereQuick.teacherId = userId;
       whereRegular.teacherId = userId;
-    } else if (role === 'STUDENT') {
+    } else if (effectiveRole === 'STUDENT' || !effectiveRole) {
+      // If role is STUDENT or not specified, treat as student browsing
       // For students, get lessons they're invited to
       whereQuick.invitedStudentIds = { has: userId };
       
@@ -337,9 +342,9 @@ router.get('/lessons', requireAuth, async (req, res) => {
         }
       }
       
-      // If no enrolled lessons and no status filter, show all lessons for browsing
+      // If no enrolled lessons, show all lessons for browsing
       // Students should be able to see all lessons to browse and see costs
-      if (!(whereRegular as any).enrolledLessonIds && !status) {
+      if (!(whereRegular as any).enrolledLessonIds) {
         // Don't set any filters - show all lessons
         // whereRegular remains empty {} which will return all lessons
       }
@@ -407,12 +412,11 @@ router.get('/lessons', requireAuth, async (req, res) => {
           { id: { in: (whereRegular as any).enrolledLessonIds } }
         ];
         delete (whereRegular as any).enrolledLessonIds;
-      } else if (role === 'STUDENT') {
-        // Student with no enrolled lessons - show all lessons for browsing
+      } else {
+        // No enrolled lessons or not a student - show all lessons for browsing
         // Clear whereRegular to return all lessons
         Object.keys(whereRegular).forEach(key => delete whereRegular[key]);
       }
-      // If role is not STUDENT or TEACHER, whereRegular stays empty to show all lessons
     }
 
     // Get quick lessons
@@ -435,10 +439,14 @@ router.get('/lessons', requireAuth, async (req, res) => {
       orderBy: { createdAt: 'desc' }, // Sort by creation date (newest first)
     };
 
+    logger.info(`Lessons query - role: ${role || 'not specified'}, effectiveRole: ${effectiveRole}, hasFilters: ${hasFilters}, whereRegular keys: ${Object.keys(whereRegular).join(', ')}`);
+    
     const regularLessons = await prisma.lesson.findMany(regularLessonsQuery).catch((err) => {
       logger.error('Error fetching regular lessons', err);
       return [];
     });
+    
+    logger.info(`Found ${regularLessons.length} regular lessons`);
 
     res.json({
       success: true,

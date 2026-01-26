@@ -72,14 +72,13 @@ router.get('/lessons/:lessonId/resources', requireAuth, async (req, res) => {
   try {
     const { lessonId } = req.params;
 
+    // LessonResource schema only relates to QuickLesson, but lessonId is just a string
+    // So we can query by lessonId directly without the relation constraint
     const resources = await prisma.lessonResource.findMany({
       where: { lessonId },
       include: {
         sharer: {
           select: { id: true, username: true, email: true }
-        },
-        lesson: {
-          select: { id: true, title: true, scheduledAt: true }
         }
       },
       orderBy: { createdAt: 'desc' }
@@ -156,28 +155,32 @@ router.post('/lessons/:lessonId/resources/upload', requireAuth, async (req, res)
       });
     }
 
-    // Verify lesson exists - LessonResource only relates to QuickLesson in schema
-    const quickLesson = await prisma.quickLesson.findUnique({
-      where: { id: lessonId }
-    });
+    // Verify lesson exists - check both Lesson and QuickLesson types
+    // Even though schema shows LessonResource relates to QuickLesson, 
+    // lessonId is just a string field, so we can support both types
+    const [regularLesson, quickLesson] = await Promise.all([
+      prisma.lesson.findUnique({ where: { id: lessonId } }),
+      prisma.quickLesson.findUnique({ where: { id: lessonId } })
+    ]);
 
-    if (!quickLesson) {
-      // Also check if it's a regular Lesson (for better error message)
-      const regularLesson = await prisma.lesson.findUnique({
-        where: { id: lessonId }
-      });
-      
-      if (regularLesson) {
-        return res.status(400).json({ 
-          error: 'Resources can only be uploaded to QuickLessons, not regular Lessons' 
-        });
-      }
-      
+    if (!regularLesson && !quickLesson) {
       return res.status(404).json({ error: 'Lesson not found' });
     }
 
-    // Use lessonId as courseId for R2 organization (QuickLesson doesn't have collectionId)
-    const courseId = lessonId;
+    // Determine courseId based on lesson type
+    // For regular Lesson, try to get collectionId from CollectionLesson relation
+    // For QuickLesson, use lessonId as courseId
+    let courseId = lessonId;
+    if (regularLesson) {
+      // Try to find the collection this lesson belongs to
+      const collectionLesson = await prisma.collectionLesson.findFirst({
+        where: { lessonId },
+        select: { collectionId: true }
+      });
+      if (collectionLesson) {
+        courseId = collectionLesson.collectionId;
+      }
+    }
 
     // Decode base64 file
     const fileBuffer = Buffer.from(file, 'base64');

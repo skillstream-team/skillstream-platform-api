@@ -32,27 +32,44 @@ export const corsOptions = {
       ? env.FRONTEND_URL.split(',').map(url => url.trim())
       : [];
 
-    // In development, allow localhost on various ports
+    // Always allow localhost origins (for local development even when backend is in production)
+    const localhostOrigins = [
+      'http://localhost:3000',
+      'http://localhost:3001',
+      'http://localhost:5173',
+      'http://localhost:5174',
+      'http://localhost:5175',
+      'http://127.0.0.1:3000',
+      'http://127.0.0.1:3001',
+      'http://127.0.0.1:5173',
+      'http://127.0.0.1:5174',
+      'http://127.0.0.1:5175'
+    ];
+
+    // Check if origin is localhost
+    const isLocalhost = localhostOrigins.includes(origin) || 
+                       origin.startsWith('http://localhost:') || 
+                       origin.startsWith('http://127.0.0.1:');
+
+    // In development, always allow localhost
     if (env.NODE_ENV === 'development') {
-      allowedOrigins.push(
-        'http://localhost:3000',
-        'http://localhost:3001',
-        'http://localhost:5173',
-        'http://localhost:5174',
-        'http://localhost:5175',
-        'http://127.0.0.1:3000',
-        'http://127.0.0.1:5173',
-        'http://127.0.0.1:5174',
-        'http://127.0.0.1:5175'
-      );
+      allowedOrigins.push(...localhostOrigins);
     }
 
-    // In production, require FRONTEND_URL to be set
-    if (env.NODE_ENV === 'production' && allowedOrigins.length === 0) {
-      return callback(new Error('CORS: FRONTEND_URL must be set in production'));
+    // In production, allow localhost for development purposes
+    // but still require FRONTEND_URL for non-localhost origins
+    if (env.NODE_ENV === 'production') {
+      if (isLocalhost) {
+        // Allow localhost even in production (for local dev against deployed backend)
+        return callback(null, true);
+      }
+      // For non-localhost origins in production, require FRONTEND_URL
+      if (allowedOrigins.length === 0) {
+        return callback(new Error('CORS: FRONTEND_URL must be set in production for non-localhost origins'));
+      }
     }
 
-    if (allowedOrigins.length === 0 || allowedOrigins.includes(origin)) {
+    if (allowedOrigins.length === 0 || allowedOrigins.includes(origin) || isLocalhost) {
       callback(null, true);
     } else {
       callback(new Error('Not allowed by CORS'));

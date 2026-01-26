@@ -116,7 +116,7 @@ router.get('/',
           take,
           include: {
             options: true,
-            createdByUser: {
+            creator: {
               select: { id: true, username: true, email: true }
             }
           },
@@ -160,7 +160,7 @@ router.get('/:pollId',
         where: { id: pollId },
         include: {
           options: true,
-          createdByUser: {
+          creator: {
             select: { id: true, username: true, email: true }
           }
         }

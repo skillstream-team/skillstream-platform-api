@@ -336,6 +336,16 @@ router.get('/lessons', requireAuth, async (req, res) => {
           (whereRegular as any).enrolledLessonIds = lessonIds;
         }
       }
+      
+      // If no enrolled lessons and no status filter, show all lessons for browsing
+      // Students should be able to see all lessons to browse and see costs
+      if (!(whereRegular as any).enrolledLessonIds && !status) {
+        // Don't set any filters - show all lessons
+        // whereRegular remains empty {} which will return all lessons
+      }
+    } else {
+      // No role specified or other role - show all lessons for browsing
+      // whereRegular remains empty {} which will return all lessons
     }
 
     // Apply status filters
@@ -390,13 +400,19 @@ router.get('/lessons', requireAuth, async (req, res) => {
         whereRegular.status = status;
       }
     } else {
-      // No status filter - if student has enrolled lessons, use OR to include them
+      // No status filter
       if ((whereRegular as any).enrolledLessonIds) {
+        // Student has enrolled lessons - show only those
         whereRegular.OR = [
           { id: { in: (whereRegular as any).enrolledLessonIds } }
         ];
         delete (whereRegular as any).enrolledLessonIds;
+      } else if (role === 'STUDENT') {
+        // Student with no enrolled lessons - show all lessons for browsing
+        // Clear whereRegular to return all lessons
+        Object.keys(whereRegular).forEach(key => delete whereRegular[key]);
       }
+      // If role is not STUDENT or TEACHER, whereRegular stays empty to show all lessons
     }
 
     // Get quick lessons
@@ -411,12 +427,18 @@ router.get('/lessons', requireAuth, async (req, res) => {
     });
 
     // Get regular lessons (standalone or from collections)
+    // If whereRegular is empty, it means show all lessons (for browsing)
+    // Prisma requires undefined (not empty object) to return all records
+    const hasFilters = Object.keys(whereRegular).length > 0;
     const regularLessonsQuery: any = {
-      where: Object.keys(whereRegular).length > 0 ? whereRegular : undefined,
+      where: hasFilters ? whereRegular : undefined,
       orderBy: { createdAt: 'desc' }, // Sort by creation date (newest first)
     };
 
-    const regularLessons = await prisma.lesson.findMany(regularLessonsQuery).catch(() => []);
+    const regularLessons = await prisma.lesson.findMany(regularLessonsQuery).catch((err) => {
+      logger.error('Error fetching regular lessons', err);
+      return [];
+    });
 
     res.json({
       success: true,

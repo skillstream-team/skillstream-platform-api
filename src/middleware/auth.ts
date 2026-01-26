@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { prisma } from '../utils/prisma';
 import { setUser } from '../utils/sentry';
+import { env } from '../utils/env';
 
 interface AuthenticatedRequest extends Request {
   user?: {
@@ -20,11 +21,7 @@ export const requireAuth = async (req: AuthenticatedRequest, res: Response, next
       return res.status(401).json({ error: 'Access denied. No token provided.' });
     }
 
-    const jwtSecret = process.env.JWT_SECRET;
-    if (!jwtSecret) {
-      console.error('JWT_SECRET is not configured');
-      return res.status(500).json({ error: 'Server configuration error' });
-    }
+    const jwtSecret = env.JWT_SECRET;
     
     const decoded = jwt.verify(token, jwtSecret) as any;
     
@@ -66,11 +63,7 @@ export const optionalAuth = async (req: AuthenticatedRequest, res: Response, nex
       return next();
     }
 
-    const jwtSecret = process.env.JWT_SECRET;
-    if (!jwtSecret) {
-      // If JWT_SECRET is not configured, skip auth
-      return next();
-    }
+    const jwtSecret = env.JWT_SECRET;
     
     const decoded = jwt.verify(token, jwtSecret) as any;
     

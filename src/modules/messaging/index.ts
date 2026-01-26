@@ -2,6 +2,7 @@
 import express from 'express';
 import messagingRoutes from './routes/rest/messaging.routes';
 import { RealtimeMessagingService } from './services/realtime-messaging.service';
+import { logger } from '../../utils/logger';
 
 let realtimeService: RealtimeMessagingService | null = null;
 
@@ -12,9 +13,9 @@ export function registerMessagingModule(app: express.Application, io?: any) {
   // Socket.IO real-time messaging
   if (io) {
     realtimeService = new RealtimeMessagingService(io);
-    console.log('✅ Messaging module registered with Socket.IO support');
+    logger.info('Messaging module registered with Socket.IO support');
   } else {
-    console.log('⚠️  Messaging module registered without Socket.IO (real-time features disabled)');
+    logger.warn('Messaging module registered without Socket.IO (real-time features disabled)');
   }
 }
 

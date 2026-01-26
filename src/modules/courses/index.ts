@@ -57,6 +57,9 @@ export function registerCoursesModule(app: express.Application) {
   // This ensures POST /api/collections matches before parameterized routes
   app.use('/api/collections', restCoursesRoutes);
   
+  // Alias /api/courses to /api/collections for backward compatibility
+  app.use('/api/courses', restCoursesRoutes);
+  
   // Register other specific collection sub-routes AFTER the main router
   // These have parameterized routes like /:collectionId/tags which won't conflict
   app.use('/api/collections', prerequisitesRoutes);
@@ -66,16 +69,25 @@ export function registerCoursesModule(app: express.Application) {
   app.use('/api/collections', comparisonRoutes);
   app.use('/api/collections', courseImportRoutes);
   
+  // Alias /api/courses for all sub-routes too
+  app.use('/api/courses', prerequisitesRoutes);
+  app.use('/api/courses', tagsRoutes);
+  app.use('/api/courses', instructorQARoutes);
+  app.use('/api/courses', shareRoutes);
+  app.use('/api/courses', comparisonRoutes);
+  app.use('/api/courses', courseImportRoutes);
+  
   app.use('/api', progressRoutes);
   app.use('/api/enrollments', enrollmentsRoutes);
   app.use('/api', announcementsRoutes);
   app.use('/api', recommendationsUserRoutes);
   app.use('/api', bookingsRoutes);
+  // Register resources routes BEFORE lessons routes to ensure more specific routes match first
+  app.use('/api', resourcesRoutes);
   app.use('/api', lessonsRoutes);
   app.use('/api', earningsRoutes);
   app.use('/api', certificatesRoutes);
   app.use('/api', attendanceRoutes);
-  app.use('/api', resourcesRoutes);
   app.use('/api', videoRoutes);
   app.use('/api', marketingRoutes);
   app.use('/api/calendar', calendarRoutes);

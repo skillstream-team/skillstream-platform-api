@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { requireAuth } from '../../../../middleware/auth';
 import { prisma } from '../../../../utils/prisma';
+import { logger } from '../../../../utils/logger';
 
 const router = Router();
 
@@ -94,7 +95,7 @@ router.get('/', requireAuth, async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Error fetching announcements:', error);
+    logger.error('Error fetching announcements', error);
     res.status(500).json({ error: 'Failed to fetch announcements' });
   }
 });
@@ -167,7 +168,7 @@ router.get('/users/:userId/announcements', requireAuth, async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Error fetching user announcements:', error);
+    logger.error('Error fetching user announcements', error);
     res.status(500).json({ error: 'Failed to fetch user announcements' });
   }
 });
@@ -227,7 +228,7 @@ router.get('/collections/:collectionId/announcements', requireAuth, async (req, 
       }
     });
   } catch (error) {
-    console.error('Error fetching collection announcements:', error);
+    logger.error('Error fetching collection announcements', error);
     res.status(500).json({ error: 'Failed to fetch collection announcements' });
   }
 });

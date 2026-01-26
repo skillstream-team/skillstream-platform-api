@@ -47,6 +47,11 @@ export const corsOptions = {
       );
     }
 
+    // In production, require FRONTEND_URL to be set
+    if (env.NODE_ENV === 'production' && allowedOrigins.length === 0) {
+      return callback(new Error('CORS: FRONTEND_URL must be set in production'));
+    }
+
     if (allowedOrigins.length === 0 || allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {

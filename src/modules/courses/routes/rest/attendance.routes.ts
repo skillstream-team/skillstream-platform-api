@@ -6,22 +6,50 @@ const router = Router();
 
 /**
  * @swagger
- * /api/lessons/{lessonId}/attendance:
+ * /api/modules/{moduleId}/attendance:
  *   get:
- *     summary: Get attendance records for a lesson
+ *     summary: Get attendance records for a module
  *     tags: [Attendance]
  */
+router.get('/modules/:moduleId/attendance', requireAuth, async (req, res) => {
+  try {
+    const { moduleId } = req.params;
+
+    const attendance = await prisma.attendance.findMany({
+      where: { moduleId },
+      include: {
+        student: {
+          select: { id: true, username: true, email: true }
+        },
+        module: {
+          select: { id: true, title: true, scheduledAt: true }
+        }
+      },
+      orderBy: { createdAt: 'asc' }
+    });
+
+    res.json({
+      success: true,
+      data: attendance
+    });
+  } catch (error) {
+    console.error('Error fetching attendance:', error);
+    res.status(500).json({ error: 'Failed to fetch attendance' });
+  }
+});
+
+// Backward compatibility route
 router.get('/lessons/:lessonId/attendance', requireAuth, async (req, res) => {
   try {
     const { lessonId } = req.params;
 
     const attendance = await prisma.attendance.findMany({
-      where: { lessonId },
+      where: { moduleId: lessonId },
       include: {
         student: {
           select: { id: true, username: true, email: true }
         },
-        lesson: {
+        module: {
           select: { id: true, title: true, scheduledAt: true }
         }
       },
@@ -40,20 +68,20 @@ router.get('/lessons/:lessonId/attendance', requireAuth, async (req, res) => {
 
 /**
  * @swagger
- * /api/lessons/{lessonId}/attendance:
+ * /api/modules/{moduleId}/attendance:
  *   post:
  *     summary: Create or update attendance record
  *     tags: [Attendance]
  */
-router.post('/lessons/:lessonId/attendance', requireAuth, async (req, res) => {
+router.post('/modules/:moduleId/attendance', requireAuth, async (req, res) => {
   try {
-    const { lessonId } = req.params;
+    const { moduleId } = req.params;
     const { studentId, status, joinedAt, duration } = req.body;
 
     const attendance = await prisma.attendance.upsert({
       where: {
-        lessonId_studentId: {
-          lessonId,
+        moduleId_studentId: {
+          moduleId,
           studentId
         }
       },
@@ -64,7 +92,51 @@ router.post('/lessons/:lessonId/attendance', requireAuth, async (req, res) => {
         leftAt: duration ? new Date(new Date(joinedAt || Date.now()).getTime() + duration * 1000) : undefined
       },
       create: {
-        lessonId,
+        moduleId,
+        studentId,
+        status,
+        joinedAt: joinedAt ? new Date(joinedAt) : new Date(),
+        duration,
+        leftAt: duration ? new Date(new Date(joinedAt || Date.now()).getTime() + duration * 1000) : undefined
+      },
+      include: {
+        student: {
+          select: { id: true, username: true, email: true }
+        }
+      }
+    });
+
+    res.json({
+      success: true,
+      data: attendance
+    });
+  } catch (error) {
+    console.error('Error creating attendance:', error);
+    res.status(500).json({ error: 'Failed to create attendance' });
+  }
+});
+
+// Backward compatibility route
+router.post('/lessons/:lessonId/attendance', requireAuth, async (req, res) => {
+  try {
+    const { lessonId } = req.params;
+    const { studentId, status, joinedAt, duration } = req.body;
+
+    const attendance = await prisma.attendance.upsert({
+      where: {
+        moduleId_studentId: {
+          moduleId: lessonId,
+          studentId
+        }
+      },
+      update: {
+        status,
+        joinedAt: joinedAt ? new Date(joinedAt) : undefined,
+        duration,
+        leftAt: duration ? new Date(new Date(joinedAt || Date.now()).getTime() + duration * 1000) : undefined
+      },
+      create: {
+        moduleId: lessonId,
         studentId,
         status,
         joinedAt: joinedAt ? new Date(joinedAt) : new Date(),
@@ -90,11 +162,55 @@ router.post('/lessons/:lessonId/attendance', requireAuth, async (req, res) => {
 
 /**
  * @swagger
- * /api/lessons/{lessonId}/attendance/{studentId}/mark:
+ * /api/modules/{moduleId}/attendance/{studentId}/mark:
  *   post:
  *     summary: Mark attendance for a student
  *     tags: [Attendance]
  */
+router.post('/modules/:moduleId/attendance/:studentId/mark', requireAuth, async (req, res) => {
+  try {
+    const { moduleId, studentId } = req.params;
+    const { status = 'present' } = req.body;
+
+    if (!['present', 'absent', 'late'].includes(status)) {
+      return res.status(400).json({ error: 'Invalid status' });
+    }
+
+    const attendance = await prisma.attendance.upsert({
+      where: {
+        moduleId_studentId: {
+          moduleId,
+          studentId
+        }
+      },
+      update: {
+        status,
+        joinedAt: status === 'present' || status === 'late' ? new Date() : undefined
+      },
+      create: {
+        moduleId,
+        studentId,
+        status,
+        joinedAt: status === 'present' || status === 'late' ? new Date() : undefined
+      },
+      include: {
+        student: {
+          select: { id: true, username: true, email: true }
+        }
+      }
+    });
+
+    res.json({
+      success: true,
+      data: attendance
+    });
+  } catch (error) {
+    console.error('Error marking attendance:', error);
+    res.status(500).json({ error: 'Failed to mark attendance' });
+  }
+});
+
+// Backward compatibility route
 router.post('/lessons/:lessonId/attendance/:studentId/mark', requireAuth, async (req, res) => {
   try {
     const { lessonId, studentId } = req.params;
@@ -106,8 +222,8 @@ router.post('/lessons/:lessonId/attendance/:studentId/mark', requireAuth, async 
 
     const attendance = await prisma.attendance.upsert({
       where: {
-        lessonId_studentId: {
-          lessonId,
+        moduleId_studentId: {
+          moduleId: lessonId,
           studentId
         }
       },
@@ -116,7 +232,7 @@ router.post('/lessons/:lessonId/attendance/:studentId/mark', requireAuth, async 
         joinedAt: status === 'present' || status === 'late' ? new Date() : undefined
       },
       create: {
-        lessonId,
+        moduleId: lessonId,
         studentId,
         status,
         joinedAt: status === 'present' || status === 'late' ? new Date() : undefined

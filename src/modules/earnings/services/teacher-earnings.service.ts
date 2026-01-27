@@ -4,23 +4,23 @@ export class TeacherEarningsService {
   private readonly DEFAULT_PLATFORM_FEE = 0.30; // 30%
 
   /**
-   * Record premium collection sale
+   * Record premium program sale
    */
-  async recordPremiumSale(collectionId: string, paymentId: string) {
-    const collection = await prisma.collection.findUnique({
-      where: { id: collectionId },
+  async recordPremiumSale(programId: string, paymentId: string) {
+    const program = await prisma.program.findUnique({
+      where: { id: programId },
       select: {
         instructorId: true,
         price: true,
       },
     });
 
-    if (!collection) {
-      throw new Error('Collection not found');
+    if (!program) {
+      throw new Error('Program not found');
     }
 
-    const platformFeeAmount = collection.price * this.DEFAULT_PLATFORM_FEE;
-    const netAmount = collection.price - platformFeeAmount;
+    const platformFeeAmount = program.price * this.DEFAULT_PLATFORM_FEE;
+    const netAmount = program.price - platformFeeAmount;
 
     const now = new Date();
     const period = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
@@ -29,15 +29,15 @@ export class TeacherEarningsService {
 
     const earnings = await prisma.teacherEarnings.create({
       data: {
-        teacherId: collection.instructorId,
-        collectionId,
+        teacherId: program.instructorId,
+        programId,
         periodStart,
         periodEnd,
         period,
-        revenueSource: 'COLLECTION',
-        sourceId: collectionId,
-        sourceType: 'COLLECTION',
-        amount: collection.price,
+        revenueSource: 'PROGRAM',
+        sourceId: programId,
+        sourceType: 'PROGRAM',
+        amount: program.price,
         platformFeePercent: this.DEFAULT_PLATFORM_FEE,
         platformFeeAmount,
         netAmount,
@@ -49,24 +49,29 @@ export class TeacherEarningsService {
     return earnings;
   }
 
+  // Backward compatibility alias
+  async recordCollectionSale(collectionId: string, paymentId: string) {
+    return this.recordPremiumSale(collectionId, paymentId);
+  }
+
   /**
-   * Record standalone lesson sale
+   * Record standalone module sale
    */
-  async recordLessonSale(lessonId: string, paymentId: string) {
-    const lesson = await prisma.lesson.findUnique({
-      where: { id: lessonId },
+  async recordModuleSale(moduleId: string, paymentId: string) {
+    const module = await prisma.module.findUnique({
+      where: { id: moduleId },
       select: {
         teacherId: true,
         price: true,
       },
     });
 
-    if (!lesson || !lesson.teacherId) {
-      throw new Error('Lesson not found or has no teacher');
+    if (!module || !module.teacherId) {
+      throw new Error('Module not found or has no teacher');
     }
 
-    const platformFeeAmount = lesson.price * this.DEFAULT_PLATFORM_FEE;
-    const netAmount = lesson.price - platformFeeAmount;
+    const platformFeeAmount = module.price * this.DEFAULT_PLATFORM_FEE;
+    const netAmount = module.price - platformFeeAmount;
 
     const now = new Date();
     const period = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
@@ -75,14 +80,14 @@ export class TeacherEarningsService {
 
     const earnings = await prisma.teacherEarnings.create({
       data: {
-        teacherId: lesson.teacherId,
+        teacherId: module.teacherId,
         periodStart,
         periodEnd,
         period,
-        revenueSource: 'LESSON',
-        sourceId: lessonId,
-        sourceType: 'LESSON',
-        amount: lesson.price,
+        revenueSource: 'MODULE',
+        sourceId: moduleId,
+        sourceType: 'MODULE',
+        amount: module.price,
         platformFeePercent: this.DEFAULT_PLATFORM_FEE,
         platformFeeAmount,
         netAmount,
@@ -92,6 +97,11 @@ export class TeacherEarningsService {
     });
 
     return earnings;
+  }
+
+  // Backward compatibility alias
+  async recordLessonSale(lessonId: string, paymentId: string) {
+    return this.recordModuleSale(lessonId, paymentId);
   }
 
   /**
@@ -114,13 +124,14 @@ export class TeacherEarningsService {
       premium: 0,
       subscription: 0,
       workshops: 0,
-      lessons: 0,
+      modules: 0,
       total: 0,
     };
 
     for (const earning of earnings) {
       switch (earning.revenueSource) {
-        case 'COLLECTION':
+        case 'PROGRAM':
+        case 'COLLECTION': // Backward compatibility
           breakdown.premium += earning.netAmount;
           break;
         case 'SUBSCRIPTION':
@@ -129,8 +140,9 @@ export class TeacherEarningsService {
         case 'LIVE_WORKSHOP':
           breakdown.workshops += earning.netAmount;
           break;
-        case 'LESSON':
-          breakdown.lessons += earning.netAmount;
+        case 'MODULE':
+        case 'LESSON': // Backward compatibility
+          breakdown.modules += earning.netAmount;
           break;
       }
       breakdown.total += earning.netAmount;
@@ -186,7 +198,13 @@ export class TeacherEarningsService {
         createdAt: 'desc',
       },
       include: {
-        collection: {
+        program: {
+          select: {
+            id: true,
+            title: true,
+          },
+        },
+        collection: { // Backward compatibility
           select: {
             id: true,
             title: true,
@@ -207,7 +225,13 @@ export class TeacherEarningsService {
       },
       take: limit,
       include: {
-        collection: {
+        program: {
+          select: {
+            id: true,
+            title: true,
+          },
+        },
+        collection: { // Backward compatibility
           select: {
             id: true,
             title: true,

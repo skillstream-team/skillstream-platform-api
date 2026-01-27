@@ -82,8 +82,28 @@ export async function deleteCachePattern(pattern: string): Promise<void> {
  * Cache key generators
  */
 export const cacheKeys = {
-  collection: (id: string) => `collection:${id}`,
-  collectionModules: (collectionId: string) => `collection:${collectionId}:modules`,
+  program: (id: string) => `program:${id}`,
+  programSections: (programId: string) => `program:${programId}:sections`,
+  programList: (page: number, limit: number, filters?: {
+    instructorId?: string;
+    categoryId?: string;
+    difficulty?: string;
+    search?: string;
+    sortBy?: string;
+    sortOrder?: string;
+  }) => {
+    const filterParts: string[] = [];
+    if (filters?.instructorId) filterParts.push(`instructor:${filters.instructorId}`);
+    if (filters?.categoryId) filterParts.push(`category:${filters.categoryId}`);
+    if (filters?.difficulty) filterParts.push(`difficulty:${filters.difficulty}`);
+    if (filters?.search) filterParts.push(`search:${filters.search}`);
+    if (filters?.sortBy) filterParts.push(`sort:${filters.sortBy}:${filters.sortOrder || 'desc'}`);
+    const filterStr = filterParts.length > 0 ? `:${filterParts.join(':')}` : '';
+    return `programs:list:${page}:${limit}${filterStr}`;
+  },
+  // Backward compatibility aliases
+  collection: (id: string) => `program:${id}`,
+  collectionModules: (collectionId: string) => `program:${collectionId}:sections`,
   collectionList: (page: number, limit: number, filters?: {
     instructorId?: string;
     categoryId?: string;
@@ -99,11 +119,11 @@ export const cacheKeys = {
     if (filters?.search) filterParts.push(`search:${filters.search}`);
     if (filters?.sortBy) filterParts.push(`sort:${filters.sortBy}:${filters.sortOrder || 'desc'}`);
     const filterStr = filterParts.length > 0 ? `:${filterParts.join(':')}` : '';
-    return `collections:list:${page}:${limit}${filterStr}`;
+    return `programs:list:${page}:${limit}${filterStr}`;
   },
   user: (id: string) => `user:${id}`,
   userProfile: (id: string) => `user:profile:${id}`,
-  enrollments: (collectionId: string, page: number, limit: number) => `enrollments:${collectionId}:${page}:${limit}`,
+  enrollments: (programId: string, page: number, limit: number) => `enrollments:${programId}:${page}:${limit}`,
   studentEnrollments: (studentId: string, page: number, limit: number) => `enrollments:student:${studentId}:${page}:${limit}`,
 };
 

@@ -9,31 +9,67 @@ const paymentService = new LessonPaymentService();
 
 /**
  * @swagger
- * /api/lessons/{lessonId}/payment:
+ * /api/modules/{moduleId}/payment:
  *   post:
- *     summary: Create payment for a lesson
- *     tags: [Lesson Payments]
+ *     summary: Create payment for a module
+ *     tags: [Module Payments]
  */
-const createLessonPaymentSchema = z.object({
+const createModulePaymentSchema = z.object({
   amount: z.number().min(0.01),
   currency: z.string().optional().default('USD'),
   provider: z.string(),
   transactionId: z.string().optional(),
 });
 
+router.post('/modules/:moduleId/payment',
+  requireAuth,
+  validate({
+    params: z.object({ moduleId: z.string().min(1) }),
+    body: createModulePaymentSchema,
+  }),
+  async (req, res) => {
+    try {
+      const { moduleId } = req.params;
+      const userId = (req as any).user?.id;
+
+      const payment = await paymentService.createModulePayment({
+        moduleId,
+        studentId: userId,
+        amount: req.body.amount,
+        currency: req.body.currency,
+        provider: req.body.provider,
+        transactionId: req.body.transactionId,
+      });
+
+      res.status(201).json({
+        success: true,
+        data: payment,
+        message: 'Payment created. Please complete the payment to confirm your attendance.',
+      });
+    } catch (error) {
+      console.error('Error creating module payment:', error);
+      const statusCode = (error as Error).message.includes('not found') ? 404 : 400;
+      res.status(statusCode).json({
+        error: (error as Error).message || 'Failed to create payment',
+      });
+    }
+  }
+);
+
+// Backward compatibility route
 router.post('/lessons/:lessonId/payment',
   requireAuth,
   validate({
     params: z.object({ lessonId: z.string().min(1) }),
-    body: createLessonPaymentSchema,
+    body: createModulePaymentSchema,
   }),
   async (req, res) => {
     try {
       const { lessonId } = req.params;
       const userId = (req as any).user?.id;
 
-      const payment = await paymentService.createLessonPayment({
-        lessonId,
+      const payment = await paymentService.createModulePayment({
+        moduleId: lessonId,
         studentId: userId,
         amount: req.body.amount,
         currency: req.body.currency,
@@ -141,11 +177,37 @@ router.post('/payments/:paymentId/confirm',
 
 /**
  * @swagger
- * /api/lessons/{lessonId}/payment/status:
+ * /api/modules/{moduleId}/payment/status:
  *   get:
- *     summary: Get payment status for a lesson
- *     tags: [Lesson Payments]
+ *     summary: Get payment status for a module
+ *     tags: [Module Payments]
  */
+router.get('/modules/:moduleId/payment/status',
+  requireAuth,
+  validate({
+    params: z.object({ moduleId: z.string().min(1) }),
+  }),
+  async (req, res) => {
+    try {
+      const { moduleId } = req.params;
+      const userId = (req as any).user?.id;
+
+      const status = await paymentService.getPaymentStatus(userId, moduleId);
+
+      res.json({
+        success: true,
+        data: status,
+      });
+    } catch (error) {
+      console.error('Error getting payment status:', error);
+      res.status(500).json({
+        error: (error as Error).message || 'Failed to get payment status',
+      });
+    }
+  }
+);
+
+// Backward compatibility route
 router.get('/lessons/:lessonId/payment/status',
   requireAuth,
   validate({

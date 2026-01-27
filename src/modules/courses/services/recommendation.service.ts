@@ -14,7 +14,7 @@ export class RecommendationService {
    */
   async generateRecommendations(userId: string, limit: number = 10): Promise<RecommendationResponseDto[]> {
     // Clear old recommendations for this user
-    await prisma.collectionRecommendation.deleteMany({
+    await prisma.programRecommendation.deleteMany({
       where: { userId }
     });
 
@@ -23,7 +23,7 @@ export class RecommendationService {
     // Get user's enrolled courses and interactions
     const userEnrollments = await prisma.enrollment.findMany({
       where: { studentId: userId },
-      include: { collection: true }
+      include: { program: true, collection: true } // Backward compatibility
     });
 
     const userInteractions = await prisma.userInteraction.findMany({
@@ -52,10 +52,21 @@ export class RecommendationService {
     // Save recommendations to database
     const savedRecommendations = await Promise.all(
       topRecommendations.map(rec => 
-        prisma.collectionRecommendation.create({
-          data: rec,
+        prisma.programRecommendation.create({
+          data: {
+            ...rec,
+            programId: rec.programId || rec.collectionId || rec.courseId,
+            collectionId: rec.collectionId || rec.courseId, // Backward compatibility
+          },
           include: {
-            collection: {
+            program: {
+              include: {
+                instructor: {
+                  select: { id: true, username: true }
+                }
+              }
+            },
+            collection: { // Backward compatibility
               include: {
                 instructor: {
                   select: { id: true, username: true }
@@ -85,12 +96,16 @@ export class RecommendationService {
     const similarUsers = await prisma.enrollment.groupBy({
       by: ['studentId'],
       where: {
-        collectionId: { in: enrolledCourseIds },
+        programId: { in: enrolledCourseIds },
+        collectionId: { in: enrolledCourseIds }, // Backward compatibility
         studentId: { not: userId }
       },
-      _count: { collectionId: true },
-      having: { collectionId: { _count: { gte: Math.max(1, Math.floor(enrolledCourseIds.length * 0.3)) } } },
-      orderBy: { _count: { collectionId: 'desc' } },
+      _count: { programId: true, collectionId: true },
+      having: { 
+        programId: { _count: { gte: Math.max(1, Math.floor(enrolledCourseIds.length * 0.3)) } },
+        collectionId: { _count: { gte: Math.max(1, Math.floor(enrolledCourseIds.length * 0.3)) } } // Backward compatibility
+      },
+      orderBy: { _count: { programId: 'desc' } },
       take: 20
     });
 
@@ -98,16 +113,18 @@ export class RecommendationService {
     const recommendedCourses = await prisma.enrollment.findMany({
       where: {
         studentId: { in: similarUsers.map(u => u.studentId) },
-        collectionId: { notIn: enrolledCourseIds }
+        programId: { notIn: enrolledCourseIds },
+        collectionId: { notIn: enrolledCourseIds } // Backward compatibility
       },
-      include: { collection: true },
-      distinct: ['collectionId']
+      include: { program: true, collection: true }, // Backward compatibility
+      distinct: ['programId']
     });
 
     return recommendedCourses.slice(0, 5).map((enrollment: any) => ({
       userId,
-      courseId: enrollment.collectionId,
-      collectionId: enrollment.collectionId,
+      courseId: enrollment.programId || enrollment.collectionId,
+      collectionId: enrollment.collectionId, // Backward compatibility
+      programId: enrollment.programId,
       score: Math.min(0.9, 0.6 + (Math.random() * 0.3)), // Score between 0.6-0.9
       reason: 'Students with similar interests also enrolled in this course',
       algorithm: 'collaborative',
@@ -124,12 +141,12 @@ export class RecommendationService {
   ): Promise<CreateRecommendationDto[]> {
     if (userEnrollments.length === 0) return [];
 
-    const enrolledCourseIds = userEnrollments.map(e => e.courseId);
+    const enrolledCourseIds = userEnrollments.map(e => e.programId || e.collectionId || e.courseId);
     
     // For simplicity, recommend courses from the same instructors
-    const instructorIds = [...new Set(userEnrollments.map(e => e.course.instructorId))];
+    const instructorIds = [...new Set(userEnrollments.map(e => (e.program || e.collection || e.course).instructorId))];
     
-    const instructorCourses = await prisma.collection.findMany({
+    const instructorCourses = await prisma.program.findMany({
       where: {
         instructorId: { in: instructorIds },
         id: { notIn: enrolledCourseIds }
@@ -140,7 +157,8 @@ export class RecommendationService {
     return instructorCourses.map((course: any) => ({
       userId,
       courseId: course.id,
-      collectionId: course.id,
+      collectionId: course.id, // Backward compatibility
+      programId: course.id,
       score: Math.min(0.85, 0.5 + (Math.random() * 0.35)), // Score between 0.5-0.85
       reason: 'From instructors of courses you\'ve enrolled in',
       algorithm: 'content_based',
@@ -155,10 +173,10 @@ export class RecommendationService {
     userId: string,
     userEnrollments: any[]
   ): Promise<CreateRecommendationDto[]> {
-    const enrolledCourseIds = userEnrollments.map(e => e.courseId);
+    const enrolledCourseIds = userEnrollments.map(e => e.programId || e.collectionId);
 
     // Get most popular courses (by enrollment count) that user hasn't enrolled in
-    const popularCourses = await prisma.collection.findMany({
+    const popularCourses = await prisma.program.findMany({
       where: {
         id: { notIn: enrolledCourseIds }
       },
@@ -176,7 +194,7 @@ export class RecommendationService {
     return popularCourses.map((course: any, index: number) => ({
       userId,
       courseId: course.id,
-      collectionId: course.id,
+      collectionId: course.id, // Backward compatibility
       score: Math.max(0.3, 0.7 - (index * 0.1)), // Decreasing score based on popularity rank
       reason: `Popular course with ${course._count.enrollments} enrollments`,
       algorithm: 'popularity',
@@ -188,7 +206,7 @@ export class RecommendationService {
    * Get user's recommendations
    */
   async getUserRecommendations(filters: RecommendationFiltersDto): Promise<RecommendationResponseDto[]> {
-    const recommendations = await prisma.collectionRecommendation.findMany({
+    const recommendations = await prisma.programRecommendation.findMany({
       where: {
         userId: filters.userId,
         ...(filters.algorithm && { algorithm: filters.algorithm }),
@@ -196,7 +214,14 @@ export class RecommendationService {
         ...(filters.excludeViewed && { isViewed: false })
       },
       include: {
-        collection: {
+        program: {
+          include: {
+            instructor: {
+              select: { id: true, username: true }
+            }
+          }
+        },
+        collection: { // Backward compatibility
           include: {
             instructor: {
               select: { id: true, username: true }
@@ -221,10 +246,10 @@ export class RecommendationService {
 
     // If user viewed a recommended course, mark it as viewed
     if (interaction.type === 'view' && interaction.courseId) {
-      await prisma.collectionRecommendation.updateMany({
+      await prisma.programRecommendation.updateMany({
         where: {
           userId: interaction.userId,
-          collectionId: interaction.collectionId || interaction.courseId
+          programId: interaction.programId || interaction.collectionId || interaction.courseId
         },
         data: { isViewed: true }
       });
@@ -232,10 +257,10 @@ export class RecommendationService {
 
     // If user enrolled in a recommended course, mark it as clicked
     if (interaction.type === 'enroll' && interaction.courseId) {
-      await prisma.collectionRecommendation.updateMany({
+      await prisma.programRecommendation.updateMany({
         where: {
           userId: interaction.userId,
-          collectionId: interaction.collectionId || interaction.courseId
+          programId: interaction.programId || interaction.collectionId || interaction.courseId
         },
         data: { isClicked: true }
       });
@@ -246,21 +271,21 @@ export class RecommendationService {
    * Get recommendation statistics for a user
    */
   async getRecommendationStats(userId: string): Promise<RecommendationStatsDto> {
-    const stats = await prisma.collectionRecommendation.aggregate({
+    const stats = await prisma.programRecommendation.aggregate({
       where: { userId },
       _count: { id: true },
       _avg: { score: true }
     });
 
-    const viewedCount = await prisma.collectionRecommendation.count({
+    const viewedCount = await prisma.programRecommendation.count({
       where: { userId, isViewed: true }
     });
 
-    const clickedCount = await prisma.collectionRecommendation.count({
+    const clickedCount = await prisma.programRecommendation.count({
       where: { userId, isClicked: true }
     });
 
-    const topAlgorithm = await prisma.collectionRecommendation.groupBy({
+    const topAlgorithm = await prisma.programRecommendation.groupBy({
       by: ['algorithm'],
       where: { userId, isClicked: true },
       _count: { algorithm: true },
@@ -288,10 +313,11 @@ export class RecommendationService {
    * Map database model to response DTO
    */
   private mapToResponseDto(recommendation: any): RecommendationResponseDto {
+    const program = recommendation.program || recommendation.collection; // Backward compatibility
     return {
       id: recommendation.id,
       userId: recommendation.userId,
-      courseId: recommendation.courseId,
+      courseId: recommendation.programId || recommendation.courseId || recommendation.collectionId,
       score: recommendation.score,
       reason: recommendation.reason,
       algorithm: recommendation.algorithm,
@@ -301,13 +327,13 @@ export class RecommendationService {
       createdAt: recommendation.createdAt,
       updatedAt: recommendation.updatedAt,
       course: {
-        id: recommendation.course.id,
-        title: recommendation.course.title,
-        description: recommendation.course.description,
-        price: recommendation.course.price,
+        id: program.id,
+        title: program.title,
+        description: program.description,
+        price: program.price,
         instructor: {
-          id: recommendation.course.instructor.id,
-          username: recommendation.course.instructor.username
+          id: program.instructor.id,
+          username: program.instructor.username
         }
       }
     };

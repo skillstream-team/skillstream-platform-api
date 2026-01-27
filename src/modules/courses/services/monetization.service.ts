@@ -11,10 +11,14 @@ export class MonetizationService {
    */
   async getAccessRequirements(
     contentId: string,
-    contentType: 'COLLECTION' | 'LESSON'
+    contentType: 'PROGRAM' | 'MODULE' | 'COLLECTION' | 'LESSON'
   ): Promise<AccessRequirements> {
-    if (contentType === 'COLLECTION') {
-      const collection = await prisma.collection.findUnique({
+    // Support both new and old content types for backward compatibility
+    const isProgram = contentType === 'PROGRAM' || contentType === 'COLLECTION';
+    const isModule = contentType === 'MODULE' || contentType === 'LESSON';
+
+    if (isProgram) {
+      const program = await prisma.program.findUnique({
         where: { id: contentId },
         select: {
           monetizationType: true,
@@ -22,16 +26,16 @@ export class MonetizationService {
         },
       });
 
-      if (!collection) {
-        throw new Error('Collection not found');
+      if (!program) {
+        throw new Error('Program not found');
       }
 
       return {
-        type: collection.monetizationType as 'FREE' | 'SUBSCRIPTION' | 'PREMIUM',
-        price: collection.monetizationType === 'PREMIUM' ? collection.price : undefined,
+        type: program.monetizationType as 'FREE' | 'SUBSCRIPTION' | 'PREMIUM',
+        price: program.monetizationType === 'PREMIUM' ? program.price : undefined,
       };
-    } else {
-      const lesson = await prisma.lesson.findUnique({
+    } else if (isModule) {
+      const module = await prisma.module.findUnique({
         where: { id: contentId },
         select: {
           monetizationType: true,
@@ -39,15 +43,17 @@ export class MonetizationService {
         },
       });
 
-      if (!lesson) {
-        throw new Error('Lesson not found');
+      if (!module) {
+        throw new Error('Module not found');
       }
 
       return {
-        type: lesson.monetizationType as 'FREE' | 'SUBSCRIPTION' | 'PREMIUM',
-        price: lesson.monetizationType === 'PREMIUM' ? lesson.price : undefined,
+        type: module.monetizationType as 'FREE' | 'SUBSCRIPTION' | 'PREMIUM',
+        price: module.monetizationType === 'PREMIUM' ? module.price : undefined,
       };
     }
+
+    throw new Error('Invalid content type');
   }
 
   /**
@@ -56,7 +62,7 @@ export class MonetizationService {
   async canAccess(
     studentId: string,
     contentId: string,
-    contentType: 'COLLECTION' | 'LESSON'
+    contentType: 'PROGRAM' | 'MODULE' | 'COLLECTION' | 'LESSON'
   ): Promise<boolean> {
     // Get access requirements
     const requirements = await this.getAccessRequirements(contentId, contentType);
@@ -77,22 +83,25 @@ export class MonetizationService {
 
     // PREMIUM content - check enrollment or payment
     if (requirements.type === 'PREMIUM') {
-      if (contentType === 'COLLECTION') {
+      const isProgram = contentType === 'PROGRAM' || contentType === 'COLLECTION';
+      const isModule = contentType === 'MODULE' || contentType === 'LESSON';
+
+      if (isProgram) {
         const enrollment = await prisma.enrollment.findUnique({
           where: {
-            collectionId_studentId: {
-              collectionId: contentId,
+            programId_studentId: {
+              programId: contentId,
               studentId,
             },
           },
         });
         return !!enrollment;
-      } else {
-        // For standalone lessons, check if there's a payment
+      } else if (isModule) {
+        // For standalone modules, check if there's a payment
         const payment = await prisma.payment.findFirst({
           where: {
             studentId,
-            lessonId: contentId,
+            moduleId: contentId,
             status: 'COMPLETED',
           },
         });

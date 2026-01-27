@@ -36,35 +36,37 @@ export class EnrollmentService {
      *         description: Student already enrolled or invalid data
      */
     async enrollStudent(data: CreateEnrollmentDto): Promise<EnrollmentResponseDto> {
-        // Check collection monetization type
-        const collection = await prisma.collection.findUnique({
-            where: { id: data.collectionId },
+        // Check program monetization type
+        const program = await prisma.program.findUnique({
+            where: { id: data.programId || data.collectionId },
             select: { monetizationType: true, price: true },
         });
 
-        if (!collection) {
-            throw new Error('Collection not found');
+        if (!program) {
+            throw new Error('Program not found');
         }
+
+        const programId = data.programId || data.collectionId;
 
         // Check access based on monetization type
         const { MonetizationService } = await import('./monetization.service');
         const monetizationService = new MonetizationService();
-        const canAccess = await monetizationService.canAccess(data.studentId, data.collectionId, 'COLLECTION');
+        const canAccess = await monetizationService.canAccess(data.studentId, programId, 'PROGRAM');
 
         if (!canAccess) {
-            if (collection.monetizationType === 'SUBSCRIPTION') {
-                throw new Error('Active subscription required to access this collection. Please subscribe to continue.');
-            } else if (collection.monetizationType === 'PREMIUM') {
-                throw new Error('This is a premium collection. Please purchase to enroll.');
+            if (program.monetizationType === 'SUBSCRIPTION') {
+                throw new Error('Active subscription required to access this program. Please subscribe to continue.');
+            } else if (program.monetizationType === 'PREMIUM') {
+                throw new Error('This is a premium program. Please purchase to enroll.');
             } else {
-                throw new Error('You do not have access to this collection.');
+                throw new Error('You do not have access to this program.');
             }
         }
 
         // Check prerequisites
         const prerequisiteCheck = await this.prerequisitesService.checkPrerequisites(
             data.studentId,
-            data.collectionId
+            programId
         );
         if (!prerequisiteCheck.canEnroll) {
             const missing = prerequisiteCheck.missingPrerequisites
@@ -82,7 +84,7 @@ export class EnrollmentService {
             // Using findFirst since composite unique constraints in MongoDB need this approach
             const existingEnrollment = await tx.enrollment.findFirst({
                 where: { 
-                    collectionId: data.collectionId,
+                    programId: programId,
                     studentId: data.studentId
                 },
             });
@@ -93,7 +95,7 @@ export class EnrollmentService {
             const payment = await tx.payment.create({
                 data: {
                     studentId: data.studentId,
-                    collectionId: data.collectionId,
+                    programId: programId,
                     amount: data.amount,
                     currency: data.currency || 'USD',
                     status: 'PENDING',
@@ -104,12 +106,12 @@ export class EnrollmentService {
 
             const enrollment = await tx.enrollment.create({
                 data: {
-                    collectionId: data.collectionId,
+                    programId: programId,
                     studentId: data.studentId,
                     paymentId: payment.id,
                 },
                 include: {
-                    collection: { select: { id: true, title: true, price: true } },
+                    program: { select: { id: true, title: true, price: true } },
                     student: { select: { id: true, username: true, email: true } },
                     payment: true,
                 },
@@ -132,8 +134,8 @@ export class EnrollmentService {
                 await emailService.sendEnrollmentConfirmation(
                     student.email,
                     student.username,
-                    result.collection.title,
-                    result.collection.id
+                    result.program.title,
+                    result.program.id
                 );
             }
         } catch (emailError) {
@@ -141,12 +143,12 @@ export class EnrollmentService {
             // Don't fail enrollment if email fails
         }
 
-        // Record teacher earnings for premium collections
-        if (collection.monetizationType === 'PREMIUM' && result.payment) {
+        // Record teacher earnings for premium programs
+        if (program.monetizationType === 'PREMIUM' && result.payment) {
             try {
                 const { TeacherEarningsService } = await import('../../earnings/services/teacher-earnings.service');
                 const earningsService = new TeacherEarningsService();
-                await earningsService.recordPremiumSale(data.collectionId, result.payment.id);
+                await earningsService.recordPremiumSale(programId, result.payment.id);
             } catch (earningsError) {
                 console.warn('Failed to record teacher earnings:', earningsError);
                 // Don't fail enrollment if earnings recording fails
@@ -192,7 +194,7 @@ export class EnrollmentService {
      *               items:
      *                 $ref: '#/components/schemas/CourseEnrollmentDto'
      */
-    async getCollectionEnrollments(collectionId: string, page: number = 1, limit: number = 20): Promise<{
+    async getProgramEnrollments(programId: string, page: number = 1, limit: number = 20): Promise<{
         data: CourseEnrollmentDto[];
         pagination: {
             page: number;
@@ -208,13 +210,13 @@ export class EnrollmentService {
 
         const [enrollments, total] = await Promise.all([
             prisma.enrollment.findMany({
-                where: { collectionId },
+                where: { programId },
                 skip,
                 take,
                 include: { student: { select: { id: true, username: true, email: true } } },
                 orderBy: { createdAt: 'desc' },
             }),
-            prisma.enrollment.count({ where: { collectionId } }),
+            prisma.enrollment.count({ where: { programId } }),
         ]);
 
         return {
@@ -256,11 +258,11 @@ export class EnrollmentService {
      *             schema:
      *               $ref: '#/components/schemas/CourseStatsDto'
      */
-    async getCollectionStats(collectionId: string): Promise<CourseStatsDto> {
+    async getProgramStats(programId: string): Promise<CourseStatsDto> {
         const [enrolledCount, totalRevenue] = await Promise.all([
-            prisma.enrollment.count({ where: { collectionId } }),
+            prisma.enrollment.count({ where: { programId } }),
             prisma.payment.aggregate({
-                where: { collectionId, status: 'COMPLETED' },
+                where: { programId, status: 'COMPLETED' },
                 _sum: { amount: true },
             }),
         ]);
@@ -366,9 +368,9 @@ export class EnrollmentService {
      *                   type: boolean
      *                   example: true
      */
-    async isStudentEnrolled(collectionId: string, studentId: string): Promise<boolean> {
+    async isStudentEnrolled(programId: string, studentId: string): Promise<boolean> {
         const enrollment = await prisma.enrollment.findFirst({
-            where: { collectionId, studentId },
+            where: { programId, studentId },
         });
 
         return !!enrollment;
@@ -407,8 +409,8 @@ export class EnrollmentService {
      *       200:
      *         description: List of active users with detailed activity breakdown
      */
-    async getActiveUsersInCollection(
-        collectionId: string,
+    async getActiveUsersInProgram(
+        programId: string,
         days: number = 7,
         page: number = 1,
         limit: number = 20
@@ -450,9 +452,9 @@ export class EnrollmentService {
         const cutoffDate = new Date();
         cutoffDate.setDate(cutoffDate.getDate() - days);
 
-        // Get all enrollments for the collection
+        // Get all enrollments for the program
         const allEnrollments = await prisma.enrollment.findMany({
-            where: { collectionId },
+            where: { programId },
             include: {
                 student: {
                     select: {
@@ -466,19 +468,19 @@ export class EnrollmentService {
 
         const enrolledUserIds = allEnrollments.map(e => e.studentId);
 
-        // Get collection videos to filter video analytics
-        const collectionVideos = await prisma.video.findMany({
-            where: { collectionId },
+        // Get program videos to filter video analytics
+        const programVideos = await prisma.video.findMany({
+            where: { programId },
             select: { id: true },
         });
-        const videoIds = collectionVideos.map(v => v.id);
+        const videoIds = programVideos.map(v => v.id);
 
-        // Get collection forum posts to filter forum replies
-        const collectionForumPosts = await prisma.forumPost.findMany({
-            where: { collectionId },
+        // Get program forum posts to filter forum replies
+        const programForumPosts = await prisma.forumPost.findMany({
+            where: { programId },
             select: { id: true },
         });
-        const forumPostIds = collectionForumPosts.map((p: any) => p.id);
+        const forumPostIds = programForumPosts.map((p: any) => p.id);
 
         // Query all activity sources in parallel
         const [
@@ -492,7 +494,7 @@ export class EnrollmentService {
             // 1. Progress records
             prisma.progress.findMany({
                 where: {
-                    collectionId,
+                    programId,
                     studentId: { in: enrolledUserIds },
                     lastAccessed: { gte: cutoffDate },
                 },
@@ -506,8 +508,8 @@ export class EnrollmentService {
             prisma.activityLog.findMany({
                 where: {
                     userId: { in: enrolledUserIds },
-                    entity: 'collection',
-                    entityId: collectionId,
+                    entity: 'program',
+                    entityId: programId,
                     createdAt: { gte: cutoffDate },
                 },
                 select: {
@@ -519,7 +521,7 @@ export class EnrollmentService {
             // 3. UserInteraction records
             prisma.userInteraction.findMany({
                 where: {
-                    collectionId,
+                    programId,
                     userId: { in: enrolledUserIds },
                     createdAt: { gte: cutoffDate },
                 },
@@ -532,7 +534,7 @@ export class EnrollmentService {
             // 4. Forum posts
             prisma.forumPost.findMany({
                 where: {
-                    collectionId,
+                    programId,
                     authorId: { in: enrolledUserIds },
                     createdAt: { gte: cutoffDate },
                 },
@@ -751,7 +753,7 @@ export class EnrollmentService {
     /**
      * Get count of active users in a course (using all activity sources)
      */
-    async getActiveUserCount(collectionId: string, days: number = 7): Promise<number> {
+    async getActiveUserCount(programId: string, days: number = 7): Promise<number> {
         const cutoffDate = new Date();
         cutoffDate.setDate(cutoffDate.getDate() - days);
 
@@ -791,7 +793,7 @@ export class EnrollmentService {
         ] = await Promise.all([
             prisma.progress.findMany({
                 where: {
-                    collectionId,
+                    programId,
                     studentId: { in: enrolledUserIds },
                     lastAccessed: { gte: cutoffDate },
                 },
@@ -801,8 +803,8 @@ export class EnrollmentService {
             prisma.activityLog.findMany({
                 where: {
                     userId: { in: enrolledUserIds },
-                    entity: 'collection',
-                    entityId: collectionId,
+                    entity: 'program',
+                    entityId: programId,
                     createdAt: { gte: cutoffDate },
                 },
                 select: { userId: true },
@@ -810,7 +812,7 @@ export class EnrollmentService {
             }),
             prisma.userInteraction.findMany({
                 where: {
-                    collectionId,
+                    programId,
                     userId: { in: enrolledUserIds },
                     createdAt: { gte: cutoffDate },
                 },
@@ -819,7 +821,7 @@ export class EnrollmentService {
             }),
             prisma.forumPost.findMany({
                 where: {
-                    collectionId,
+                    programId,
                     authorId: { in: enrolledUserIds },
                     createdAt: { gte: cutoffDate },
                 },

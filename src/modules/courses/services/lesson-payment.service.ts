@@ -3,8 +3,8 @@ import { emailService } from '../../users/services/email.service';
 
 const PAYMENT_DEADLINE_HOURS = 24; // Payment required 24 hours before lesson
 
-export interface CreateLessonPaymentDto {
-  lessonId?: string;
+export interface CreateModulePaymentDto {
+  moduleId?: string;
   bookingId?: string;
   studentId: string;
   amount: number;
@@ -13,9 +13,9 @@ export interface CreateLessonPaymentDto {
   transactionId?: string;
 }
 
-export interface LessonPaymentResponseDto {
+export interface ModulePaymentResponseDto {
   id: string;
-  lessonId?: string;
+  moduleId?: string;
   bookingId?: string;
   studentId: string;
   amount: number;
@@ -25,6 +25,10 @@ export interface LessonPaymentResponseDto {
   paidAt?: Date;
   createdAt: Date;
 }
+
+// Backward compatibility aliases
+export type CreateLessonPaymentDto = CreateModulePaymentDto;
+export type LessonPaymentResponseDto = ModulePaymentResponseDto;
 
 export class LessonPaymentService {
   /**
@@ -37,31 +41,31 @@ export class LessonPaymentService {
   }
 
   /**
-   * Check if payment is required for a lesson
+   * Check if payment is required for a module
    */
-  async isPaymentRequired(lessonId: string, studentId: string): Promise<boolean> {
-    const lesson = await prisma.quickLesson.findUnique({
-      where: { id: lessonId },
+  async isPaymentRequired(moduleId: string, studentId: string): Promise<boolean> {
+    const module = await prisma.quickModule.findUnique({
+      where: { id: moduleId },
     });
 
-    if (!lesson) {
+    if (!module) {
       return false;
     }
 
     // Check if student is invited
-    if (!lesson.invitedStudentIds.includes(studentId)) {
+    if (!module.invitedStudentIds.includes(studentId)) {
       return false;
     }
 
-    // Check if lesson has a price
-    if (!lesson.price || lesson.price <= 0) {
+    // Check if module has a price
+    if (!module.price || module.price <= 0) {
       return false;
     }
 
     // Check if payment already exists
     const existingPayment = await prisma.payment.findFirst({
       where: {
-        lessonId,
+        moduleId,
         studentId,
         status: 'COMPLETED',
       },
@@ -96,48 +100,48 @@ export class LessonPaymentService {
   }
 
   /**
-   * Create payment for a lesson
+   * Create payment for a module
    */
-  async createLessonPayment(data: CreateLessonPaymentDto): Promise<LessonPaymentResponseDto> {
-    if (!data.lessonId && !data.bookingId) {
-      throw new Error('Either lessonId or bookingId is required');
+  async createModulePayment(data: CreateModulePaymentDto): Promise<ModulePaymentResponseDto> {
+    if (!data.moduleId && !data.bookingId) {
+      throw new Error('Either moduleId or bookingId is required');
     }
 
     let scheduledAt: Date;
     let price: number;
 
-    if (data.lessonId) {
-      const lesson = await prisma.quickLesson.findUnique({
-        where: { id: data.lessonId },
+    if (data.moduleId) {
+      const module = await prisma.quickModule.findUnique({
+        where: { id: data.moduleId },
       });
 
-      if (!lesson) {
-        throw new Error('Lesson not found');
+      if (!module) {
+        throw new Error('Module not found');
       }
 
       // Check if student is invited (by ID)
-      if (!lesson.invitedStudentIds.includes(data.studentId)) {
-        throw new Error('Student is not invited to this lesson');
+      if (!module.invitedStudentIds.includes(data.studentId)) {
+        throw new Error('Student is not invited to this module');
       }
 
-      scheduledAt = lesson.scheduledAt;
-      price = lesson.price || 0;
+      scheduledAt = module.scheduledAt;
+      price = module.price || 0;
 
       if (price <= 0) {
-        throw new Error('Lesson has no price set');
+        throw new Error('Module has no price set');
       }
 
       // Check if payment already exists
       const existingPayment = await prisma.payment.findFirst({
         where: {
-          lessonId: data.lessonId,
+          moduleId: data.moduleId,
           studentId: data.studentId,
           status: 'COMPLETED',
         },
       });
 
       if (existingPayment) {
-        throw new Error('Payment already completed for this lesson');
+        throw new Error('Payment already completed for this module');
       }
     } else if (data.bookingId) {
       const booking = await prisma.booking.findUnique({
@@ -195,7 +199,7 @@ export class LessonPaymentService {
     const payment = await prisma.payment.create({
       data: {
         studentId: data.studentId,
-        lessonId: data.lessonId,
+        moduleId: data.moduleId,
         bookingId: data.bookingId,
         amount: data.amount,
         currency: data.currency || 'USD',
@@ -214,14 +218,22 @@ export class LessonPaymentService {
     return this.mapToDto(payment);
   }
 
+  // Backward compatibility alias
+  async createLessonPayment(data: CreateLessonPaymentDto): Promise<LessonPaymentResponseDto> {
+    return this.createModulePayment({
+      ...data,
+      moduleId: (data as any).moduleId || (data as any).lessonId,
+    });
+  }
+
   /**
    * Confirm payment (mark as completed)
    */
-  async confirmPayment(paymentId: string, transactionId?: string): Promise<LessonPaymentResponseDto> {
+  async confirmPayment(paymentId: string, transactionId?: string): Promise<ModulePaymentResponseDto> {
     const payment = await prisma.payment.findUnique({
       where: { id: paymentId },
       include: {
-        lesson: true,
+        module: true,
         booking: {
           include: { slot: true },
         },
@@ -263,36 +275,36 @@ export class LessonPaymentService {
       return updatedPayment;
     });
 
-    // Record teacher earnings for lesson/booking payments
+    // Record teacher earnings for module/booking payments
     try {
-      if (payment.lessonId && payment.lesson) {
-        // Check if it's a standalone Lesson (not QuickLesson)
-        const standaloneLesson = await prisma.lesson.findUnique({
-          where: { id: payment.lessonId },
+      if (payment.moduleId && payment.module) {
+        // Check if it's a standalone Module (not QuickModule)
+        const standaloneModule = await prisma.module.findUnique({
+          where: { id: payment.moduleId },
           select: { teacherId: true, monetizationType: true },
         });
 
-        if (standaloneLesson && standaloneLesson.monetizationType === 'PREMIUM' && standaloneLesson.teacherId) {
+        if (standaloneModule && standaloneModule.monetizationType === 'PREMIUM' && standaloneModule.teacherId) {
           const { TeacherEarningsService } = await import('../../earnings/services/teacher-earnings.service');
           const earningsService = new TeacherEarningsService();
-          await earningsService.recordLessonSale(payment.lessonId, paymentId);
+          await earningsService.recordModuleSale(payment.moduleId, paymentId);
         }
       }
     } catch (earningsError) {
-      console.warn('Failed to record teacher earnings for lesson payment:', earningsError);
+      console.warn('Failed to record teacher earnings for module payment:', earningsError);
       // Don't throw - payment is already confirmed
     }
 
     // Send confirmation email
     try {
-      if (payment.lessonId && payment.lesson) {
+      if (payment.moduleId && payment.module) {
         await emailService.sendEmail(
           payment.student.email,
-          'Lesson Payment Confirmed',
+          'Module Payment Confirmed',
           `
             <h2>Payment Confirmed</h2>
-            <p>Your payment of $${payment.amount} for the lesson "${payment.lesson.title}" has been confirmed.</p>
-            <p>Lesson scheduled for: ${payment.lesson.scheduledAt.toLocaleString()}</p>
+            <p>Your payment of $${payment.amount} for the module "${payment.module.title}" has been confirmed.</p>
+            <p>Module scheduled for: ${payment.module.scheduledAt.toLocaleString()}</p>
             <p>We'll see you there!</p>
           `
         );
@@ -303,7 +315,7 @@ export class LessonPaymentService {
           `
             <h2>Payment Confirmed</h2>
             <p>Your payment of $${payment.amount} for your booking has been confirmed.</p>
-            <p>Lesson scheduled for: ${payment.booking.slot.startTime.toLocaleString()}</p>
+            <p>Module scheduled for: ${payment.booking.slot.startTime.toLocaleString()}</p>
             <p>We'll see you there!</p>
           `
         );
@@ -317,35 +329,35 @@ export class LessonPaymentService {
   }
 
   /**
-   * Get payment status for a lesson/booking
+   * Get payment status for a module/booking
    */
-  async getPaymentStatus(studentId: string, lessonId?: string, bookingId?: string): Promise<{
+  async getPaymentStatus(studentId: string, moduleId?: string, bookingId?: string): Promise<{
     required: boolean;
     paid: boolean;
-    payment?: LessonPaymentResponseDto;
+    payment?: ModulePaymentResponseDto;
     deadline?: Date;
     isOverdue: boolean;
   }> {
-    if (!lessonId && !bookingId) {
-      throw new Error('Either lessonId or bookingId is required');
+    if (!moduleId && !bookingId) {
+      throw new Error('Either moduleId or bookingId is required');
     }
 
     let scheduledAt: Date;
     let price: number;
 
-    if (lessonId) {
-      const lesson = await prisma.quickLesson.findUnique({
-        where: { id: lessonId },
+    if (moduleId) {
+      const module = await prisma.quickModule.findUnique({
+        where: { id: moduleId },
       });
 
-      if (!lesson) {
+      if (!module) {
         return { required: false, paid: false, isOverdue: false };
       }
 
-      scheduledAt = lesson.scheduledAt;
-      price = lesson.price || 0;
+      scheduledAt = module.scheduledAt;
+      price = module.price || 0;
 
-      if (!lesson.invitedStudentIds.includes(studentId)) {
+      if (!module.invitedStudentIds.includes(studentId)) {
         return { required: false, paid: false, isOverdue: false };
       }
     } else if (bookingId) {
@@ -372,7 +384,7 @@ export class LessonPaymentService {
     // Check for existing payment
     const payment = await prisma.payment.findFirst({
       where: {
-        lessonId: lessonId || undefined,
+        moduleId: moduleId || undefined,
         bookingId: bookingId || undefined,
         studentId,
         status: 'COMPLETED',
@@ -389,18 +401,18 @@ export class LessonPaymentService {
   }
 
   /**
-   * Check and cancel unpaid lessons (should be called by scheduled job)
+   * Check and cancel unpaid modules (should be called by scheduled job)
    */
-  async checkAndCancelUnpaidLessons(): Promise<number> {
+  async checkAndCancelUnpaidModules(): Promise<number> {
     const now = new Date();
     const deadlineThreshold = new Date(now.getTime() + PAYMENT_DEADLINE_HOURS * 60 * 60 * 1000);
 
-    // Find lessons with payment deadline passed but no payment
-    const unpaidLessons = await prisma.quickLesson.findMany({
+    // Find modules with payment deadline passed but no payment
+    const unpaidModules = await prisma.quickModule.findMany({
       where: {
         status: 'scheduled',
         scheduledAt: {
-          gte: now, // Only future lessons
+          gte: now, // Only future modules
         },
         price: {
           gt: 0, // Has a price
@@ -417,14 +429,14 @@ export class LessonPaymentService {
 
     let cancelledCount = 0;
 
-    for (const lesson of unpaidLessons) {
-      const deadline = this.calculatePaymentDeadline(lesson.scheduledAt);
+    for (const module of unpaidModules) {
+      const deadline = this.calculatePaymentDeadline(module.scheduledAt);
       
       // Check if deadline has passed
       if (now >= deadline) {
         // Check each invited student
-        for (const studentId of lesson.invitedStudentIds) {
-          const hasPayment = lesson.payments.some(
+        for (const studentId of module.invitedStudentIds) {
+          const hasPayment = module.payments.some(
             (p) => p.studentId === studentId && p.status === 'COMPLETED'
           );
 
@@ -440,11 +452,11 @@ export class LessonPaymentService {
               if (student) {
                 await emailService.sendEmail(
                   student.email,
-                  'Lesson Cancelled - Payment Not Received',
+                  'Module Cancelled - Payment Not Received',
                   `
-                    <h2>Lesson Cancelled</h2>
-                    <p>Your lesson "${lesson.title}" scheduled for ${lesson.scheduledAt.toLocaleString()} has been cancelled due to non-payment.</p>
-                    <p>Payment was required at least 24 hours before the lesson time.</p>
+                    <h2>Module Cancelled</h2>
+                    <p>Your module "${module.title}" scheduled for ${module.scheduledAt.toLocaleString()} has been cancelled due to non-payment.</p>
+                    <p>Payment was required at least 24 hours before the module time.</p>
                     <p>If you have any questions, please contact support.</p>
                   `
                 );
@@ -455,10 +467,10 @@ export class LessonPaymentService {
           }
         }
 
-        // If no students have paid, cancel the entire lesson
-        if (lesson.payments.length === 0) {
-          await prisma.quickLesson.update({
-            where: { id: lesson.id },
+        // If no students have paid, cancel the entire module
+        if (module.payments.length === 0) {
+          await prisma.quickModule.update({
+            where: { id: module.id },
             data: { status: 'cancelled' },
           });
           cancelledCount++;
@@ -529,10 +541,10 @@ export class LessonPaymentService {
   /**
    * Map Prisma payment to DTO
    */
-  private mapToDto(payment: any): LessonPaymentResponseDto {
+  private mapToDto(payment: any): ModulePaymentResponseDto {
     return {
       id: payment.id,
-      lessonId: payment.lessonId || undefined,
+      moduleId: payment.moduleId || payment.lessonId || undefined,
       bookingId: payment.bookingId || undefined,
       studentId: payment.studentId,
       amount: payment.amount,
@@ -542,6 +554,11 @@ export class LessonPaymentService {
       paidAt: payment.paidAt || undefined,
       createdAt: payment.createdAt,
     };
+  }
+
+  // Backward compatibility alias
+  async checkAndCancelUnpaidLessons(): Promise<number> {
+    return this.checkAndCancelUnpaidModules();
   }
 }
 

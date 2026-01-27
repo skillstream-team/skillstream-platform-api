@@ -5,8 +5,10 @@ export interface UploadFileDto {
   file: Buffer;
   filename: string;
   contentType: string;
-  collectionId: string;
+  programId: string;
   type: 'pdf' | 'image' | 'document' | 'zip' | 'other';
+  // Backward compatibility
+  collectionId?: string;
 }
 
 export interface FileResponseDto {
@@ -36,7 +38,8 @@ export class CloudflareR2Service {
   }
 
   async uploadFile(data: UploadFileDto): Promise<FileResponseDto> {
-    const key = this.generateKey(data.collectionId, data.type, data.filename);
+    const courseId = data.programId || data.collectionId || '';
+    const key = this.generateKey(courseId, data.type, data.filename);
     
     const command = new PutObjectCommand({
       Bucket: this.bucketName,
@@ -44,7 +47,7 @@ export class CloudflareR2Service {
       Body: data.file,
       ContentType: data.contentType,
       Metadata: {
-        collectionId: data.collectionId.toString(),
+        programId: courseId,
         type: data.type,
         originalFilename: data.filename,
       },

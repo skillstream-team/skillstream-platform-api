@@ -42,7 +42,8 @@ export class ReviewsService {
     // Check if student is enrolled
     const enrollment = await prisma.enrollment.findFirst({
       where: {
-        collectionId: data.courseId,
+        programId: data.courseId,
+        collectionId: data.courseId, // Backward compatibility
         studentId: data.studentId,
       },
     });
@@ -52,9 +53,10 @@ export class ReviewsService {
     }
 
     // Check if review already exists
-    const existing = await prisma.collectionReview.findFirst({
+    const existing = await prisma.programReview.findFirst({
       where: {
-        collectionId: data.courseId,
+        programId: data.courseId,
+        collectionId: data.courseId, // Backward compatibility
         studentId: data.studentId,
       },
     });
@@ -68,9 +70,10 @@ export class ReviewsService {
       throw new Error('Rating must be between 1 and 5');
     }
 
-    const review = await prisma.collectionReview.create({
+    const review = await prisma.programReview.create({
       data: {
-        collectionId: data.courseId,
+        programId: data.courseId,
+        collectionId: data.courseId, // Backward compatibility
         studentId: data.studentId,
         rating: data.rating,
         title: data.title,
@@ -79,7 +82,13 @@ export class ReviewsService {
         isPublished: true,
       },
       include: {
-        collection: {
+        program: {
+          select: {
+            id: true,
+            title: true,
+          },
+        },
+        collection: { // Backward compatibility
           select: {
             id: true,
             title: true,
@@ -96,7 +105,8 @@ export class ReviewsService {
     });
 
     // Invalidate course cache
-    await deleteCache(`collection:${data.courseId}`);
+    await deleteCache(`program:${data.courseId}`);
+    await deleteCache(`collection:${data.courseId}`); // Backward compatibility
 
     return this.mapToDto(review);
   }
@@ -133,12 +143,22 @@ export class ReviewsService {
     }
 
     const [reviews, total, allReviews] = await Promise.all([
-      prisma.collectionReview.findMany({
-        where,
+      prisma.programReview.findMany({
+        where: {
+          ...where,
+          programId: where.courseId,
+          collectionId: where.courseId, // Backward compatibility
+        },
         skip,
         take,
         include: {
-          collection: {
+          program: {
+            select: {
+              id: true,
+              title: true,
+            },
+          },
+          collection: { // Backward compatibility
             select: {
               id: true,
               title: true,
@@ -157,9 +177,15 @@ export class ReviewsService {
           { createdAt: 'desc' },
         ],
       }),
-      prisma.collectionReview.count({ where }),
-      prisma.collectionReview.findMany({
-        where: { collectionId: courseId, isPublished: true },
+      prisma.programReview.count({ 
+        where: { 
+          ...where, 
+          programId: where.courseId,
+          collectionId: where.courseId 
+        } 
+      }),
+      prisma.programReview.findMany({
+        where: { programId: courseId, collectionId: courseId, isPublished: true }, // Backward compatibility
         select: { rating: true },
       }),
     ]);
@@ -193,10 +219,16 @@ export class ReviewsService {
    * Get review by ID
    */
   async getReviewById(reviewId: string): Promise<ReviewResponseDto> {
-    const review = await prisma.collectionReview.findUnique({
+    const review = await prisma.programReview.findUnique({
       where: { id: reviewId },
       include: {
-        collection: {
+        program: {
+          select: {
+            id: true,
+            title: true,
+          },
+        },
+        collection: { // Backward compatibility
           select: {
             id: true,
             title: true,
@@ -227,7 +259,7 @@ export class ReviewsService {
     studentId: string,
     data: Partial<CreateReviewDto>
   ): Promise<ReviewResponseDto> {
-    const review = await prisma.collectionReview.findFirst({
+    const review = await prisma.programReview.findFirst({
       where: { id: reviewId, studentId },
     });
 
@@ -245,11 +277,17 @@ export class ReviewsService {
     if (data.title !== undefined) updateData.title = data.title;
     if (data.content !== undefined) updateData.content = data.content;
 
-    const updated = await prisma.collectionReview.update({
+    const updated = await prisma.programReview.update({
       where: { id: reviewId },
       data: updateData,
       include: {
-        collection: {
+        program: {
+          select: {
+            id: true,
+            title: true,
+          },
+        },
+        collection: { // Backward compatibility
           select: {
             id: true,
             title: true,
@@ -265,7 +303,8 @@ export class ReviewsService {
       },
     });
 
-    await deleteCache(`collection:${updated.collectionId}`);
+    await deleteCache(`program:${updated.programId || updated.collectionId}`);
+    await deleteCache(`collection:${updated.collectionId}`); // Backward compatibility
 
     return this.mapToDto(updated);
   }
@@ -282,18 +321,19 @@ export class ReviewsService {
       throw new Error('Review not found or unauthorized');
     }
 
-    await prisma.collectionReview.delete({
+    await prisma.programReview.delete({
       where: { id: reviewId },
     });
 
-    await deleteCache(`collection:${review.collectionId}`);
+    await deleteCache(`program:${review.programId || review.collectionId}`);
+    await deleteCache(`collection:${review.collectionId}`); // Backward compatibility
   }
 
   /**
    * Mark review as helpful
    */
   async markHelpful(reviewId: string, userId: string): Promise<number> {
-    const review = await prisma.collectionReview.findUnique({
+    const review = await prisma.programReview.findUnique({
       where: { id: reviewId },
     });
 
@@ -330,7 +370,7 @@ export class ReviewsService {
       where: { reviewId, isHelpful: true },
     });
 
-    await prisma.collectionReview.update({
+    await prisma.programReview.update({
       where: { id: reviewId },
       data: { helpfulCount },
     });
@@ -346,10 +386,15 @@ export class ReviewsService {
     instructorId: string,
     response: string
   ): Promise<ReviewResponseDto> {
-    const review = await prisma.collectionReview.findUnique({
+    const review = await prisma.programReview.findUnique({
       where: { id: reviewId },
       include: {
-        collection: {
+        program: {
+          select: {
+            instructorId: true,
+          },
+        },
+        collection: { // Backward compatibility
           select: {
             instructorId: true,
           },
@@ -361,18 +406,25 @@ export class ReviewsService {
       throw new Error('Review not found');
     }
 
-    if (review.collection.instructorId !== instructorId) {
-      throw new Error('Only the collection instructor can respond to reviews');
+    const program = review.program || review.collection
+    if (program.instructorId !== instructorId) {
+      throw new Error('Only the program instructor can respond to reviews');
     }
 
-    const updated = await prisma.collectionReview.update({
+    const updated = await prisma.programReview.update({
       where: { id: reviewId },
       data: {
         instructorResponse: response,
         instructorResponseAt: new Date(),
       },
       include: {
-        collection: {
+        program: {
+          select: {
+            id: true,
+            title: true,
+          },
+        },
+        collection: { // Backward compatibility
           select: {
             id: true,
             title: true,
@@ -397,8 +449,8 @@ export class ReviewsService {
   private mapToDto(review: any): ReviewResponseDto {
     return {
       id: review.id,
-      courseId: review.collectionId,
-      course: review.collection,
+      courseId: review.programId || review.collectionId,
+      course: review.program || review.collection,
       studentId: review.studentId,
       student: review.student,
       rating: review.rating,

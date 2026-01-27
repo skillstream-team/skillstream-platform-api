@@ -49,25 +49,25 @@ import { calendarSchema } from './routes/graphql/calendar.resolver';
 
 export function registerCoursesModule(app: express.Application) {
   // REST routes
-  // Register specific routes BEFORE the main collections router to ensure they match first
-  // This prevents /api/collections/:id from matching routes like /api/collections/wishlist
-  app.use('/api/collections/wishlist', wishlistRoutes);
+  // Register specific routes BEFORE the main programs router to ensure they match first
+  // This prevents /api/programs/:id from matching routes like /api/programs/wishlist
+  app.use('/api/programs/wishlist', wishlistRoutes);
   
-  // Register main collections router AFTER specific routes
-  // This ensures POST /api/collections matches before parameterized routes
-  app.use('/api/collections', restCoursesRoutes);
+  // Register main programs router AFTER specific routes
+  // This ensures POST /api/programs matches before parameterized routes
+  app.use('/api/programs', restCoursesRoutes);
   
-  // Alias /api/courses to /api/collections for backward compatibility
+  // Alias /api/courses to /api/programs for backward compatibility
   app.use('/api/courses', restCoursesRoutes);
   
-  // Register other specific collection sub-routes AFTER the main router
-  // These have parameterized routes like /:collectionId/tags which won't conflict
-  app.use('/api/collections', prerequisitesRoutes);
-  app.use('/api/collections', tagsRoutes); // Collection-specific tag routes
-  app.use('/api/collections', instructorQARoutes);
-  app.use('/api/collections', shareRoutes);
-  app.use('/api/collections', comparisonRoutes);
-  app.use('/api/collections', courseImportRoutes);
+  // Register other specific program sub-routes AFTER the main router
+  // These have parameterized routes like /:programId/tags which won't conflict
+  app.use('/api/programs', prerequisitesRoutes);
+  app.use('/api/programs', tagsRoutes); // Program-specific tag routes
+  app.use('/api/programs', instructorQARoutes);
+  app.use('/api/programs', shareRoutes);
+  app.use('/api/programs', comparisonRoutes);
+  app.use('/api/programs', courseImportRoutes);
   
   // Alias /api/courses for all sub-routes too
   app.use('/api/courses', prerequisitesRoutes);
@@ -84,7 +84,7 @@ export function registerCoursesModule(app: express.Application) {
   app.use('/api', bookingsRoutes);
   // Register resources routes BEFORE lessons routes to ensure more specific routes match first
   app.use('/api', resourcesRoutes);
-  app.use('/api', lessonsRoutes);
+  app.use('/api', lessonsRoutes); // Note: routes are now /api/modules but file is still lessons.routes.ts for now
   app.use('/api', earningsRoutes);
   app.use('/api', certificatesRoutes);
   app.use('/api', attendanceRoutes);
@@ -139,7 +139,7 @@ export function registerCoursesModule(app: express.Application) {
   }));
 }
 
-export { CollectionsService } from './services/service';
+export { CollectionsService, ProgramsService } from './services/service';
 export { EnrollmentService } from './services/enrollment.service';
 export { PaymentService } from './services/payment.service';
 export { MediaService } from './services/media.service';

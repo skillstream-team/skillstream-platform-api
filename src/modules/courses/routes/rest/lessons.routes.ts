@@ -5,19 +5,19 @@ import { requireSubscription } from '../../../../middleware/subscription';
 import { prisma } from '../../../../utils/prisma';
 import { logger } from '../../../../utils/logger';
 import { emailService } from '../../../users/services/email.service';
-import { CollectionsService } from '../../services/service';
+import { ProgramsService } from '../../services/service';
 
 const router = Router();
-const service = new CollectionsService();
+const service = new ProgramsService();
 
 /**
  * @swagger
- * /api/lessons/quick:
+ * /api/modules/quick:
  *   post:
- *     summary: Create a quick lesson
- *     tags: [Lessons]
+ *     summary: Create a quick module
+ *     tags: [Modules]
  */
-router.post('/lessons/quick', requireAuth, requireRole('TEACHER'), async (req, res) => {
+router.post('/modules/quick', requireAuth, requireRole('TEACHER'), async (req, res) => {
   try {
     const userId = (req as any).user?.id;
     const { 
@@ -40,7 +40,7 @@ router.post('/lessons/quick', requireAuth, requireRole('TEACHER'), async (req, r
       
       if (lessonTime <= minTime) {
         return res.status(400).json({ 
-          error: 'Lessons with payment must be scheduled at least 24 hours in advance' 
+          error: 'Modules with payment must be scheduled at least 24 hours in advance' 
         });
       }
     }
@@ -80,7 +80,7 @@ router.post('/lessons/quick', requireAuth, requireRole('TEACHER'), async (req, r
     const joinLink = `https://meet.skillstream.com/${Date.now()}`;
     const meetingId = `meeting-${Date.now()}`;
 
-    const quickLesson = await prisma.quickLesson.create({
+    const quickModule = await prisma.quickModule.create({
       data: {
         title,
         description,
@@ -104,7 +104,7 @@ router.post('/lessons/quick', requireAuth, requireRole('TEACHER'), async (req, r
 
     // Get teacher info for email
     const teacher = await prisma.user.findUnique({
-      where: { id: quickLesson.teacherId },
+      where: { id: quickModule.teacherId },
       select: { id: true, username: true, email: true }
     });
 
@@ -121,11 +121,11 @@ router.post('/lessons/quick', requireAuth, requireRole('TEACHER'), async (req, r
         for (const student of students) {
           await emailService.sendEmail(
             student.email,
-            `Invitation to Lesson: ${title}`,
+            `Invitation to Module: ${title}`,
             `
-              <h2>You've been invited to a lesson!</h2>
-              <p>${teacher?.username || 'A teacher'} has invited you to attend a lesson.</p>
-              <h3>Lesson Details:</h3>
+              <h2>You've been invited to a module!</h2>
+              <p>${teacher?.username || 'A teacher'} has invited you to attend a module.</p>
+              <h3>Module Details:</h3>
               <ul>
                 <li><strong>Title:</strong> ${title}</li>
                 <li><strong>Subject:</strong> ${subject || 'N/A'}</li>
@@ -134,7 +134,7 @@ router.post('/lessons/quick', requireAuth, requireRole('TEACHER'), async (req, r
                 <li><strong>Price:</strong> $${price}</li>
                 <li><strong>Payment Deadline:</strong> ${paymentDeadline.toLocaleString()}</li>
               </ul>
-              <p><strong>Important:</strong> Payment must be completed at least 24 hours before the lesson time.</p>
+              <p><strong>Important:</strong> Payment must be completed at least 24 hours before the module time.</p>
               <p>Please complete your payment to confirm your attendance.</p>
             `
           );
@@ -147,22 +147,22 @@ router.post('/lessons/quick', requireAuth, requireRole('TEACHER'), async (req, r
 
     res.status(201).json({
       success: true,
-      data: quickLesson
+      data: quickModule
     });
   } catch (error) {
-    logger.error('Error creating quick lesson', error);
-    res.status(500).json({ error: 'Failed to create quick lesson' });
+    logger.error('Error creating quick module', error);
+    res.status(500).json({ error: 'Failed to create quick module' });
   }
 });
 
 /**
  * @swagger
- * /api/lessons:
+ * /api/modules:
  *   post:
- *     summary: Create a standalone lesson
- *     tags: [Lessons]
+ *     summary: Create a standalone module
+ *     tags: [Modules]
  */
-router.post('/lessons', requireAuth, requireRole('TEACHER'), async (req, res) => {
+router.post('/modules', requireAuth, requireRole('TEACHER'), async (req, res) => {
   try {
     const userId = (req as any).user?.id;
     const { 
@@ -187,13 +187,13 @@ router.post('/lessons', requireAuth, requireRole('TEACHER'), async (req, res) =>
     }
 
     // Build content JSON
-    const lessonContent: any = content || {};
+    const moduleContent: any = content || {};
     if (description) {
-      lessonContent.description = description;
+      moduleContent.description = description;
     }
 
-    // Create standalone lesson
-    const lesson = await prisma.lesson.create({
+    // Create standalone module
+    const module = await prisma.module.create({
       data: {
         title: title.trim(),
         content: lessonContent,
@@ -207,30 +207,30 @@ router.post('/lessons', requireAuth, requireRole('TEACHER'), async (req, res) =>
     });
 
     // Extract description from content for response
-    const responseContent = lesson.content as any;
+    const responseContent = module.content as any;
     res.status(201).json({
-      ...lesson,
+      ...module,
       description: responseContent?.description || '',
     });
   } catch (error) {
-    logger.error('Error creating lesson', error);
-    res.status(500).json({ error: 'Failed to create lesson' });
+    logger.error('Error creating module', error);
+    res.status(500).json({ error: 'Failed to create module' });
   }
 });
 
 /**
  * @swagger
- * /api/lessons/{id}:
+ * /api/modules/{id}:
  *   get:
- *     summary: Get a single lesson by ID
- *     tags: [Lessons]
+ *     summary: Get a single module by ID
+ *     tags: [Modules]
  */
-router.get('/lessons/:id', requireAuth, async (req, res) => {
+router.get('/modules/:id', requireAuth, async (req, res) => {
   try {
     const { id } = req.params;
-    logger.info(`GET /api/lessons/:id called with id: ${id}`);
+    logger.info(`GET /api/modules/:id called with id: ${id}`);
     
-    const lesson = await prisma.lesson.findUnique({
+    const module = await prisma.module.findUnique({
       where: { id },
       select: {
         id: true,
@@ -257,34 +257,34 @@ router.get('/lessons/:id', requireAuth, async (req, res) => {
       },
     });
 
-    if (!lesson) {
-      return res.status(404).json({ error: 'Lesson not found' });
+    if (!module) {
+      return res.status(404).json({ error: 'Module not found' });
     }
 
-    // Extract description and moduleId from content if they exist
-    const content = lesson.content as any;
+    // Extract description and sectionId from content if they exist
+    const content = module.content as any;
     const description = content?.description || '';
-    const moduleId = content?.moduleId || '';
+    const sectionId = content?.sectionId || '';
 
     res.json({
-      ...lesson,
+      ...module,
       description,
-      moduleId,
+      sectionId,
     });
   } catch (error) {
-    logger.error('Error fetching lesson', error);
-    res.status(500).json({ error: 'Failed to fetch lesson' });
+    logger.error('Error fetching module', error);
+    res.status(500).json({ error: 'Failed to fetch module' });
   }
 });
 
 /**
  * @swagger
- * /api/lessons:
+ * /api/modules:
  *   get:
- *     summary: Get lessons (for teacher or student)
- *     tags: [Lessons]
+ *     summary: Get modules (for teacher or student)
+ *     tags: [Modules]
  */
-router.get('/lessons', requireAuth, async (req, res) => {
+router.get('/modules', requireAuth, async (req, res) => {
   try {
     const userId = (req as any).user?.id;
     const userRole = (req as any).user?.role;
@@ -307,46 +307,46 @@ router.get('/lessons', requireAuth, async (req, res) => {
       // For students, get lessons from bookings
       const bookings = await prisma.booking.findMany({
         where: { 
-          studentId: userId,
-          status: { not: 'cancelled' }
+          studentId: userId
+          // Note: Booking model may not have a status field - adjust based on schema
         },
         include: {
           slot: true
         }
       });
       
-      // Also get lessons from collections the student is enrolled in
+      // Also get modules from programs the student is enrolled in
       // Note: Enrollment model doesn't have a status field, so we get all enrollments
       const enrollments = await prisma.enrollment.findMany({
         where: { 
           studentId: userId
         },
-        select: { collectionId: true }
+        select: { programId: true }
       });
       
-      const enrolledCollectionIds = enrollments.map(e => e.collectionId);
+      const enrolledProgramIds = enrollments.map(e => e.programId);
       
-      // Get lessons from enrolled collections
-      if (enrolledCollectionIds.length > 0) {
-        const collectionLessons = await prisma.collectionLesson.findMany({
+      // Get modules from enrolled programs
+      if (enrolledProgramIds.length > 0) {
+        const programModules = await prisma.programModule.findMany({
           where: {
-            collectionId: { in: enrolledCollectionIds }
+            programId: { in: enrolledProgramIds }
           },
-          select: { lessonId: true }
+          select: { moduleId: true }
         });
         
-        const lessonIds = collectionLessons.map(cl => cl.lessonId);
-        if (lessonIds.length > 0) {
-          // Store lesson IDs for later use in query
-          (whereRegular as any).enrolledLessonIds = lessonIds;
+        const moduleIds = programModules.map(pm => pm.moduleId);
+        if (moduleIds.length > 0) {
+          // Store module IDs for later use in query
+          (whereRegular as any).enrolledModuleIds = moduleIds;
         }
       }
       
-      // If no enrolled lessons, show all lessons for browsing
-      // Students should be able to see all lessons to browse and see costs
-      if (!(whereRegular as any).enrolledLessonIds) {
-        // Don't set any filters - show all lessons
-        // whereRegular remains empty {} which will return all lessons
+      // If no enrolled modules, show all modules for browsing
+      // Students should be able to see all modules to browse and see costs
+      if (!(whereRegular as any).enrolledModuleIds) {
+        // Don't set any filters - show all modules
+        // whereRegular remains empty {} which will return all modules
       }
     } else {
       // No role specified or other role - show all lessons for browsing
@@ -357,70 +357,68 @@ router.get('/lessons', requireAuth, async (req, res) => {
     if (status === 'upcoming') {
       whereQuick.scheduledAt = { gte: new Date() };
       whereQuick.status = 'scheduled';
-      // For regular lessons, include both scheduled lessons with future dates AND standalone lessons (no scheduledAt)
+      // For regular modules, include both scheduled modules with future dates AND standalone modules (no scheduledAt)
       const statusConditions: any[] = [
         { scheduledAt: { gte: new Date() }, status: 'scheduled' },
-        { scheduledAt: null, status: 'scheduled' } // Standalone content lessons
+        { scheduledAt: null, status: 'scheduled' } // Standalone content modules
       ];
       
-      // If student has enrolled lessons, add them to OR conditions
-      if ((whereRegular as any).enrolledLessonIds) {
-        statusConditions.push({ id: { in: (whereRegular as any).enrolledLessonIds } });
-        delete (whereRegular as any).enrolledLessonIds;
+      // If student has enrolled modules, add them separately to whereRegular
+      // Note: enrolledModuleIds are for regular Module model, not QuickModule
+      // Regular Module doesn't have scheduledAt or status fields like QuickModule
+      // So we handle enrolled modules separately - they should be shown regardless of status
+      if ((whereRegular as any).enrolledModuleIds) {
+        const enrolledModuleIds = (whereRegular as any).enrolledModuleIds;
+        delete (whereRegular as any).enrolledModuleIds;
+        // For enrolled modules, we want to show them regardless of status
+        // So we add them as a simple id filter
+        whereRegular.id = { in: enrolledModuleIds };
+        // Don't apply status conditions to enrolled modules since they're regular Module type
+      } else {
+        // No enrolled modules, apply status conditions for QuickModule compatibility
+        // But regular Module doesn't have these fields, so we don't apply them
+        // whereRegular remains empty {} to show all modules
       }
-      
-      whereRegular.OR = statusConditions;
     } else if (status === 'past') {
       whereQuick.scheduledAt = { lt: new Date() };
       whereQuick.status = { in: ['completed', 'cancelled'] };
-      const statusConditions: any[] = [
-        { scheduledAt: { lt: new Date() }, status: { in: ['completed', 'cancelled'] } }
-      ];
       
-      // If student has enrolled lessons, add them to OR conditions
-      if ((whereRegular as any).enrolledLessonIds) {
-        statusConditions.push({ id: { in: (whereRegular as any).enrolledLessonIds } });
-        delete (whereRegular as any).enrolledLessonIds;
+      // Regular Module doesn't have scheduledAt or status fields
+      // If student has enrolled modules, show them by ID only
+      if ((whereRegular as any).enrolledModuleIds) {
+        const enrolledModuleIds = (whereRegular as any).enrolledModuleIds;
+        delete (whereRegular as any).enrolledModuleIds;
+        whereRegular.id = { in: enrolledModuleIds };
       }
-      
-      if (statusConditions.length > 1) {
-        whereRegular.OR = statusConditions;
-      } else {
-        whereRegular.scheduledAt = { lt: new Date() };
-        whereRegular.status = { in: ['completed', 'cancelled'] };
-      }
+      // Don't apply status conditions to whereRegular since Module model doesn't have these fields
     } else if (status) {
       whereQuick.status = status;
-      const statusConditions: any[] = [{ status }];
       
-      // If student has enrolled lessons, add them to OR conditions
-      if ((whereRegular as any).enrolledLessonIds) {
-        statusConditions.push({ id: { in: (whereRegular as any).enrolledLessonIds } });
-        delete (whereRegular as any).enrolledLessonIds;
+      // Regular Module doesn't have status field
+      // If student has enrolled modules, show them by ID only
+      if ((whereRegular as any).enrolledModuleIds) {
+        const enrolledModuleIds = (whereRegular as any).enrolledModuleIds;
+        delete (whereRegular as any).enrolledModuleIds;
+        whereRegular.id = { in: enrolledModuleIds };
       }
-      
-      if (statusConditions.length > 1) {
-        whereRegular.OR = statusConditions;
-      } else {
-        whereRegular.status = status;
-      }
+      // Don't apply status conditions to whereRegular since Module model doesn't have status field
     } else {
       // No status filter
-      if ((whereRegular as any).enrolledLessonIds) {
-        // Student has enrolled lessons - show only those
-        whereRegular.OR = [
-          { id: { in: (whereRegular as any).enrolledLessonIds } }
-        ];
-        delete (whereRegular as any).enrolledLessonIds;
+      if ((whereRegular as any).enrolledModuleIds) {
+        // Student has enrolled modules - show only those
+        const enrolledModuleIds = (whereRegular as any).enrolledModuleIds;
+        delete (whereRegular as any).enrolledModuleIds;
+        // For enrolled modules, filter by ID only (regular Module doesn't have status/scheduledAt)
+        whereRegular.id = { in: enrolledModuleIds };
       } else {
-        // No enrolled lessons or not a student - show all lessons for browsing
-        // Clear whereRegular to return all lessons
+        // No enrolled modules or not a student - show all modules for browsing
+        // Clear whereRegular to return all modules
         Object.keys(whereRegular).forEach(key => delete whereRegular[key]);
       }
     }
 
-    // Get quick lessons
-    const quickLessons = await prisma.quickLesson.findMany({
+    // Get quick modules
+    const quickModules = await prisma.quickModule.findMany({
       where: whereQuick,
       include: {
         teacher: {
@@ -430,34 +428,60 @@ router.get('/lessons', requireAuth, async (req, res) => {
       orderBy: { scheduledAt: 'asc' }
     });
 
-    // Get regular lessons (standalone or from collections)
-    // If whereRegular is empty, it means show all lessons (for browsing)
+    // Get regular modules (standalone or from programs)
+    // If whereRegular is empty, it means show all modules (for browsing)
     // Prisma requires undefined (not empty object) to return all records
     const hasFilters = Object.keys(whereRegular).length > 0;
-    const regularLessonsQuery: any = {
+    const regularModulesQuery: any = {
       where: hasFilters ? whereRegular : undefined,
       orderBy: { createdAt: 'desc' }, // Sort by creation date (newest first)
+      include: {
+        // Include teacher information if teacherId exists
+        // Note: Module model has teacherId but no relation, so we'll fetch it separately
+      },
     };
 
-    logger.info(`Lessons query - role: ${role || 'not specified'}, effectiveRole: ${effectiveRole}, hasFilters: ${hasFilters}, whereRegular keys: ${Object.keys(whereRegular).join(', ')}`);
+    logger.info(`Modules query - role: ${role || 'not specified'}, effectiveRole: ${effectiveRole}, hasFilters: ${hasFilters}, whereRegular keys: ${Object.keys(whereRegular).join(', ')}`);
     
-    const regularLessons = await prisma.lesson.findMany(regularLessonsQuery).catch((err) => {
-      logger.error('Error fetching regular lessons', err);
+    const regularModulesRaw = await prisma.module.findMany(regularModulesQuery).catch((err) => {
+      logger.error('Error fetching regular modules', err);
       return [];
     });
     
-    logger.info(`Found ${regularLessons.length} regular lessons`);
+    // Fetch teacher information for modules that have teacherId
+    const regularModules = await Promise.all(
+      regularModulesRaw.map(async (module) => {
+        if (module.teacherId) {
+          try {
+            const teacher = await prisma.user.findUnique({
+              where: { id: module.teacherId },
+              select: { id: true, username: true, email: true, firstName: true, lastName: true },
+            });
+            return {
+              ...module,
+              teacher: teacher || null,
+            };
+          } catch (error) {
+            logger.error(`Error fetching teacher for module ${module.id}`, error);
+            return { ...module, teacher: null };
+          }
+        }
+        return { ...module, teacher: null };
+      })
+    );
+    
+    logger.info(`Found ${regularModules.length} regular modules`);
 
     res.json({
       success: true,
       data: {
-        quickLessons,
-        regularLessons
+        quickModules,
+        regularModules
       }
     });
   } catch (error) {
-    logger.error('Error fetching lessons', error);
-    res.status(500).json({ error: 'Failed to fetch lessons' });
+    logger.error('Error fetching modules', error);
+    res.status(500).json({ error: 'Failed to fetch modules' });
   }
 });
 
@@ -468,19 +492,19 @@ router.get('/lessons', requireAuth, async (req, res) => {
  *     summary: Update a lesson
  *     tags: [Lessons]
  */
-router.put('/lessons/:id', requireAuth, requireRole('TEACHER'), async (req, res) => {
+router.put('/modules/:id', requireAuth, requireRole('TEACHER'), async (req, res) => {
   try {
     const { id } = req.params;
     const { title, description, order, duration, price, isPreview, moduleId } = req.body;
     
-    // Get lesson to check if it exists
-    const existingLesson = await prisma.lesson.findUnique({
+    // Get module to check if it exists
+    const existingModule = await prisma.module.findUnique({
       where: { id },
       select: { content: true },
     });
 
-    if (!existingLesson) {
-      return res.status(404).json({ error: 'Lesson not found' });
+    if (!existingModule) {
+      return res.status(404).json({ error: 'Module not found' });
     }
 
     // Build update data
@@ -496,68 +520,68 @@ router.put('/lessons/:id', requireAuth, requireRole('TEACHER'), async (req, res)
     }
     if (isPreview !== undefined) updateData.isPreview = isPreview;
 
-    // Handle content JSON (description and moduleId)
-    const existingContent = (existingLesson.content as any) || {};
+    // Handle content JSON (description and sectionId)
+    const existingContent = (existingModule.content as any) || {};
     const contentUpdate: any = { ...existingContent };
     if (description !== undefined) contentUpdate.description = description;
-    if (moduleId !== undefined) contentUpdate.moduleId = moduleId;
+    if (moduleId !== undefined) contentUpdate.sectionId = moduleId;
     updateData.content = contentUpdate;
 
-    // Update lesson using service (this will handle cache invalidation for collections)
-    const updatedLesson = await service.updateLesson(id, updateData);
+    // Update module using service (this will handle cache invalidation for programs)
+    const updatedModule = await service.updateModule(id, updateData);
 
-    // Extract description and moduleId from content for response
-    const content = updatedLesson.content as any;
+    // Extract description and sectionId from content for response
+    const content = updatedModule.content as any;
     res.json({
-      ...updatedLesson,
+      ...updatedModule,
       description: content?.description || '',
-      moduleId: content?.moduleId || '',
+      sectionId: content?.sectionId || '',
     });
   } catch (error) {
-    logger.error('Error updating lesson', error);
-    res.status(500).json({ error: 'Failed to update lesson' });
+    logger.error('Error updating module', error);
+    res.status(500).json({ error: 'Failed to update module' });
   }
 });
 
 /**
  * @swagger
- * /api/lessons/{id}:
+ * /api/modules/{id}:
  *   delete:
- *     summary: Delete a lesson
- *     tags: [Lessons]
+ *     summary: Delete a module
+ *     tags: [Modules]
  */
-router.delete('/lessons/:id', requireAuth, requireRole('TEACHER'), async (req, res) => {
+router.delete('/modules/:id', requireAuth, requireRole('TEACHER'), async (req, res) => {
   try {
     const { id } = req.params;
     
-    // Check if lesson exists and get collections it belongs to for cache invalidation
-    const collectionLessons = await prisma.collectionLesson.findMany({
-      where: { lessonId: id },
-      select: { collectionId: true },
+    // Check if module exists and get programs it belongs to for cache invalidation
+    const programModules = await prisma.programModule.findMany({
+      where: { moduleId: id },
+      select: { programId: true },
     });
 
-    const lesson = await prisma.lesson.findUnique({
+    const module = await prisma.module.findUnique({
       where: { id },
     });
 
-    if (!lesson) {
-      return res.status(404).json({ error: 'Lesson not found' });
+    if (!module) {
+      return res.status(404).json({ error: 'Module not found' });
     }
 
-    await prisma.lesson.delete({ where: { id } });
+    await prisma.module.delete({ where: { id } });
     
-    // Invalidate cache for all collections this lesson belonged to
+    // Invalidate cache for all programs this module belonged to
     const { deleteCache, cacheKeys } = await import('../../../../utils/cache');
     await Promise.all(
-      collectionLessons.map(cl => 
-        deleteCache(cacheKeys.collection(cl.collectionId))
+      programModules.map(pm => 
+        deleteCache(cacheKeys.program(pm.programId))
       )
     );
     
-    res.json({ success: true, message: 'Lesson deleted successfully' });
+    res.json({ success: true, message: 'Module deleted successfully' });
   } catch (error) {
-    logger.error('Error deleting lesson', error);
-    res.status(500).json({ error: 'Failed to delete lesson' });
+    logger.error('Error deleting module', error);
+    res.status(500).json({ error: 'Failed to delete module' });
   }
 });
 

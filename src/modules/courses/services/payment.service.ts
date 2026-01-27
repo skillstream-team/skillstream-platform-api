@@ -5,8 +5,8 @@ export class PaymentService {
     private mapPaymentToDto(payment: any): PaymentResponseDto {
         return {
             ...payment,
-            courseId: payment.collectionId,
-            course: payment.collection,
+            courseId: payment.programId || payment.collectionId,
+            course: payment.program || payment.collection,
         } as PaymentResponseDto;
     }
 
@@ -34,7 +34,8 @@ export class PaymentService {
         const payment = await prisma.payment.create({
             data: {
                 studentId: data.studentId,
-                collectionId: data.courseId,
+                programId: data.courseId,
+                collectionId: data.courseId, // Backward compatibility
                 amount: data.amount,
                 currency: data.currency || 'USD',
                 status: data.status,
@@ -43,7 +44,8 @@ export class PaymentService {
             },
             include: {
                 student: { select: { id: true, username: true, email: true } },
-                collection: { select: { id: true, title: true, price: true } },
+                program: { select: { id: true, title: true, price: true } },
+                collection: { select: { id: true, title: true, price: true } }, // Backward compatibility
             },
         });
 
@@ -86,7 +88,8 @@ export class PaymentService {
             },
             include: {
                 student: { select: { id: true, username: true, email: true } },
-                collection: { select: { id: true, title: true, price: true } },
+                program: { select: { id: true, title: true, price: true } },
+                collection: { select: { id: true, title: true, price: true } }, // Backward compatibility
             },
         });
 
@@ -121,7 +124,8 @@ export class PaymentService {
             where: { id: paymentId },
             include: {
                 student: { select: { id: true, username: true, email: true } },
-                collection: { select: { id: true, title: true, price: true } },
+                program: { select: { id: true, title: true, price: true } },
+                collection: { select: { id: true, title: true, price: true } }, // Backward compatibility
             },
         });
 
@@ -156,7 +160,8 @@ export class PaymentService {
             where: { studentId },
             include: {
                 student: { select: { id: true, username: true, email: true } },
-                collection: { select: { id: true, title: true, price: true } },
+                program: { select: { id: true, title: true, price: true } },
+                collection: { select: { id: true, title: true, price: true } }, // Backward compatibility
             },
             orderBy: { createdAt: 'desc' },
         });
@@ -189,10 +194,11 @@ export class PaymentService {
      */
     async getPaymentsByCourse(courseId: string): Promise<PaymentResponseDto[]> {
         const payments = await prisma.payment.findMany({
-            where: { collectionId: courseId },
+            where: { programId: courseId, collectionId: courseId }, // Backward compatibility
             include: {
                 student: { select: { id: true, username: true, email: true } },
-                collection: { select: { id: true, title: true, price: true } },
+                program: { select: { id: true, title: true, price: true } },
+                collection: { select: { id: true, title: true, price: true } }, // Backward compatibility
             },
             orderBy: { createdAt: 'desc' },
         });
@@ -225,18 +231,19 @@ export class PaymentService {
      */
     async getCompletedPaymentsByCollection(courseId: string): Promise<PaymentResponseDto[]> {
         const payments = await prisma.payment.findMany({
-            where: { collectionId: courseId, status: 'COMPLETED' },
+            where: { programId: courseId, collectionId: courseId, status: 'COMPLETED' }, // Backward compatibility
             include: {
                 student: { select: { id: true, username: true, email: true } },
-                collection: { select: { id: true, title: true, price: true } },
+                program: { select: { id: true, title: true, price: true } },
+                collection: { select: { id: true, title: true, price: true } }, // Backward compatibility
             },
             orderBy: { createdAt: 'desc' },
         });
 
         return payments.map((p: any) => ({
             ...p,
-            courseId: p.collectionId,
-            course: p.collection,
+            courseId: p.programId || p.collectionId,
+            course: p.program || p.collection,
         })) as PaymentResponseDto[];
     }
 }

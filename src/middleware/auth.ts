@@ -3,6 +3,7 @@ import jwt from 'jsonwebtoken';
 import { prisma } from '../utils/prisma';
 import { setUser } from '../utils/sentry';
 import { env } from '../utils/env';
+import { logger } from '../utils/logger';
 
 interface AuthenticatedRequest extends Request {
   user?: {
@@ -15,7 +16,8 @@ interface AuthenticatedRequest extends Request {
 
 export const requireAuth = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
-    const token = req.header('Authorization')?.replace('Bearer ', '');
+    const authHeader = req.header('Authorization');
+    const token = authHeader?.replace('Bearer ', '');
     
     if (!token) {
       return res.status(401).json({ error: 'Access denied. No token provided.' });
@@ -23,7 +25,15 @@ export const requireAuth = async (req: AuthenticatedRequest, res: Response, next
 
     const jwtSecret = env.JWT_SECRET;
     
+    if (!jwtSecret) {
+      return res.status(500).json({ error: 'Server configuration error.' });
+    }
+    
     const decoded = jwt.verify(token, jwtSecret) as any;
+    
+    if (!decoded || !decoded.id) {
+      return res.status(401).json({ error: 'Invalid token format.' });
+    }
     
     // Get user from database
     const user = await prisma.user.findUnique({
@@ -50,8 +60,22 @@ export const requireAuth = async (req: AuthenticatedRequest, res: Response, next
     });
     
     next();
-  } catch (error) {
-    res.status(401).json({ error: 'Invalid token.' });
+  } catch (error: any) {
+    // Log authentication errors for debugging (but don't expose sensitive info)
+    logger.warn(`Authentication failed for ${req.path}`, {
+      error: error.name,
+      hasToken: !!req.header('Authorization'),
+      path: req.path,
+    });
+    
+    // More specific error messages
+    if (error.name === 'TokenExpiredError') {
+      return res.status(401).json({ error: 'Token expired. Please login again.' });
+    }
+    if (error.name === 'JsonWebTokenError') {
+      return res.status(401).json({ error: 'Invalid token.' });
+    }
+    return res.status(401).json({ error: 'Authentication failed.' });
   }
 };
 

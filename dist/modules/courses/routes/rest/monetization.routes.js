@@ -47,7 +47,7 @@ const monetizationService = new monetization_service_1.MonetizationService();
  */
 router.get('/collections/:id/monetization', auth_1.requireAuth, async (req, res) => {
     try {
-        const requirements = await monetizationService.getAccessRequirements(req.params.id, 'COLLECTION');
+        const requirements = await monetizationService.getAccessRequirements(req.params.id, 'PROGRAM');
         res.json(requirements);
     }
     catch (error) {
@@ -62,7 +62,7 @@ router.get('/collections/:id/monetization', auth_1.requireAuth, async (req, res)
  */
 router.get('/lessons/:id/monetization', auth_1.requireAuth, async (req, res) => {
     try {
-        const requirements = await monetizationService.getAccessRequirements(req.params.id, 'LESSON');
+        const requirements = await monetizationService.getAccessRequirements(req.params.id, 'MODULE');
         res.json(requirements);
     }
     catch (error) {
@@ -82,14 +82,14 @@ router.put('/collections/:id/monetization', auth_1.requireAuth, (0, roles_1.requ
         if (!['FREE', 'SUBSCRIPTION', 'PREMIUM'].includes(monetizationType)) {
             return res.status(400).json({ error: 'Invalid monetization type' });
         }
-        const collection = await prisma.collection.update({
+        const program = await prisma.program.update({
             where: { id: req.params.id },
             data: {
                 monetizationType,
                 subscriptionTier: subscriptionTier || null,
             },
         });
-        res.json(collection);
+        res.json(program);
     }
     catch (error) {
         res.status(500).json({ error: error.message });
@@ -108,11 +108,11 @@ router.put('/lessons/:id/monetization', auth_1.requireAuth, (0, roles_1.requireR
         if (!['FREE', 'SUBSCRIPTION', 'PREMIUM'].includes(monetizationType)) {
             return res.status(400).json({ error: 'Invalid monetization type' });
         }
-        const lesson = await prisma.lesson.update({
+        const module = await prisma.module.update({
             where: { id: req.params.id },
             data: { monetizationType },
         });
-        res.json(lesson);
+        res.json(module);
     }
     catch (error) {
         res.status(500).json({ error: error.message });
@@ -128,7 +128,7 @@ router.get('/content/:type/:id/access', auth_1.requireAuth, async (req, res) => 
     try {
         const userId = req.user?.id;
         const { type, id } = req.params;
-        if (!['COLLECTION', 'LESSON'].includes(type)) {
+        if (!['PROGRAM', 'MODULE'].includes(type)) {
             return res.status(400).json({ error: 'Invalid content type' });
         }
         const canAccess = await monetizationService.canAccess(userId, id, type);

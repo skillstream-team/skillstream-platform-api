@@ -3,6 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
 const auth_1 = require("../../../../middleware/auth");
 const prisma_1 = require("../../../../utils/prisma");
+const logger_1 = require("../../../../utils/logger");
 const router = (0, express_1.Router)();
 /**
  * @swagger
@@ -46,15 +47,15 @@ router.get('/', auth_1.requireAuth, async (req, res) => {
         }
         else if (scope === 'course' && collectionId) {
             where.scope = 'course';
-            where.collectionId = collectionId;
+            where.programId = collectionId;
         }
         else if (scope === 'user' && userId) {
-            const collectionIds = await getUserCollectionIds(userId);
+            const programIds = await getUserCollectionIds(userId);
             where.AND.push({
                 OR: [
                     { scope: 'global' },
                     { scope: 'user', targetUserId: userId },
-                    { scope: 'course', collectionId: { in: collectionIds } }
+                    { scope: 'course', programId: { in: programIds } }
                 ]
             });
         }
@@ -70,7 +71,7 @@ router.get('/', auth_1.requireAuth, async (req, res) => {
                     creator: {
                         select: { id: true, username: true, email: true }
                     },
-                    collection: {
+                    program: {
                         select: { id: true, title: true }
                     }
                 },
@@ -92,7 +93,7 @@ router.get('/', auth_1.requireAuth, async (req, res) => {
         });
     }
     catch (error) {
-        console.error('Error fetching announcements:', error);
+        logger_1.logger.error('Error fetching announcements', error);
         res.status(500).json({ error: 'Failed to fetch announcements' });
     }
 });
@@ -118,7 +119,7 @@ router.get('/users/:userId/announcements', auth_1.requireAuth, async (req, res) 
                     OR: [
                         { scope: 'global' },
                         { scope: 'user', targetUserId: userId },
-                        { scope: 'course', collectionId: { in: collectionIds } }
+                        { scope: 'course', programId: { in: collectionIds } }
                     ]
                 },
                 {
@@ -138,7 +139,7 @@ router.get('/users/:userId/announcements', auth_1.requireAuth, async (req, res) 
                     creator: {
                         select: { id: true, username: true, email: true }
                     },
-                    collection: {
+                    program: {
                         select: { id: true, title: true }
                     }
                 },
@@ -160,7 +161,7 @@ router.get('/users/:userId/announcements', auth_1.requireAuth, async (req, res) 
         });
     }
     catch (error) {
-        console.error('Error fetching user announcements:', error);
+        logger_1.logger.error('Error fetching user announcements', error);
         res.status(500).json({ error: 'Failed to fetch user announcements' });
     }
 });
@@ -178,7 +179,7 @@ router.get('/collections/:collectionId/announcements', auth_1.requireAuth, async
         const limit = Math.min(parseInt(req.query.limit) || 20, 100);
         const skip = (page - 1) * limit;
         const where = {
-            collectionId,
+            programId: collectionId,
             isActive: true,
             OR: [
                 { expiresAt: null },
@@ -194,7 +195,7 @@ router.get('/collections/:collectionId/announcements', auth_1.requireAuth, async
                     creator: {
                         select: { id: true, username: true, email: true }
                     },
-                    collection: {
+                    program: {
                         select: { id: true, title: true }
                     }
                 },
@@ -216,15 +217,15 @@ router.get('/collections/:collectionId/announcements', auth_1.requireAuth, async
         });
     }
     catch (error) {
-        console.error('Error fetching collection announcements:', error);
+        logger_1.logger.error('Error fetching collection announcements', error);
         res.status(500).json({ error: 'Failed to fetch collection announcements' });
     }
 });
 async function getUserCollectionIds(userId) {
     const enrollments = await prisma_1.prisma.enrollment.findMany({
         where: { studentId: userId },
-        select: { collectionId: true }
+        select: { programId: true }
     });
-    return enrollments.map(e => e.collectionId);
+    return enrollments.map(e => e.programId);
 }
 exports.default = router;

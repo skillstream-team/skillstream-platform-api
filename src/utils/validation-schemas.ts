@@ -82,13 +82,29 @@ export const createEnrollmentSchema = z.object({
   transactionId: z.string().optional(),
 });
 
-// Module schemas
+// Module schemas — price is required (teachers must set individual price per module)
 export const createModuleSchema = z.object({
   title: z.string().min(1).max(200),
   description: z.string().max(5000).optional(),
   order: z.number().int().min(0),
+  price: z.number().min(0),
   createdBy: z.string().min(1),
   // courseId comes from URL params, not body
+});
+
+export const updateModuleSchema = z.object({
+  title: z.string().min(1).max(200).optional(),
+  description: z.string().max(5000).optional(),
+  order: z.number().int().min(0).optional(),
+  price: z.number().min(0).optional(),
+});
+
+// Section schema (no price — sections are containers; modules have price)
+export const createSectionSchema = z.object({
+  title: z.string().min(1).max(200),
+  description: z.string().max(5000).optional(),
+  order: z.number().int().min(0),
+  createdBy: z.string().min(1),
 });
 
 // Quiz schemas

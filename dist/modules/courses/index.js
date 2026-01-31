@@ -17,7 +17,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.calendarSchema = exports.recommendationSchema = exports.mediaSchema = exports.enrollmentSchema = exports.coursesSchema = exports.MonetizationService = exports.CourseImportService = exports.ComparisonService = exports.ShareService = exports.ReferralService = exports.InstructorQAService = exports.TagsService = exports.LearningPathsService = exports.CouponsService = exports.BundlesService = exports.DashboardService = exports.PrerequisitesService = exports.WishlistService = exports.CategoryService = exports.TeacherEarningsService = exports.WhiteboardService = exports.PollService = exports.CalendarService = exports.RecommendationService = exports.RealtimeService = exports.CloudflareStreamService = exports.CloudflareR2Service = exports.MediaService = exports.PaymentService = exports.EnrollmentService = exports.CollectionsService = void 0;
+exports.calendarSchema = exports.recommendationSchema = exports.mediaSchema = exports.enrollmentSchema = exports.coursesSchema = exports.MonetizationService = exports.CourseImportService = exports.ComparisonService = exports.ShareService = exports.ReferralService = exports.InstructorQAService = exports.TagsService = exports.LearningPathsService = exports.CouponsService = exports.BundlesService = exports.DashboardService = exports.PrerequisitesService = exports.WishlistService = exports.CategoryService = exports.TeacherEarningsService = exports.WhiteboardService = exports.PollService = exports.CalendarService = exports.RecommendationService = exports.RealtimeService = exports.CloudflareStreamService = exports.CloudflareR2Service = exports.MediaService = exports.PaymentService = exports.EnrollmentService = exports.ProgramsService = exports.CollectionsService = void 0;
 exports.registerCoursesModule = registerCoursesModule;
 const express_graphql_1 = require("express-graphql");
 const courses_routes_1 = __importDefault(require("./routes/rest/courses.routes"));
@@ -73,30 +73,40 @@ const calendar_resolver_1 = require("./routes/graphql/calendar.resolver");
 Object.defineProperty(exports, "calendarSchema", { enumerable: true, get: function () { return calendar_resolver_1.calendarSchema; } });
 function registerCoursesModule(app) {
     // REST routes
-    // Register specific routes BEFORE the main collections router to ensure they match first
-    // This prevents /api/collections/:id from matching routes like /api/collections/wishlist
-    app.use('/api/collections/wishlist', wishlist_routes_1.default);
-    // Register main collections router AFTER specific routes
-    // This ensures POST /api/collections matches before parameterized routes
-    app.use('/api/collections', courses_routes_1.default);
-    // Register other specific collection sub-routes AFTER the main router
-    // These have parameterized routes like /:collectionId/tags which won't conflict
-    app.use('/api/collections', prerequisites_routes_1.default);
-    app.use('/api/collections', tags_routes_1.default); // Collection-specific tag routes
-    app.use('/api/collections', instructor_qa_routes_1.default);
-    app.use('/api/collections', share_routes_1.default);
-    app.use('/api/collections', comparison_routes_1.default);
-    app.use('/api/collections', course_import_routes_1.default);
+    // Register specific routes BEFORE the main programs router to ensure they match first
+    // This prevents /api/programs/:id from matching routes like /api/programs/wishlist
+    app.use('/api/programs/wishlist', wishlist_routes_1.default);
+    // Register main programs router AFTER specific routes
+    // This ensures POST /api/programs matches before parameterized routes
+    app.use('/api/programs', courses_routes_1.default);
+    // Alias /api/courses to /api/programs for backward compatibility
+    app.use('/api/courses', courses_routes_1.default);
+    // Register other specific program sub-routes AFTER the main router
+    // These have parameterized routes like /:programId/tags which won't conflict
+    app.use('/api/programs', prerequisites_routes_1.default);
+    app.use('/api/programs', tags_routes_1.default); // Program-specific tag routes
+    app.use('/api/programs', instructor_qa_routes_1.default);
+    app.use('/api/programs', share_routes_1.default);
+    app.use('/api/programs', comparison_routes_1.default);
+    app.use('/api/programs', course_import_routes_1.default);
+    // Alias /api/courses for all sub-routes too
+    app.use('/api/courses', prerequisites_routes_1.default);
+    app.use('/api/courses', tags_routes_1.default);
+    app.use('/api/courses', instructor_qa_routes_1.default);
+    app.use('/api/courses', share_routes_1.default);
+    app.use('/api/courses', comparison_routes_1.default);
+    app.use('/api/courses', course_import_routes_1.default);
     app.use('/api', progress_routes_1.default);
     app.use('/api/enrollments', enrollments_routes_1.default);
     app.use('/api', announcements_routes_1.default);
     app.use('/api', recommendations_user_routes_1.default);
     app.use('/api', bookings_routes_1.default);
-    app.use('/api', lessons_routes_1.default);
+    // Register resources routes BEFORE lessons routes to ensure more specific routes match first
+    app.use('/api', resources_routes_1.default);
+    app.use('/api', lessons_routes_1.default); // Note: routes are now /api/modules but file is still lessons.routes.ts for now
     app.use('/api', earnings_routes_1.default);
     app.use('/api', certificates_routes_1.default);
     app.use('/api', attendance_routes_1.default);
-    app.use('/api', resources_routes_1.default);
     app.use('/api', video_routes_1.default);
     app.use('/api', marketing_routes_1.default);
     app.use('/api/calendar', calendar_routes_1.default);
@@ -144,6 +154,7 @@ function registerCoursesModule(app) {
 }
 var service_1 = require("./services/service");
 Object.defineProperty(exports, "CollectionsService", { enumerable: true, get: function () { return service_1.CollectionsService; } });
+Object.defineProperty(exports, "ProgramsService", { enumerable: true, get: function () { return service_1.ProgramsService; } });
 var enrollment_service_1 = require("./services/enrollment.service");
 Object.defineProperty(exports, "EnrollmentService", { enumerable: true, get: function () { return enrollment_service_1.EnrollmentService; } });
 var payment_service_1 = require("./services/payment.service");

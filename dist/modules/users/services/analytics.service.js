@@ -12,7 +12,7 @@ class AnalyticsService {
         // Overview stats
         const [totalUsers, totalCourses, totalEnrollments, activeUsers, allPayments, usersByRole,] = await Promise.all([
             prisma_1.prisma.user.count(),
-            prisma_1.prisma.collection.count(),
+            prisma_1.prisma.program.count(),
             prisma_1.prisma.enrollment.count(),
             prisma_1.prisma.user.count({
                 where: {
@@ -167,7 +167,7 @@ class AnalyticsService {
      * Get collection-specific analytics
      */
     async getCollectionAnalytics(collectionId) {
-        const course = await prisma_1.prisma.collection.findUnique({
+        const course = await prisma_1.prisma.program.findUnique({
             where: { id: collectionId },
             include: {
                 enrollments: {

@@ -9,26 +9,56 @@ const router = (0, express_1.Router)();
 const paymentService = new lesson_payment_service_1.LessonPaymentService();
 /**
  * @swagger
- * /api/lessons/{lessonId}/payment:
+ * /api/modules/{moduleId}/payment:
  *   post:
- *     summary: Create payment for a lesson
- *     tags: [Lesson Payments]
+ *     summary: Create payment for a module
+ *     tags: [Module Payments]
  */
-const createLessonPaymentSchema = zod_1.z.object({
+const createModulePaymentSchema = zod_1.z.object({
     amount: zod_1.z.number().min(0.01),
     currency: zod_1.z.string().optional().default('USD'),
     provider: zod_1.z.string(),
     transactionId: zod_1.z.string().optional(),
 });
+router.post('/modules/:moduleId/payment', auth_1.requireAuth, (0, validation_1.validate)({
+    params: zod_1.z.object({ moduleId: zod_1.z.string().min(1) }),
+    body: createModulePaymentSchema,
+}), async (req, res) => {
+    try {
+        const { moduleId } = req.params;
+        const userId = req.user?.id;
+        const payment = await paymentService.createModulePayment({
+            moduleId,
+            studentId: userId,
+            amount: req.body.amount,
+            currency: req.body.currency,
+            provider: req.body.provider,
+            transactionId: req.body.transactionId,
+        });
+        res.status(201).json({
+            success: true,
+            data: payment,
+            message: 'Payment created. Please complete the payment to confirm your attendance.',
+        });
+    }
+    catch (error) {
+        console.error('Error creating module payment:', error);
+        const statusCode = error.message.includes('not found') ? 404 : 400;
+        res.status(statusCode).json({
+            error: error.message || 'Failed to create payment',
+        });
+    }
+});
+// Backward compatibility route
 router.post('/lessons/:lessonId/payment', auth_1.requireAuth, (0, validation_1.validate)({
     params: zod_1.z.object({ lessonId: zod_1.z.string().min(1) }),
-    body: createLessonPaymentSchema,
+    body: createModulePaymentSchema,
 }), async (req, res) => {
     try {
         const { lessonId } = req.params;
         const userId = req.user?.id;
-        const payment = await paymentService.createLessonPayment({
-            lessonId,
+        const payment = await paymentService.createModulePayment({
+            moduleId: lessonId,
             studentId: userId,
             amount: req.body.amount,
             currency: req.body.currency,
@@ -58,7 +88,7 @@ router.post('/lessons/:lessonId/payment', auth_1.requireAuth, (0, validation_1.v
  */
 router.post('/bookings/:bookingId/payment', auth_1.requireAuth, (0, validation_1.validate)({
     params: zod_1.z.object({ bookingId: zod_1.z.string().min(1) }),
-    body: createLessonPaymentSchema,
+    body: createModulePaymentSchema,
 }), async (req, res) => {
     try {
         const { bookingId } = req.params;
@@ -118,11 +148,31 @@ router.post('/payments/:paymentId/confirm', auth_1.requireAuth, (0, validation_1
 });
 /**
  * @swagger
- * /api/lessons/{lessonId}/payment/status:
+ * /api/modules/{moduleId}/payment/status:
  *   get:
- *     summary: Get payment status for a lesson
- *     tags: [Lesson Payments]
+ *     summary: Get payment status for a module
+ *     tags: [Module Payments]
  */
+router.get('/modules/:moduleId/payment/status', auth_1.requireAuth, (0, validation_1.validate)({
+    params: zod_1.z.object({ moduleId: zod_1.z.string().min(1) }),
+}), async (req, res) => {
+    try {
+        const { moduleId } = req.params;
+        const userId = req.user?.id;
+        const status = await paymentService.getPaymentStatus(userId, moduleId);
+        res.json({
+            success: true,
+            data: status,
+        });
+    }
+    catch (error) {
+        console.error('Error getting payment status:', error);
+        res.status(500).json({
+            error: error.message || 'Failed to get payment status',
+        });
+    }
+});
+// Backward compatibility route
 router.get('/lessons/:lessonId/payment/status', auth_1.requireAuth, (0, validation_1.validate)({
     params: zod_1.z.object({ lessonId: zod_1.z.string().min(1) }),
 }), async (req, res) => {

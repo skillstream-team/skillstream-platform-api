@@ -42,7 +42,7 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  collections            Collection[]              @relation("InstructorCollections")
+  programs            Program[]              @relation("InstructorPrograms")
   enrollments            Enrollment[]
   submissions            Submission[]
   payments               Payment[]
@@ -53,7 +53,7 @@ model User {
   streamQuestions        StreamQuestion[]
   streamPolls            StreamPoll[]
   pollResponses          PollResponse[]
-  collectionModules          CollectionModule[]
+  programSections          ProgramSection[]
   quizAttempts           QuizAttempt[]
   quizGraded             QuizAttempt[]             @relation("QuizGrader")
   createdQuizzes         Quiz[]
@@ -61,7 +61,7 @@ model User {
   progress               Progress[]
   achievements           Achievement[]
   certificates           Certificate[]
-  recommendations        CollectionRecommendation[]
+  recommendations        ProgramRecommendation[]
   createdWhiteboards     Whiteboard[]              @relation("WhiteboardCreator")
   whiteboardActions      WhiteboardAction[]        @relation("WhiteboardActionUser")
   interactions           UserInteraction[]
@@ -83,9 +83,9 @@ model User {
   bookingsAsStudent      Booking[]                 @relation("BookingStudent")
   bookingsAsTeacher      Booking[]                 @relation("BookingTeacher")
   attendances            Attendance[]
-  lessonSlots            LessonSlot[]              @relation("LessonSlotTeacher")
-  quickLessons           QuickLesson[]             @relation("QuickLessonTeacher")
-  lessonResourcesCreated LessonResource[]          @relation("LessonResourceSharer")
+  moduleSlots            ModuleSlot[]              @relation("ModuleSlotTeacher")
+  quickModules           QuickModule[]             @relation("QuickModuleTeacher")
+  moduleResourcesCreated ModuleResource[]          @relation("ModuleResourceSharer")
   videoConferencesHosted VideoConference[]         @relation("VideoConferenceHost")
   settings               UserSettings?
   apiKeys                ApiKey[]                  @relation("ApiKeyUser")
@@ -103,7 +103,7 @@ model User {
   videoBookmarks         VideoBookmark[]
   earnedBadges           EarnedBadge[]
   leaderboardEntries     LeaderboardEntry[]
-  reviews                CollectionReview[]
+  reviews                ProgramReview[]
   reviewHelpful          ReviewHelpful[]
   forumPosts             ForumPost[]
   forumReplies           ForumReply[]
@@ -118,19 +118,19 @@ model User {
   studentEngagements     StudentEngagement[]       @relation("StudentEngagement")
   teacherPayouts         TeacherPayout[]           @relation("TeacherPayouts")
   earningsSummary        TeacherEarningsSummary?   @relation("TeacherEarningsSummary")
-  wishlistEntries        CollectionWishlist[]
+  wishlistEntries        ProgramWishlist[]
   referrals              Referral[]                 @relation("Referrer")
   referredBy             Referral?                  @relation("Referred")
   referralEarnings      ReferralEarning[]
   dashboardData          UserDashboard?
-  collectionShares           CollectionShare[]
+  programShares           ProgramShare[]
   qaQuestions            InstructorQA[]
   qaAnswers              InstructorQAAnswer[]
   bundleEnrollments      BundleEnrollment[]
   learningPathEnrollments LearningPathEnrollment[]
   couponRedemptions      CouponRedemption[]
   pushSubscription       PushSubscription?
-  collectionImports          CollectionImport[]
+  programImports          ProgramImport[]
   broadcasts            Broadcast[]
 
   @@index([provider, providerId])
@@ -157,13 +157,13 @@ model Category {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  collections  Collection[]
+  programs  Program[]
   learningPaths LearningPath[]
 
   @@index([isActive, order])
 }
 
-model Collection {
+model Program {
   id           String   @id @default(auto()) @map("_id") @db.ObjectId
   title        String
   description  String?
@@ -176,7 +176,7 @@ model Collection {
   duration     Int?     // Estimated duration in hours
   language     String?  @default("en") // Language code (en, es, fr, etc.)
   learningObjectives Json? // Array of learning objectives
-  requirements Json?   // Array of collection requirements
+  requirements Json?   // Array of program requirements
   
   // Moderation & Publishing
   moderationStatus String @default("PENDING") // "PENDING", "APPROVED", "REJECTED"
@@ -192,10 +192,10 @@ model Collection {
   createdBy    String   @db.ObjectId
 
   instructorId String @db.ObjectId
-  instructor   User   @relation("InstructorCollections", fields: [instructorId], references: [id])
+  instructor   User   @relation("InstructorPrograms", fields: [instructorId], references: [id])
 
   enrollments        Enrollment[]
-  collectionLessons  CollectionLesson[]
+  programModules  ProgramModule[]
   quizzes            Quiz[]
   polls              Poll[]
   assignments        Assignment[]
@@ -203,33 +203,33 @@ model Collection {
   materials          Material[]
   videos             Video[]
   liveStreams        LiveStream[]
-  modules            CollectionModule[]
+  sections            ProgramSection[]
   progress           Progress[]
   achievements       Achievement[]
   certificates       Certificate[]
-  recommendations    CollectionRecommendation[]
+  recommendations    ProgramRecommendation[]
   interactions       UserInteraction[]
   events             CalendarEvent[]
   Interaction        Interaction[]
   announcements      Announcement[]
   whiteboards        Whiteboard[]
-  reviews            CollectionReview[]
+  reviews            ProgramReview[]
   forumPosts         ForumPost[]
   studyGroups        StudyGroup[]
   sharedWorkspaces   SharedWorkspace[]
   waitlistEntries    WaitlistEntry[]
   leaderboardEntries LeaderboardEntry[]
-  earnings           TeacherEarnings[]      @relation("CollectionEarnings")
-  wishlistEntries    CollectionWishlist[]
-  prerequisites      CollectionPrerequisite[]   @relation("PrerequisiteCollection")
-  requiredBy         CollectionPrerequisite[]   @relation("DependentCollection")
-  bundleItems        CollectionBundleItem[]
-  tags               CollectionTag[]
+  earnings           TeacherEarnings[]      @relation("ProgramEarnings")
+  wishlistEntries    ProgramWishlist[]
+  prerequisites      ProgramPrerequisite[]   @relation("PrerequisiteProgram")
+  requiredBy         ProgramPrerequisite[]   @relation("DependentProgram")
+  bundleItems        ProgramBundleItem[]
+  tags               ProgramTag[]
   qaQuestions        InstructorQA[]
-  shares             CollectionShare[]
-  learningPathCollections LearningPathCollection[] @relation("LearningPathCollections")
+  shares             ProgramShare[]
+  learningPathPrograms LearningPathProgram[] @relation("LearningPathPrograms")
   coupons            Coupon[]
-  imports            CollectionImport[]
+  imports            ProgramImport[]
   subscriptionAccesses SubscriptionAccess[]
   engagements        StudentEngagement[]
   
@@ -241,25 +241,25 @@ model Collection {
   @@index([monetizationType])
 }
 
-// Join table for Collections and Lessons (many-to-many)
-model CollectionLesson {
+// Join table for Programs and Modules (many-to-many)
+model ProgramModule {
   id           String     @id @default(auto()) @map("_id") @db.ObjectId
-  collectionId String     @db.ObjectId
-  collection   Collection @relation(fields: [collectionId], references: [id], onDelete: Cascade)
-  lessonId     String     @db.ObjectId
-  lesson       Lesson     @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  programId String     @db.ObjectId
+  program   Program @relation(fields: [programId], references: [id], onDelete: Cascade)
+  moduleId     String     @db.ObjectId
+  module       Module     @relation(fields: [moduleId], references: [id], onDelete: Cascade)
   order        Int        @default(0)
   createdAt    DateTime   @default(now())
   
-  @@unique([collectionId, lessonId])
-  @@index([collectionId])
-  @@index([lessonId])
+  @@unique([programId, moduleId])
+  @@index([programId])
+  @@index([moduleId])
 }
 
 model Enrollment {
   id           String @id @default(auto()) @map("_id") @db.ObjectId
-  collectionId String @db.ObjectId
-  collection   Collection @relation(fields: [collectionId], references: [id])
+  programId String @db.ObjectId
+  program   Program @relation(fields: [programId], references: [id])
   studentId    String @db.ObjectId
   student      User   @relation(fields: [studentId], references: [id])
 
@@ -268,8 +268,8 @@ model Enrollment {
 
   createdAt DateTime @default(now())
 
-  @@unique([collectionId, studentId])
-  @@index([collectionId])
+  @@unique([programId, studentId])
+  @@index([programId])
   @@index([studentId])
 }
 
@@ -278,16 +278,16 @@ model Payment {
   studentId String @db.ObjectId
   student   User   @relation(fields: [studentId], references: [id])
   
-  // Collection payment (existing)
-  collectionId  String? @db.ObjectId
-  collection    Collection? @relation(fields: [collectionId], references: [id])
+  // Program payment (existing)
+  programId  String? @db.ObjectId
+  program    Program? @relation(fields: [programId], references: [id])
   enrollment Enrollment?
 
-  // Lesson/Booking payment (new)
+  // Module/Booking payment (new)
   bookingId String? @unique @db.ObjectId
   booking   Booking? @relation(fields: [bookingId], references: [id])
-  lessonId  String? @db.ObjectId
-  lesson    QuickLesson? @relation(fields: [lessonId], references: [id])
+  moduleId  String? @db.ObjectId
+  module    QuickModule? @relation(fields: [moduleId], references: [id])
   
   // Workshop payment
   workshopEnrollment LiveWorkshopEnrollment?
@@ -303,14 +303,14 @@ model Payment {
   updatedAt     DateTime @updatedAt
 
   @@index([studentId, status])
-  @@index([lessonId])
+  @@index([moduleId])
   @@index([status, dueAt])
 }
 
 model Material {
   id         String   @id @default(auto()) @map("_id") @db.ObjectId
-  collectionId   String   @db.ObjectId
-  collection     Collection   @relation(fields: [collectionId], references: [id])
+  programId   String   @db.ObjectId
+  program     Program   @relation(fields: [programId], references: [id])
   type       String
   key        String
   filename   String
@@ -324,25 +324,25 @@ model Material {
   updatedAt  DateTime @updatedAt
 }
 
-model Lesson {
+model Module {
   id          String    @id @default(auto()) @map("_id") @db.ObjectId
-  // Lesson can exist independently (no collectionId required)
+  // Module can exist independently (no programId required)
   title       String
   content     Json?
   order       Int        @default(0)
   scheduledAt DateTime?
   teacherId   String?   @db.ObjectId
   duration    Int? // Duration in minutes
-  price       Float      @default(0) // Price for the lesson
+  price       Float      @default(0) // Price for the module
   joinLink    String?
   meetingId   String?
   status      String    @default("scheduled") // "scheduled", "in_progress", "completed", "cancelled"
-  isPreview   Boolean   @default(false) // Free preview lesson
+  isPreview   Boolean   @default(false) // Free preview module
   monetizationType String @default("PREMIUM") // "FREE", "SUBSCRIPTION", "PREMIUM"
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
   quizzes     Quiz[]
-  collectionLessons CollectionLesson[]
+  programModules ProgramModule[]
   subscriptionAccesses SubscriptionAccess[]
   engagements        StudentEngagement[]
   
@@ -353,11 +353,11 @@ model Lesson {
 
 model Quiz {
   id           String        @id @default(auto()) @map("_id") @db.ObjectId
-  collectionId     String        @db.ObjectId
-  collection       Collection        @relation(fields: [collectionId], references: [id])
+  programId     String        @db.ObjectId
+  program       Program        @relation(fields: [programId], references: [id])
+  sectionId     String?       @db.ObjectId
+  section       ProgramSection? @relation(fields: [sectionId], references: [id])
   moduleId     String?       @db.ObjectId
-  module       CollectionModule? @relation(fields: [moduleId], references: [id])
-  lessonId     String?       @db.ObjectId
   title        String
   description  String?
   instructions String?
@@ -375,7 +375,7 @@ model Quiz {
   questions   QuizQuestion[]
   attempts    QuizAttempt[]
   events      CalendarEvent[]
-  Lesson      Lesson?         @relation(fields: [lessonId], references: [id])
+  Module      Module?         @relation(fields: [moduleId], references: [id])
   Interaction Interaction[]
 }
 
@@ -420,10 +420,10 @@ model QuizAttempt {
 
 model Assignment {
   id           String        @id @default(auto()) @map("_id") @db.ObjectId
-  collectionId     String        @db.ObjectId
-  collection       Collection        @relation(fields: [collectionId], references: [id])
-  moduleId     String?       @db.ObjectId
-  module       CollectionModule? @relation(fields: [moduleId], references: [id])
+  programId     String        @db.ObjectId
+  program       Program        @relation(fields: [programId], references: [id])
+  sectionId     String?       @db.ObjectId
+  section       ProgramSection? @relation(fields: [sectionId], references: [id])
   title        String
   description  String?
   instructions String?
@@ -457,11 +457,11 @@ model Submission {
 
 model Poll {
   id           String       @id @default(auto()) @map("_id") @db.ObjectId
-  collectionId     String       @db.ObjectId
+  programId     String       @db.ObjectId
   title        String
   description  String?
-  moduleId     String?      @db.ObjectId
-  collection       Collection       @relation(fields: [collectionId], references: [id])
+  sectionId     String?      @db.ObjectId
+  program       Program       @relation(fields: [programId], references: [id])
   liveStreamId String?      @db.ObjectId
   liveStream   LiveStream?  @relation(fields: [liveStreamId], references: [id])
   createdBy    String       @db.ObjectId
@@ -487,8 +487,8 @@ model PollOption {
 
 model Video {
   id           String    @id @default(auto()) @map("_id") @db.ObjectId
-  collectionId     String    @db.ObjectId
-  collection       Collection    @relation(fields: [collectionId], references: [id])
+  programId     String    @db.ObjectId
+  program       Program    @relation(fields: [programId], references: [id])
   streamId     String    @unique
   title        String
   description  String?
@@ -511,13 +511,13 @@ model Video {
   notes      VideoNote[]
   bookmarks  VideoBookmark[]
   
-  @@index([collectionId, isPreview])
+  @@index([programId, isPreview])
 }
 
 model LiveStream {
   id          String    @id @default(auto()) @map("_id") @db.ObjectId
-  collectionId    String    @db.ObjectId
-  collection      Collection    @relation(fields: [collectionId], references: [id])
+  programId    String    @db.ObjectId
+  program      Program    @relation(fields: [programId], references: [id])
   streamId    String    @unique
   title       String
   description String?
@@ -602,10 +602,10 @@ model Notification {
   @@index([type, createdAt])
 }
 
-model CollectionModule {
+model ProgramSection {
   id          String    @id @default(auto()) @map("_id") @db.ObjectId
-  collectionId    String    @db.ObjectId
-  collection      Collection    @relation(fields: [collectionId], references: [id])
+  programId    String    @db.ObjectId
+  program      Program    @relation(fields: [programId], references: [id])
   title       String
   content     Json?
   description String?
@@ -627,10 +627,10 @@ model Progress {
   id           String        @id @default(auto()) @map("_id") @db.ObjectId
   studentId    String        @db.ObjectId
   student      User          @relation(fields: [studentId], references: [id])
-  collectionId     String        @db.ObjectId
-  collection       Collection        @relation(fields: [collectionId], references: [id])
-  moduleId     String?       @db.ObjectId
-  module       CollectionModule? @relation(fields: [moduleId], references: [id])
+  programId     String        @db.ObjectId
+  program       Program        @relation(fields: [programId], references: [id])
+  sectionId     String?       @db.ObjectId
+  section       ProgramSection? @relation(fields: [sectionId], references: [id])
   type         String
   itemId       String        @db.ObjectId
   status       String
@@ -642,29 +642,29 @@ model Progress {
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
 
-  @@unique([studentId, collectionId, type, itemId])
+  @@unique([studentId, programId, type, itemId])
 }
 
 model Achievement {
   id        String   @id @default(auto()) @map("_id") @db.ObjectId
   studentId String   @db.ObjectId
   student   User     @relation(fields: [studentId], references: [id])
-  collectionId  String?  @db.ObjectId
-  collection    Collection?  @relation(fields: [collectionId], references: [id])
+  programId  String?  @db.ObjectId
+  program    Program?  @relation(fields: [programId], references: [id])
   badgeName String
   badgeIcon String?
   earnedAt  DateTime @default(now())
   metadata  Json?
 
-  @@unique([studentId, collectionId, badgeName])
+  @@unique([studentId, programId, badgeName])
 }
 
 model Certificate {
   id          String    @id @default(auto()) @map("_id") @db.ObjectId
   studentId   String    @db.ObjectId
   student     User      @relation(fields: [studentId], references: [id])
-  collectionId    String    @db.ObjectId
-  collection      Collection    @relation(fields: [collectionId], references: [id])
+  programId    String    @db.ObjectId
+  program      Program    @relation(fields: [programId], references: [id])
   title       String
   description String?
   template    String?
@@ -675,15 +675,15 @@ model Certificate {
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
-  @@unique([studentId, collectionId])
+  @@unique([studentId, programId])
 }
 
-model CollectionRecommendation {
+model ProgramRecommendation {
   id        String   @id @default(auto()) @map("_id") @db.ObjectId
   userId    String   @db.ObjectId
   user      User     @relation(fields: [userId], references: [id])
-  collectionId  String   @db.ObjectId
-  collection    Collection   @relation(fields: [collectionId], references: [id])
+  programId  String   @db.ObjectId
+  program    Program   @relation(fields: [programId], references: [id])
   score     Float
   reason    String
   algorithm String
@@ -693,7 +693,7 @@ model CollectionRecommendation {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@unique([userId, collectionId])
+  @@unique([userId, programId])
   @@index([userId, score])
 }
 
@@ -701,15 +701,15 @@ model UserInteraction {
   id        String   @id @default(auto()) @map("_id") @db.ObjectId
   userId    String   @db.ObjectId
   user      User     @relation(fields: [userId], references: [id])
-  collectionId  String?  @db.ObjectId
-  collection    Collection?  @relation(fields: [collectionId], references: [id])
+  programId  String?  @db.ObjectId
+  program    Program?  @relation(fields: [programId], references: [id])
   type      String
   value     Float?
   metadata  Json?
   createdAt DateTime @default(now())
 
   @@index([userId, type])
-  @@index([collectionId, type])
+  @@index([programId, type])
 }
 
 model CalendarEvent {
@@ -721,8 +721,8 @@ model CalendarEvent {
   endTime     DateTime?
   isAllDay    Boolean   @default(false)
   location    String?
-  collectionId    String?   @db.ObjectId
-  collection      Collection?   @relation(fields: [collectionId], references: [id])
+  programId    String?   @db.ObjectId
+  program      Program?   @relation(fields: [programId], references: [id])
   createdBy   String    @db.ObjectId
   creator     User      @relation(fields: [createdBy], references: [id])
 
@@ -748,7 +748,7 @@ model CalendarEvent {
   reminders EventReminder[]
   waitlist  WaitlistEntry[]
 
-  @@index([collectionId, startTime])
+  @@index([programId, startTime])
   @@index([createdBy, startTime])
   @@index([isRecurring, recurrenceEnd])
 }
@@ -897,10 +897,10 @@ model ContentFlag {
   @@index([reportedBy, createdAt])
 }
 
-model CollectionReview {
+model ProgramReview {
   id                   String    @id @default(auto()) @map("_id") @db.ObjectId
-  collectionId             String    @db.ObjectId
-  collection               Collection    @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+  programId             String    @db.ObjectId
+  program               Program    @relation(fields: [programId], references: [id], onDelete: Cascade)
   studentId            String    @db.ObjectId
   student              User      @relation(fields: [studentId], references: [id], onDelete: Cascade)
   rating               Int // 1-5 stars
@@ -916,8 +916,8 @@ model CollectionReview {
 
   helpfulVotes ReviewHelpful[]
 
-  @@unique([collectionId, studentId])
-  @@index([collectionId, rating, createdAt])
+  @@unique([programId, studentId])
+  @@index([programId, rating, createdAt])
   @@index([studentId, createdAt])
   @@index([isPublished, createdAt])
 }
@@ -925,7 +925,7 @@ model CollectionReview {
 model ReviewHelpful {
   id        String       @id @default(auto()) @map("_id") @db.ObjectId
   reviewId  String       @db.ObjectId
-  review    CollectionReview @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+  review    ProgramReview @relation(fields: [reviewId], references: [id], onDelete: Cascade)
   userId    String       @db.ObjectId
   user      User         @relation(fields: [userId], references: [id], onDelete: Cascade)
   isHelpful Boolean      @default(true)
@@ -937,8 +937,8 @@ model ReviewHelpful {
 
 model ForumPost {
   id           String      @id @default(auto()) @map("_id") @db.ObjectId
-  collectionId     String      @db.ObjectId
-  collection       Collection      @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+  programId     String      @db.ObjectId
+  program       Program      @relation(fields: [programId], references: [id], onDelete: Cascade)
   authorId     String      @db.ObjectId
   author       User        @relation(fields: [authorId], references: [id], onDelete: Cascade)
   title        String
@@ -960,8 +960,8 @@ model ForumPost {
   replies ForumReply[]  @relation("PostReplies")
   upvotes ForumUpvote[] @relation("PostUpvotes")
 
-  @@index([collectionId, createdAt])
-  @@index([collectionId, isPinned, createdAt])
+  @@index([programId, createdAt])
+  @@index([programId, isPinned, createdAt])
   @@index([authorId, createdAt])
   @@index([isResolved, createdAt])
   @@index([isHidden, deletedAt])
@@ -1067,8 +1067,8 @@ model LeaderboardEntry {
   id          String    @id @default(auto()) @map("_id") @db.ObjectId
   userId      String    @db.ObjectId
   user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  collectionId    String?   @db.ObjectId
-  collection      Collection?   @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+  programId    String?   @db.ObjectId
+  program      Program?   @relation(fields: [programId], references: [id], onDelete: Cascade)
   period      String // "daily", "weekly", "monthly", "all_time"
   points      Int       @default(0)
   rank        Int
@@ -1077,8 +1077,8 @@ model LeaderboardEntry {
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
-  @@unique([userId, collectionId, period, periodStart])
-  @@index([collectionId, period, points])
+  @@unique([userId, programId, period, periodStart])
+  @@index([programId, period, points])
   @@index([period, points, rank])
 }
 
@@ -1173,8 +1173,8 @@ model VideoAnalytics {
 
 model StudyGroup {
   id          String   @id @default(auto()) @map("_id") @db.ObjectId
-  collectionId    String?  @db.ObjectId
-  collection      Collection?  @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+  programId    String?  @db.ObjectId
+  program      Program?  @relation(fields: [programId], references: [id], onDelete: Cascade)
   name        String
   description String?
   createdBy   String   @db.ObjectId
@@ -1188,7 +1188,7 @@ model StudyGroup {
   projects   GroupProject[]
   workspaces SharedWorkspace[]
 
-  @@index([collectionId, createdAt])
+  @@index([programId, createdAt])
   @@index([createdBy, createdAt])
 }
 
@@ -1224,8 +1224,8 @@ model SharedWorkspace {
   id          String      @id @default(auto()) @map("_id") @db.ObjectId
   groupId     String?     @db.ObjectId
   group       StudyGroup? @relation(fields: [groupId], references: [id], onDelete: Cascade)
-  collectionId    String?     @db.ObjectId
-  collection      Collection?     @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+  programId    String?     @db.ObjectId
+  program      Program?     @relation(fields: [programId], references: [id], onDelete: Cascade)
   userId      String      @db.ObjectId
   user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
   name        String
@@ -1237,14 +1237,14 @@ model SharedWorkspace {
   updatedAt   DateTime    @updatedAt
 
   @@index([groupId, createdAt])
-  @@index([collectionId, createdAt])
+  @@index([programId, createdAt])
   @@index([userId, createdAt])
 }
 
 model WaitlistEntry {
   id         String         @id @default(auto()) @map("_id") @db.ObjectId
-  collectionId   String?        @db.ObjectId
-  collection     Collection?        @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+  programId   String?        @db.ObjectId
+  program     Program?        @relation(fields: [programId], references: [id], onDelete: Cascade)
   eventId    String?        @db.ObjectId
   event      CalendarEvent? @relation(fields: [eventId], references: [id], onDelete: Cascade)
   userId     String         @db.ObjectId
@@ -1254,40 +1254,40 @@ model WaitlistEntry {
   enrolledAt DateTime?
   createdAt  DateTime       @default(now())
 
-  @@unique([collectionId, userId])
+  @@unique([programId, userId])
   @@unique([eventId, userId])
-  @@index([collectionId, position])
+  @@index([programId, position])
   @@index([eventId, position])
   @@index([userId, createdAt])
 }
 
-model CollectionWishlist {
+model ProgramWishlist {
   id        String   @id @default(auto()) @map("_id") @db.ObjectId
   userId    String   @db.ObjectId
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  collectionId  String   @db.ObjectId
-  collection    Collection   @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+  programId  String   @db.ObjectId
+  program    Program   @relation(fields: [programId], references: [id], onDelete: Cascade)
   createdAt DateTime @default(now())
 
-  @@unique([userId, collectionId])
+  @@unique([userId, programId])
   @@index([userId])
-  @@index([collectionId])
+  @@index([programId])
   @@index([createdAt])
 }
 
 model Interaction {
   id        String   @id @default(auto()) @map("_id") @db.ObjectId
   userId    String   @db.ObjectId
-  collectionId  String?  @db.ObjectId
-  moduleId  String?  @db.ObjectId
+  programId  String?  @db.ObjectId
+  sectionId  String?  @db.ObjectId
   quizId    String?  @db.ObjectId
   eventType String
   metadata  Json?
   createdAt DateTime @default(now())
 
   user   User          @relation(fields: [userId], references: [id])
-  collection Collection?       @relation(fields: [collectionId], references: [id])
-  module CollectionModule? @relation(fields: [moduleId], references: [id])
+  program Program?       @relation(fields: [programId], references: [id])
+  section ProgramSection? @relation(fields: [sectionId], references: [id])
   quiz   Quiz?         @relation(fields: [quizId], references: [id])
 }
 
@@ -1392,8 +1392,8 @@ model Announcement {
   message      String
   type         String    @default("global") // "global", "course", "user"
   scope        String    @default("global") // "global", "course", "user"
-  collectionId     String?   @db.ObjectId
-  collection       Collection?   @relation(fields: [collectionId], references: [id])
+  programId     String?   @db.ObjectId
+  program       Program?   @relation(fields: [programId], references: [id])
   createdBy    String    @db.ObjectId
   creator      User      @relation(fields: [createdBy], references: [id])
   targetUserId String?   @db.ObjectId
@@ -1403,7 +1403,7 @@ model Announcement {
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
-  @@index([scope, collectionId])
+  @@index([scope, programId])
   @@index([createdBy])
   @@index([isActive, expiresAt])
 }
@@ -1422,17 +1422,17 @@ model TeacherAvailability {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  slots LessonSlot[]
+  slots ModuleSlot[]
 
   @@index([teacherId, startTime])
 }
 
-model LessonSlot {
+model ModuleSlot {
   id             String               @id @default(auto()) @map("_id") @db.ObjectId
   availabilityId String?              @db.ObjectId
   availability   TeacherAvailability? @relation(fields: [availabilityId], references: [id])
   teacherId      String               @db.ObjectId
-  teacher        User                 @relation("LessonSlotTeacher", fields: [teacherId], references: [id])
+  teacher        User                 @relation("ModuleSlotTeacher", fields: [teacherId], references: [id])
   startTime      DateTime
   endTime        DateTime
   subject        String?
@@ -1452,7 +1452,7 @@ model LessonSlot {
 model Booking {
   id          String     @id @default(auto()) @map("_id") @db.ObjectId
   slotId      String     @unique @db.ObjectId
-  slot        LessonSlot @relation(fields: [slotId], references: [id])
+  slot        ModuleSlot @relation(fields: [slotId], references: [id])
   studentId   String     @db.ObjectId
   student     User       @relation("BookingStudent", fields: [studentId], references: [id])
   teacherId   String     @db.ObjectId
@@ -1477,29 +1477,29 @@ model Booking {
   @@index([paymentDueAt, status])
 }
 
-model QuickLesson {
+model QuickModule {
   id          String   @id @default(auto()) @map("_id") @db.ObjectId
   title       String
   description String?
   teacherId   String   @db.ObjectId
-  teacher     User     @relation("QuickLessonTeacher", fields: [teacherId], references: [id])
+  teacher     User     @relation("QuickModuleTeacher", fields: [teacherId], references: [id])
   scheduledAt DateTime
   subject     String?
   duration    Int? // Duration in minutes
-  price       Float? // Price per student for this lesson
+  price       Float? // Price per student for this module
   joinLink    String?
   meetingId   String?
   status      String   @default("scheduled") // "scheduled", "in_progress", "completed", "cancelled"
   
   // Student selection
-  invitedStudentIds String[] // IDs of students invited to this lesson
+  invitedStudentIds String[] // IDs of students invited to this module
   maxStudents       Int? // Maximum number of students allowed
   
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
   attendance Attendance[]
-  resources  LessonResource[]
+  resources  ModuleResource[]
   payments   Payment[]
 
   @@index([teacherId, scheduledAt])
@@ -1509,8 +1509,8 @@ model QuickLesson {
 
 model Attendance {
   id        String       @id @default(auto()) @map("_id") @db.ObjectId
-  lessonId  String?      @db.ObjectId
-  lesson    QuickLesson? @relation(fields: [lessonId], references: [id])
+  moduleId  String?      @db.ObjectId
+  module    QuickModule? @relation(fields: [moduleId], references: [id])
   bookingId String?      @unique @db.ObjectId
   booking   Booking?     @relation(fields: [bookingId], references: [id])
   studentId String       @db.ObjectId
@@ -1522,15 +1522,15 @@ model Attendance {
   createdAt DateTime     @default(now())
   updatedAt DateTime     @updatedAt
 
-  @@unique([lessonId, studentId])
+  @@unique([moduleId, studentId])
   @@index([studentId])
   @@index([status])
 }
 
-model LessonResource {
+model ModuleResource {
   id        String      @id @default(auto()) @map("_id") @db.ObjectId
-  lessonId  String      @db.ObjectId
-  lesson    QuickLesson @relation(fields: [lessonId], references: [id])
+  moduleId  String      @db.ObjectId
+  module    QuickModule @relation(fields: [moduleId], references: [id])
   title     String
   type      String // "file", "link", "document"
   url       String?
@@ -1539,11 +1539,11 @@ model LessonResource {
   size      Int?
   mimeType  String?
   sharedBy  String      @db.ObjectId
-  sharer    User        @relation("LessonResourceSharer", fields: [sharedBy], references: [id])
+  sharer    User        @relation("ModuleResourceSharer", fields: [sharedBy], references: [id])
   createdAt DateTime    @default(now())
   updatedAt DateTime    @updatedAt
 
-  @@index([lessonId, createdAt])
+  @@index([moduleId, createdAt])
 }
 
 model VideoConference {
@@ -1581,8 +1581,8 @@ model BreakoutRoom {
 
 model Whiteboard {
   id              String             @id @default(auto()) @map("_id") @db.ObjectId
-  collectionId        String?            @db.ObjectId
-  collection          Collection?            @relation(fields: [collectionId], references: [id])
+  programId        String?            @db.ObjectId
+  program          Program?            @relation(fields: [programId], references: [id])
   liveStreamId    String?            @db.ObjectId
   liveStream      LiveStream?        @relation(fields: [liveStreamId], references: [id])
   title           String
@@ -1598,7 +1598,7 @@ model Whiteboard {
   createdAt       DateTime           @default(now())
   updatedAt       DateTime           @updatedAt
 
-  @@index([collectionId, createdAt])
+  @@index([programId, createdAt])
   @@index([liveStreamId, createdAt])
 }
 
@@ -1694,8 +1694,8 @@ model TeacherEarnings {
   teacherId String @db.ObjectId
   teacher   User   @relation("TeacherEarnings", fields: [teacherId], references: [id], onDelete: Cascade)
 
-  collectionId String? @db.ObjectId
-  collection   Collection? @relation("CollectionEarnings", fields: [collectionId], references: [id], onDelete: Cascade)
+  programId String? @db.ObjectId
+  program   Program? @relation("ProgramEarnings", fields: [programId], references: [id], onDelete: Cascade)
 
   periodStart DateTime // Start of the month/period
   periodEnd   DateTime // End of the month/period
@@ -1707,12 +1707,12 @@ model TeacherEarnings {
   currency        String @default("USD")
 
   // New fields for hybrid monetization
-  revenueSource String @default("COLLECTION") 
-    // "COLLECTION" (premium sales), "SUBSCRIPTION" (revenue pool), 
-    // "LIVE_WORKSHOP", "LESSON" (standalone lesson sales)
+  revenueSource String @default("PROGRAM") 
+    // "PROGRAM" (premium sales), "SUBSCRIPTION" (revenue pool), 
+    // "LIVE_WORKSHOP", "MODULE" (standalone module sales)
   
-  sourceId      String? // ID of collection, lesson, or workshop
-  sourceType    String? // "COLLECTION", "LESSON", "WORKSHOP"
+  sourceId      String? // ID of program, module, or workshop
+  sourceType    String? // "PROGRAM", "MODULE", "WORKSHOP"
   
   // Subscription-specific fields
   watchTimeMinutes Int? @default(0) // Total watch time for subscription revenue
@@ -1735,10 +1735,10 @@ model TeacherEarnings {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@unique([teacherId, collectionId, period, revenueSource])
+  @@unique([teacherId, programId, period, revenueSource])
   @@index([teacherId, period])
   @@index([status, period])
-  @@index([collectionId, period])
+  @@index([programId, period])
   @@index([payoutId])
   @@index([revenueSource, period])
 }
@@ -1785,22 +1785,22 @@ model TeacherEarningsSummary {
   updatedAt      DateTime @updatedAt
 }
 
-model CollectionPrerequisite {
+model ProgramPrerequisite {
   id              String   @id @default(auto()) @map("_id") @db.ObjectId
-  collectionId        String   @db.ObjectId
-  collection          Collection   @relation("DependentCollection", fields: [collectionId], references: [id], onDelete: Cascade)
+  programId        String   @db.ObjectId
+  program          Program   @relation("DependentProgram", fields: [programId], references: [id], onDelete: Cascade)
   prerequisiteId  String   @db.ObjectId
-  prerequisite    Collection   @relation("PrerequisiteCollection", fields: [prerequisiteId], references: [id], onDelete: Cascade)
+  prerequisite    Program   @relation("PrerequisiteProgram", fields: [prerequisiteId], references: [id], onDelete: Cascade)
   isRequired      Boolean  @default(true) // If false, it's a recommended prerequisite
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
-  @@unique([collectionId, prerequisiteId])
-  @@index([collectionId])
+  @@unique([programId, prerequisiteId])
+  @@index([programId])
   @@index([prerequisiteId])
 }
 
-model CollectionBundle {
+model ProgramBundle {
   id          String   @id @default(auto()) @map("_id") @db.ObjectId
   title       String
   description String?
@@ -1810,31 +1810,31 @@ model CollectionBundle {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  items       CollectionBundleItem[]
+  items       ProgramBundleItem[]
   enrollments BundleEnrollment[]
   coupons     Coupon[]
 
   @@index([isActive])
 }
 
-model CollectionBundleItem {
+model ProgramBundleItem {
   id        String        @id @default(auto()) @map("_id") @db.ObjectId
   bundleId String        @db.ObjectId
-  bundle    CollectionBundle  @relation(fields: [bundleId], references: [id], onDelete: Cascade)
-  collectionId  String        @db.ObjectId
-  collection    Collection        @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+  bundle    ProgramBundle  @relation(fields: [bundleId], references: [id], onDelete: Cascade)
+  programId  String        @db.ObjectId
+  program    Program        @relation(fields: [programId], references: [id], onDelete: Cascade)
   order     Int           @default(0)
   createdAt DateTime      @default(now())
 
-  @@unique([bundleId, collectionId])
+  @@unique([bundleId, programId])
   @@index([bundleId])
-  @@index([collectionId])
+  @@index([programId])
 }
 
 model BundleEnrollment {
   id        String       @id @default(auto()) @map("_id") @db.ObjectId
   bundleId String       @db.ObjectId
-  bundle    CollectionBundle @relation(fields: [bundleId], references: [id], onDelete: Cascade)
+  bundle    ProgramBundle @relation(fields: [bundleId], references: [id], onDelete: Cascade)
   studentId String       @db.ObjectId
   student   User         @relation(fields: [studentId], references: [id], onDelete: Cascade)
   createdAt DateTime     @default(now())
@@ -1856,14 +1856,14 @@ model Coupon {
   expiresAt     DateTime?
   isActive      Boolean  @default(true)
   applicableTo  String   @default("ALL") // "ALL", "COURSE", "BUNDLE", "SUBSCRIPTION"
-  collectionId      String?   @db.ObjectId
+  programId      String?   @db.ObjectId
   bundleId      String?   @db.ObjectId
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
   redemptions   CouponRedemption[]
-  collection        Collection?   @relation(fields: [collectionId], references: [id], onDelete: SetNull)
-  bundle        CollectionBundle? @relation(fields: [bundleId], references: [id], onDelete: SetNull)
+  program        Program?   @relation(fields: [programId], references: [id], onDelete: SetNull)
+  bundle        ProgramBundle? @relation(fields: [bundleId], references: [id], onDelete: SetNull)
 
   @@index([isActive, expiresAt])
 }
@@ -1895,25 +1895,25 @@ model LearningPath {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  collections     LearningPathCollection[]
+  programs     LearningPathProgram[]
   enrollments LearningPathEnrollment[]
 
   @@index([isActive, difficulty])
 }
 
-model LearningPathCollection {
+model LearningPathProgram {
   id        String       @id @default(auto()) @map("_id") @db.ObjectId
   pathId   String       @db.ObjectId
   path     LearningPath @relation(fields: [pathId], references: [id], onDelete: Cascade)
-  collectionId String       @db.ObjectId
-  collection   Collection       @relation("LearningPathCollections", fields: [collectionId], references: [id], onDelete: Cascade)
+  programId String       @db.ObjectId
+  program   Program       @relation("LearningPathPrograms", fields: [programId], references: [id], onDelete: Cascade)
   order    Int          @default(0)
   isRequired Boolean    @default(true)
   createdAt DateTime    @default(now())
 
-  @@unique([pathId, collectionId])
+  @@unique([pathId, programId])
   @@index([pathId, order])
-  @@index([collectionId])
+  @@index([programId])
 }
 
 model LearningPathEnrollment {
@@ -1933,25 +1933,25 @@ model LearningPathEnrollment {
   @@index([studentId])
 }
 
-model CollectionTag {
+model ProgramTag {
   id        String   @id @default(auto()) @map("_id") @db.ObjectId
-  collectionId String   @db.ObjectId
-  collection   Collection   @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+  programId String   @db.ObjectId
+  program   Program   @relation(fields: [programId], references: [id], onDelete: Cascade)
   name     String
   createdAt DateTime @default(now())
 
-  @@unique([collectionId, name])
-  @@index([collectionId])
+  @@unique([programId, name])
+  @@index([programId])
   @@index([name])
 }
 
 model InstructorQA {
   id        String   @id @default(auto()) @map("_id") @db.ObjectId
-  collectionId String   @db.ObjectId
-  collection   Collection   @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+  programId String   @db.ObjectId
+  program   Program   @relation(fields: [programId], references: [id], onDelete: Cascade)
   studentId String   @db.ObjectId
   student   User     @relation(fields: [studentId], references: [id], onDelete: Cascade)
-  lessonId  String?  @db.ObjectId
+  moduleId  String?  @db.ObjectId
   question  String
   isAnswered Boolean @default(false)
   isResolved Boolean @default(false)
@@ -1962,7 +1962,7 @@ model InstructorQA {
 
   answers   InstructorQAAnswer[]
 
-  @@index([collectionId, isAnswered])
+  @@index([programId, isAnswered])
   @@index([studentId])
   @@index([isHidden, deletedAt])
 }
@@ -1981,16 +1981,16 @@ model InstructorQAAnswer {
   @@index([instructorId])
 }
 
-model CollectionShare {
+model ProgramShare {
   id        String   @id @default(auto()) @map("_id") @db.ObjectId
-  collectionId String   @db.ObjectId
-  collection   Collection   @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+  programId String   @db.ObjectId
+  program   Program   @relation(fields: [programId], references: [id], onDelete: Cascade)
   userId   String   @db.ObjectId
   user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   platform String   // "facebook", "twitter", "linkedin", "whatsapp", etc.
   createdAt DateTime @default(now())
 
-  @@index([collectionId])
+  @@index([programId])
   @@index([userId])
   @@index([platform])
 }
@@ -2049,7 +2049,7 @@ model PushSubscription {
   updatedAt DateTime @updatedAt
 }
 
-model CollectionImport {
+model ProgramImport {
   id          String   @id @default(auto()) @map("_id") @db.ObjectId
   createdBy   String   @db.ObjectId
   creator     User     @relation(fields: [createdBy], references: [id], onDelete: Cascade)
@@ -2058,8 +2058,8 @@ model CollectionImport {
   sourceData Json?    // Platform-specific data (API keys, course IDs, etc.)
   status      String   @default("PENDING") // "PENDING", "PROCESSING", "COMPLETED", "FAILED", "CANCELLED"
   progress    Float    @default(0) // 0-100
-  importedCollectionId String? @db.ObjectId
-  importedCollection Collection? @relation(fields: [importedCollectionId], references: [id], onDelete: SetNull)
+  importedProgramId String? @db.ObjectId
+  importedProgram Program? @relation(fields: [importedProgramId], references: [id], onDelete: SetNull)
   errorMessage String?
   metadata    Json?    // Additional metadata about the import
   startedAt   DateTime?
@@ -2148,10 +2148,10 @@ model SubscriptionAccess {
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   
   // Content access
-  collectionId String?  @db.ObjectId
-  collection   Collection? @relation(fields: [collectionId], references: [id], onDelete: Cascade)
-  lessonId     String?  @db.ObjectId
-  lesson       Lesson?  @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  programId String?  @db.ObjectId
+  program   Program? @relation(fields: [programId], references: [id], onDelete: Cascade)
+  moduleId     String?  @db.ObjectId
+  module       Module?  @relation(fields: [moduleId], references: [id], onDelete: Cascade)
   
   // Access metadata
   grantedAt    DateTime @default(now())
@@ -2161,10 +2161,10 @@ model SubscriptionAccess {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
   
-  @@unique([userId, collectionId, lessonId])
+  @@unique([userId, programId, moduleId])
   @@index([userId, expiresAt])
-  @@index([collectionId])
-  @@index([lessonId])
+  @@index([programId])
+  @@index([moduleId])
 }
 
 model StudentEngagement {
@@ -2173,10 +2173,10 @@ model StudentEngagement {
   student     User     @relation("StudentEngagement", fields: [studentId], references: [id], onDelete: Cascade)
   
   // Content reference
-  collectionId String? @db.ObjectId
-  collection   Collection? @relation(fields: [collectionId], references: [id], onDelete: Cascade)
-  lessonId     String? @db.ObjectId
-  lesson       Lesson? @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  programId String? @db.ObjectId
+  program   Program? @relation(fields: [programId], references: [id], onDelete: Cascade)
+  moduleId     String? @db.ObjectId
+  module       Module? @relation(fields: [moduleId], references: [id], onDelete: Cascade)
   
   // Engagement metrics
   watchTimeMinutes Int @default(0)
@@ -2191,9 +2191,9 @@ model StudentEngagement {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   
-  @@unique([studentId, collectionId, lessonId, period])
-  @@index([collectionId, period])
-  @@index([lessonId, period])
+  @@unique([studentId, programId, moduleId, period])
+  @@index([programId, period])
+  @@index([moduleId, period])
   @@index([studentId, period])
 }
 
@@ -2208,7 +2208,7 @@ model SubscriptionRevenuePool {
   platformFee       Float @default(0) // Platform's cut
   teacherPool       Float @default(0) // Amount distributed to teachers
   totalWatchTime    Int   @default(0) // Total minutes watched by subscribers
-  totalEngagements  Int   @default(0) // Total lesson completions
+  totalEngagements  Int   @default(0) // Total module completions
   
   // Distribution status
   status      String @default("PENDING") // "PENDING", "CALCULATING", "DISTRIBUTED"

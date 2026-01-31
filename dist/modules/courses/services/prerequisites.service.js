@@ -12,19 +12,19 @@ class PrerequisitesService {
         if (data.courseId === data.prerequisiteId) {
             throw new Error('A course cannot be a prerequisite of itself');
         }
-        // Check if prerequisite collection exists
-        const prerequisiteCourse = await prisma_1.prisma.collection.findUnique({
+        // Check if prerequisite program exists
+        const prerequisiteCourse = await prisma_1.prisma.program.findUnique({
             where: { id: data.prerequisiteId },
         });
         if (!prerequisiteCourse) {
-            throw new Error('Prerequisite collection not found');
+            throw new Error('Prerequisite program not found');
         }
-        // Check if collection exists
-        const course = await prisma_1.prisma.collection.findUnique({
+        // Check if program exists
+        const course = await prisma_1.prisma.program.findUnique({
             where: { id: data.collectionId || data.courseId },
         });
         if (!course) {
-            throw new Error('Collection not found');
+            throw new Error('Program not found');
         }
         // Check for circular dependencies
         const wouldCreateCycle = await this.wouldCreateCircularDependency(data.courseId, data.prerequisiteId);
@@ -32,10 +32,10 @@ class PrerequisitesService {
             throw new Error('Adding this prerequisite would create a circular dependency');
         }
         // Check if prerequisite already exists
-        const existing = await prisma_1.prisma.collectionPrerequisite.findUnique({
+        const existing = await prisma_1.prisma.programPrerequisite.findUnique({
             where: {
-                collectionId_prerequisiteId: {
-                    collectionId: data.collectionId || data.courseId,
+                programId_prerequisiteId: {
+                    programId: data.collectionId || data.courseId,
                     prerequisiteId: data.prerequisiteId,
                 },
             },
@@ -43,14 +43,14 @@ class PrerequisitesService {
         if (existing) {
             throw new Error('This prerequisite already exists');
         }
-        const prerequisite = await prisma_1.prisma.collectionPrerequisite.create({
+        const prerequisite = await prisma_1.prisma.programPrerequisite.create({
             data: {
-                collectionId: data.collectionId || data.courseId,
+                programId: data.collectionId || data.courseId,
                 prerequisiteId: data.prerequisiteId,
                 isRequired: data.isRequired ?? true,
             },
             include: {
-                collection: {
+                program: {
                     select: {
                         id: true,
                         title: true,
@@ -66,18 +66,18 @@ class PrerequisitesService {
             },
         });
         // Invalidate cache
-        await (0, cache_1.deleteCache)(`collection:${data.collectionId || data.courseId}`);
-        await (0, cache_1.deleteCache)(`collection:${data.prerequisiteId}`);
+        await (0, cache_1.deleteCache)(`program:${data.collectionId || data.courseId}`);
+        await (0, cache_1.deleteCache)(`program:${data.prerequisiteId}`);
         return this.mapToDto(prerequisite);
     }
     /**
      * Remove a prerequisite from a course
      */
     async removePrerequisite(courseId, prerequisiteId) {
-        const prerequisite = await prisma_1.prisma.collectionPrerequisite.findUnique({
+        const prerequisite = await prisma_1.prisma.programPrerequisite.findUnique({
             where: {
-                collectionId_prerequisiteId: {
-                    collectionId: courseId,
+                programId_prerequisiteId: {
+                    programId: courseId,
                     prerequisiteId,
                 },
             },
@@ -85,22 +85,22 @@ class PrerequisitesService {
         if (!prerequisite) {
             throw new Error('Prerequisite not found');
         }
-        await prisma_1.prisma.collectionPrerequisite.delete({
+        await prisma_1.prisma.programPrerequisite.delete({
             where: {
                 id: prerequisite.id,
             },
         });
         // Invalidate cache
-        await (0, cache_1.deleteCache)(`collection:${courseId}`);
+        await (0, cache_1.deleteCache)(`program:${courseId}`);
     }
     /**
      * Get all prerequisites for a course
      */
     async getCoursePrerequisites(courseId) {
-        const prerequisites = await prisma_1.prisma.collectionPrerequisite.findMany({
-            where: { collectionId: courseId },
+        const prerequisites = await prisma_1.prisma.programPrerequisite.findMany({
+            where: { programId: courseId },
             include: {
-                collection: {
+                program: {
                     select: {
                         id: true,
                         title: true,
@@ -122,10 +122,10 @@ class PrerequisitesService {
      * Get all courses that require this course as a prerequisite
      */
     async getDependentCourses(courseId) {
-        const dependents = await prisma_1.prisma.collectionPrerequisite.findMany({
+        const dependents = await prisma_1.prisma.programPrerequisite.findMany({
             where: { prerequisiteId: courseId },
             include: {
-                collection: {
+                program: {
                     select: {
                         id: true,
                         title: true,
@@ -147,9 +147,9 @@ class PrerequisitesService {
      * Check if a student has completed all required prerequisites
      */
     async checkPrerequisites(studentId, courseId) {
-        const prerequisites = await prisma_1.prisma.collectionPrerequisite.findMany({
+        const prerequisites = await prisma_1.prisma.programPrerequisite.findMany({
             where: {
-                collectionId: courseId,
+                programId: courseId,
                 isRequired: true,
             },
             include: {
@@ -172,13 +172,13 @@ class PrerequisitesService {
         const completedCourses = await prisma_1.prisma.certificate.findMany({
             where: {
                 studentId,
-                collectionId: { in: prerequisiteIds },
+                programId: { in: prerequisiteIds },
             },
             select: {
-                collectionId: true,
+                programId: true,
             },
         });
-        const completedCourseIds = new Set(completedCourses.map((c) => c.collectionId));
+        const completedCourseIds = new Set(completedCourses.map((c) => c.programId));
         const missingPrerequisites = prerequisites
             .filter((p) => !completedCourseIds.has(p.prerequisiteId))
             .map((p) => ({
@@ -209,8 +209,8 @@ class PrerequisitesService {
             }
             visited.add(currentId);
             // Get all prerequisites of the current course
-            const prereqs = await prisma_1.prisma.collectionPrerequisite.findMany({
-                where: { collectionId: currentId },
+            const prereqs = await prisma_1.prisma.programPrerequisite.findMany({
+                where: { programId: currentId },
                 select: { prerequisiteId: true },
             });
             for (const prereq of prereqs) {
@@ -224,10 +224,10 @@ class PrerequisitesService {
     mapToDto(prerequisite) {
         return {
             id: prerequisite.id,
-            courseId: prerequisite.collectionId,
+            courseId: prerequisite.programId,
             course: {
-                id: prerequisite.collection.id,
-                title: prerequisite.collection.title,
+                id: prerequisite.program.id,
+                title: prerequisite.program.title,
             },
             prerequisiteId: prerequisite.prerequisiteId,
             prerequisite: {

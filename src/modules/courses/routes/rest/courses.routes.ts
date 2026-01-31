@@ -5,7 +5,7 @@ import { requireRole } from '../../../../middleware/roles';
 import { requireAuth } from '../../../../middleware/auth';
 import { requireSubscription } from '../../../../middleware/subscription';
 import { validate } from '../../../../middleware/validation';
-import { createCourseSchema, updateCourseSchema, courseIdParamSchema, createModuleSchema } from '../../../../utils/validation-schemas';
+import { createCourseSchema, updateCourseSchema, courseIdParamSchema, createModuleSchema, createSectionSchema } from '../../../../utils/validation-schemas';
 import { prisma } from '../../../../utils/prisma';
 
 const router = Router();
@@ -182,7 +182,7 @@ router.get('/:id/modules',
 router.post('/:id/sections', 
     requireAuth,
     requireRole('TEACHER'),
-    validate({ params: courseIdParamSchema, body: createModuleSchema }),
+    validate({ params: courseIdParamSchema, body: createSectionSchema }),
     async (req, res) => {
         try{
             const programSection = await service.addSectionToProgram(req.params.id, req.body)

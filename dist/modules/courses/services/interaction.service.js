@@ -144,9 +144,9 @@ exports.InteractionService = InteractionService;
  */
 async function getRecommendedCourses(userId) {
     const interactions = await user_model_1.prisma.interaction.findMany({ where: { userId } });
-    const collectionScores = {};
+    const programScores = {};
     interactions.forEach(i => {
-        if (!i.collectionId)
+        if (!i.programId)
             return;
         let score = 0;
         switch (i.eventType) {
@@ -164,14 +164,14 @@ async function getRecommendedCourses(userId) {
                 score += 2;
                 break;
         }
-        const key = i.collectionId;
-        collectionScores[key] = (collectionScores[key] || 0) + score;
+        const key = i.programId;
+        programScores[key] = (programScores[key] || 0) + score;
     });
-    const topCollectionIds = Object.entries(collectionScores)
+    const topProgramIds = Object.entries(programScores)
         .sort(([, a], [, b]) => b - a)
         .slice(0, 5)
-        .map(([collectionId]) => collectionId);
-    return user_model_1.prisma.collection.findMany({
-        where: { id: { in: topCollectionIds } }
+        .map(([programId]) => programId);
+    return user_model_1.prisma.program.findMany({
+        where: { id: { in: topProgramIds } }
     });
 }

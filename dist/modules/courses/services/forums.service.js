@@ -10,13 +10,13 @@ class ForumsService {
     async createPost(data) {
         const post = await prisma_1.prisma.forumPost.create({
             data: {
-                collectionId: data.collectionId,
+                programId: data.collectionId,
                 authorId: data.authorId,
                 title: data.title,
                 content: data.content,
             },
             include: {
-                collection: {
+                program: {
                     select: {
                         id: true,
                         title: true,
@@ -53,7 +53,7 @@ class ForumsService {
                 skip,
                 take,
                 include: {
-                    collection: {
+                    program: {
                         select: {
                             id: true,
                             title: true,
@@ -92,7 +92,7 @@ class ForumsService {
         const post = await prisma_1.prisma.forumPost.findUnique({
             where: { id: postId },
             include: {
-                collection: {
+                program: {
                     select: {
                         id: true,
                         title: true,
@@ -266,7 +266,7 @@ class ForumsService {
         const post = await prisma_1.prisma.forumPost.findUnique({
             where: { id: postId },
             include: {
-                collection: {
+                program: {
                     select: {
                         instructorId: true,
                     },
@@ -276,7 +276,7 @@ class ForumsService {
         if (!post) {
             throw new Error('Post not found');
         }
-        if (post.collection?.instructorId !== instructorId) {
+        if (post.program?.instructorId !== instructorId) {
             throw new Error('Only the collection instructor can mark best answer');
         }
         const reply = await prisma_1.prisma.forumReply.findFirst({
@@ -315,7 +315,7 @@ class ForumsService {
             where: { id: postId },
             data: { isPinned },
             include: {
-                collection: {
+                program: {
                     select: {
                         id: true,
                         title: true,
@@ -340,7 +340,7 @@ class ForumsService {
             where: { id: postId },
             data: { isLocked },
             include: {
-                collection: {
+                program: {
                     select: {
                         id: true,
                         title: true,
@@ -363,8 +363,8 @@ class ForumsService {
     mapPostToDto(post) {
         return {
             id: post.id,
-            collectionId: post.collectionId,
-            collection: post.collection,
+            collectionId: post.programId, // Backward compatibility
+            collection: post.program, // Backward compatibility
             authorId: post.authorId,
             author: post.author,
             title: post.title,

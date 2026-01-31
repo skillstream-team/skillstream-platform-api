@@ -8,7 +8,7 @@ class BundlesService {
      */
     async createBundle(data) {
         // Validate all collections exist
-        const collections = await prisma_1.prisma.collection.findMany({
+        const programs = await prisma_1.prisma.program.findMany({
             where: { id: { in: data.collectionIds } },
             select: {
                 id: true,
@@ -17,21 +17,21 @@ class BundlesService {
                 thumbnailUrl: true,
             },
         });
-        if (collections.length !== data.collectionIds.length) {
-            throw new Error('One or more collections not found');
+        if (programs.length !== data.collectionIds.length) {
+            throw new Error('One or more programs not found');
         }
         // Calculate total value
-        const totalValue = collections.reduce((sum, collection) => sum + collection.price, 0);
+        const totalValue = programs.reduce((sum, program) => sum + program.price, 0);
         const savings = totalValue - data.price;
-        const bundle = await prisma_1.prisma.collectionBundle.create({
+        const bundle = await prisma_1.prisma.programBundle.create({
             data: {
                 title: data.title,
                 description: data.description,
                 price: data.price,
                 thumbnailUrl: data.thumbnailUrl,
                 items: {
-                    create: data.collectionIds.map((collectionId, index) => ({
-                        collectionId,
+                    create: data.collectionIds.map((programId, index) => ({
+                        programId,
                         order: index,
                     })),
                 },
@@ -39,7 +39,7 @@ class BundlesService {
             include: {
                 items: {
                     include: {
-                        collection: {
+                        program: {
                             select: {
                                 id: true,
                                 title: true,
@@ -58,12 +58,12 @@ class BundlesService {
      * Get all active bundles
      */
     async getAllBundles() {
-        const bundles = await prisma_1.prisma.collectionBundle.findMany({
+        const bundles = await prisma_1.prisma.programBundle.findMany({
             where: { isActive: true },
             include: {
                 items: {
                     include: {
-                        collection: {
+                        program: {
                             select: {
                                 id: true,
                                 title: true,
@@ -87,12 +87,12 @@ class BundlesService {
      * Get bundle by ID
      */
     async getBundleById(bundleId) {
-        const bundle = await prisma_1.prisma.collectionBundle.findUnique({
+        const bundle = await prisma_1.prisma.programBundle.findUnique({
             where: { id: bundleId },
             include: {
                 items: {
                     include: {
-                        collection: {
+                        program: {
                             select: {
                                 id: true,
                                 title: true,
@@ -108,7 +108,7 @@ class BundlesService {
         if (!bundle) {
             return null;
         }
-        const totalValue = bundle.items.reduce((sum, item) => sum + item.collection.price, 0);
+        const totalValue = bundle.items.reduce((sum, item) => sum + (item.program?.price || 0), 0);
         const savings = totalValue - bundle.price;
         return this.mapToDto(bundle, totalValue, savings);
     }
@@ -116,12 +116,12 @@ class BundlesService {
      * Enroll student in bundle (enrolls in all collections)
      */
     async enrollInBundle(bundleId, studentId) {
-        const bundle = await prisma_1.prisma.collectionBundle.findUnique({
+        const bundle = await prisma_1.prisma.programBundle.findUnique({
             where: { id: bundleId },
             include: {
                 items: {
                     select: {
-                        collectionId: true,
+                        programId: true,
                     },
                 },
             },
@@ -132,19 +132,19 @@ class BundlesService {
         if (!bundle.isActive) {
             throw new Error('Bundle is not active');
         }
-        const collectionIds = bundle.items.map((item) => item.collectionId);
+        const programIds = bundle.items.map((item) => item.programId);
         // Check existing enrollments
         const existingEnrollments = await prisma_1.prisma.enrollment.findMany({
             where: {
                 studentId,
-                collectionId: { in: collectionIds },
+                programId: { in: programIds },
             },
             select: {
-                collectionId: true,
+                programId: true,
             },
         });
-        const existingCollectionIds = new Set(existingEnrollments.map((e) => e.collectionId));
-        const newCollectionIds = collectionIds.filter((id) => !existingCollectionIds.has(id));
+        const existingProgramIds = new Set(existingEnrollments.map((e) => e.programId));
+        const newProgramIds = programIds.filter((id) => !existingProgramIds.has(id));
         // Create bundle enrollment
         await prisma_1.prisma.bundleEnrollment.create({
             data: {
@@ -155,8 +155,8 @@ class BundlesService {
         // Note: Actual collection enrollments would be handled by the enrollment service
         // This just tracks bundle enrollment
         return {
-            enrolled: newCollectionIds.length,
-            alreadyEnrolled: existingCollectionIds.size,
+            enrolled: newProgramIds.length,
+            alreadyEnrolled: existingProgramIds.size,
         };
     }
     mapToDto(bundle, totalValue, savings) {

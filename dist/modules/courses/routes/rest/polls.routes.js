@@ -5,6 +5,8 @@ const poll_service_1 = require("../../services/poll.service");
 const auth_1 = require("../../../../middleware/auth");
 const roles_1 = require("../../../../middleware/roles");
 const validation_1 = require("../../../../middleware/validation");
+const prisma_1 = require("../../../../utils/prisma");
+const logger_1 = require("../../../../utils/logger");
 const zod_1 = require("zod");
 const router = (0, express_1.Router)();
 const pollService = new poll_service_1.PollService();
@@ -60,8 +62,101 @@ router.post('/', auth_1.requireAuth, (0, roles_1.requireRole)('TEACHER'), (0, va
         });
     }
     catch (error) {
-        console.error('Error creating poll:', error);
+        logger_1.logger.error('Error creating poll', error);
         res.status(500).json({ error: 'Failed to create poll' });
+    }
+});
+/**
+ * @swagger
+ * /api/polls:
+ *   get:
+ *     summary: Get polls (optionally filtered by courseId)
+ *     tags: [Polls]
+ */
+router.get('/', (0, validation_1.validate)({
+    query: zod_1.z.object({
+        courseId: zod_1.z.string().optional(),
+        collectionId: zod_1.z.string().optional(),
+        page: zod_1.z.string().optional().transform(val => val ? parseInt(val) : 1),
+        limit: zod_1.z.string().optional().transform(val => val ? parseInt(val) : 20),
+        isActive: zod_1.z.string().optional().transform(val => val === 'true'),
+    }),
+}), async (req, res) => {
+    try {
+        const { courseId, collectionId, page = 1, limit = 20, isActive } = req.query;
+        const targetCollectionId = collectionId || courseId;
+        const where = {};
+        if (targetCollectionId) {
+            where.programId = targetCollectionId;
+        }
+        if (isActive !== undefined) {
+            where.isActive = isActive;
+        }
+        const skip = (page - 1) * limit;
+        const take = limit;
+        const [polls, total] = await Promise.all([
+            prisma_1.prisma.poll.findMany({
+                where,
+                skip,
+                take,
+                include: {
+                    options: true,
+                    creator: {
+                        select: { id: true, username: true, email: true }
+                    }
+                },
+                orderBy: { createdAt: 'desc' }
+            }),
+            prisma_1.prisma.poll.count({ where })
+        ]);
+        res.json({
+            success: true,
+            polls,
+            pagination: {
+                page,
+                limit,
+                total,
+                totalPages: Math.ceil(total / limit),
+                hasNext: page * limit < total,
+                hasPrev: page > 1,
+            }
+        });
+    }
+    catch (error) {
+        logger_1.logger.error('Error fetching polls', error);
+        res.status(500).json({ error: 'Failed to fetch polls' });
+    }
+});
+/**
+ * @swagger
+ * /api/polls/{pollId}:
+ *   get:
+ *     summary: Get a poll by ID
+ *     tags: [Polls]
+ */
+router.get('/:pollId', (0, validation_1.validate)({ params: zod_1.z.object({ pollId: zod_1.z.string().min(1) }) }), async (req, res) => {
+    try {
+        const { pollId } = req.params;
+        const poll = await prisma_1.prisma.poll.findUnique({
+            where: { id: pollId },
+            include: {
+                options: true,
+                creator: {
+                    select: { id: true, username: true, email: true }
+                }
+            }
+        });
+        if (!poll) {
+            return res.status(404).json({ error: 'Poll not found' });
+        }
+        res.json({
+            success: true,
+            data: poll
+        });
+    }
+    catch (error) {
+        logger_1.logger.error('Error fetching poll', error);
+        res.status(500).json({ error: 'Failed to fetch poll' });
     }
 });
 /**
@@ -89,7 +184,7 @@ router.post('/:pollId/respond', auth_1.requireAuth, (0, validation_1.validate)({
         });
     }
     catch (error) {
-        console.error('Error responding to poll:', error);
+        logger_1.logger.error('Error responding to poll', error);
         res.status(500).json({ error: 'Failed to respond to poll' });
     }
 });
@@ -113,7 +208,7 @@ router.get('/:pollId/results', auth_1.requireAuth, (0, validation_1.validate)({ 
         });
     }
     catch (error) {
-        console.error('Error fetching poll results:', error);
+        logger_1.logger.error('Error fetching poll results', error);
         res.status(500).json({ error: 'Failed to fetch poll results' });
     }
 });

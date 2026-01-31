@@ -737,7 +737,7 @@ class AdminPlatformService {
             where.title = { contains: options.search, mode: 'insensitive' };
         }
         const [bundles, total] = await Promise.all([
-            user_model_1.prisma.collectionBundle.findMany({
+            user_model_1.prisma.programBundle.findMany({
                 where,
                 skip,
                 take: limit,
@@ -786,7 +786,7 @@ class AdminPlatformService {
         };
     }
     async getBundle(id) {
-        const bundle = await user_model_1.prisma.collectionBundle.findUnique({
+        const bundle = await user_model_1.prisma.programBundle.findUnique({
             where: { id },
             include: {
                 items: {
@@ -828,7 +828,7 @@ class AdminPlatformService {
         });
         const totalPrice = courses.reduce((sum, c) => sum + (c.price || 0), 0);
         const finalPrice = data.price || (data.discount ? totalPrice * (1 - data.discount / 100) : totalPrice);
-        const bundle = await user_model_1.prisma.collectionBundle.create({
+        const bundle = await user_model_1.prisma.programBundle.create({
             data: {
                 title: data.name,
                 description: data.description,
@@ -875,11 +875,11 @@ class AdminPlatformService {
         // Update courses if provided
         if (data.courseIds) {
             // Delete existing items
-            await user_model_1.prisma.collectionBundleItem.deleteMany({
+            await user_model_1.prisma.programBundleItem.deleteMany({
                 where: { bundleId: id },
             });
             // Create new items
-            await user_model_1.prisma.collectionBundleItem.createMany({
+            await user_model_1.prisma.programBundleItem.createMany({
                 data: data.courseIds.map((courseId, index) => ({
                     bundleId: id,
                     collectionId: courseId,
@@ -913,7 +913,7 @@ class AdminPlatformService {
         };
     }
     async deleteBundle(id) {
-        await user_model_1.prisma.collectionBundle.delete({
+        await user_model_1.prisma.programBundle.delete({
             where: { id },
         });
         return {

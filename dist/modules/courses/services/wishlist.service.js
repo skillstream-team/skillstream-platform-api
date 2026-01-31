@@ -8,19 +8,19 @@ class WishlistService {
      * Add a course to user's wishlist
      */
     async addToWishlist(userId, courseId) {
-        // Check if collection exists
-        const course = await prisma_1.prisma.collection.findUnique({
+        // Check if program exists
+        const course = await prisma_1.prisma.program.findUnique({
             where: { id: courseId },
         });
         if (!course) {
-            throw new Error('Collection not found');
+            throw new Error('Program not found');
         }
         // Check if already in wishlist
-        const existing = await prisma_1.prisma.collectionWishlist.findUnique({
+        const existing = await prisma_1.prisma.programWishlist.findUnique({
             where: {
-                userId_collectionId: {
+                userId_programId: {
                     userId,
-                    collectionId: courseId,
+                    programId: courseId,
                 },
             },
         });
@@ -28,13 +28,13 @@ class WishlistService {
             throw new Error('Course is already in your wishlist');
         }
         // Add to wishlist
-        const wishlistItem = await prisma_1.prisma.collectionWishlist.create({
+        const wishlistItem = await prisma_1.prisma.programWishlist.create({
             data: {
                 userId,
-                collectionId: courseId,
+                programId: courseId,
             },
             include: {
-                collection: {
+                program: {
                     include: {
                         category: {
                             select: {
@@ -61,9 +61,9 @@ class WishlistService {
             },
         });
         // Calculate average rating
-        const reviews = await prisma_1.prisma.collectionReview.findMany({
+        const reviews = await prisma_1.prisma.programReview.findMany({
             where: {
-                collectionId: courseId,
+                programId: courseId,
                 isPublished: true,
             },
             select: {
@@ -78,28 +78,28 @@ class WishlistService {
         const item = wishlistItem;
         return {
             id: item.id,
-            courseId: item.collectionId,
+            courseId: item.programId,
             course: {
-                id: item.collection.id,
-                title: item.collection.title,
-                description: item.collection.description || undefined,
-                price: item.collection.price,
-                thumbnailUrl: item.collection.thumbnailUrl || undefined,
-                category: item.collection.category
+                id: item.program.id,
+                title: item.program.title,
+                description: item.program.description || undefined,
+                price: item.program.price,
+                thumbnailUrl: item.program.thumbnailUrl || undefined,
+                category: item.program.category
                     ? {
-                        id: item.collection.category.id,
-                        name: item.collection.category.name,
-                        slug: item.collection.category.slug,
+                        id: item.program.category.id,
+                        name: item.program.category.name,
+                        slug: item.program.category.slug,
                     }
                     : undefined,
                 instructor: {
-                    id: item.collection.instructor.id,
-                    username: item.collection.instructor.username,
-                    email: item.collection.instructor.email,
+                    id: item.program.instructor.id,
+                    username: item.program.instructor.username,
+                    email: item.program.instructor.email,
                 },
                 averageRating,
-                reviewCount: item.collection._count.reviews,
-                enrollmentCount: item.collection._count.enrollments,
+                reviewCount: item.program._count.reviews,
+                enrollmentCount: item.program._count.enrollments,
             },
             createdAt: item.createdAt,
         };
@@ -108,18 +108,18 @@ class WishlistService {
      * Remove a course from user's wishlist
      */
     async removeFromWishlist(userId, courseId) {
-        const wishlistItem = await prisma_1.prisma.collectionWishlist.findUnique({
+        const wishlistItem = await prisma_1.prisma.programWishlist.findUnique({
             where: {
-                userId_collectionId: {
+                userId_programId: {
                     userId,
-                    collectionId: courseId,
+                    programId: courseId,
                 },
             },
         });
         if (!wishlistItem) {
             throw new Error('Course is not in your wishlist');
         }
-        await prisma_1.prisma.collectionWishlist.delete({
+        await prisma_1.prisma.programWishlist.delete({
             where: {
                 id: wishlistItem.id,
             },
@@ -134,12 +134,12 @@ class WishlistService {
         const skip = (page - 1) * limit;
         const take = Math.min(limit, 100);
         const [wishlistItems, total] = await Promise.all([
-            prisma_1.prisma.collectionWishlist.findMany({
+            prisma_1.prisma.programWishlist.findMany({
                 where: { userId },
                 skip,
                 take,
                 include: {
-                    collection: {
+                    program: {
                         include: {
                             category: {
                                 select: {
@@ -166,13 +166,13 @@ class WishlistService {
                 },
                 orderBy: { createdAt: 'desc' },
             }),
-            prisma_1.prisma.collectionWishlist.count({ where: { userId } }),
+            prisma_1.prisma.programWishlist.count({ where: { userId } }),
         ]);
         // Calculate average ratings for all collections
-        const courseIds = wishlistItems.map((item) => item.collectionId);
-        const reviews = await prisma_1.prisma.collectionReview.findMany({
+        const courseIds = wishlistItems.map((item) => item.programId);
+        const reviews = await prisma_1.prisma.programReview.findMany({
             where: {
-                collectionId: { in: courseIds },
+                programId: { in: courseIds },
                 isPublished: true,
             },
             select: {
@@ -183,7 +183,7 @@ class WishlistService {
         // Calculate average rating per collection
         const ratingsMap = new Map();
         for (const courseId of courseIds) {
-            const courseReviews = reviews.filter((r) => r.collectionId === courseId);
+            const courseReviews = reviews.filter((r) => r.programId === courseId);
             const average = courseReviews.length > 0
                 ? courseReviews.reduce((sum, r) => sum + r.rating, 0) / courseReviews.length
                 : 0;
@@ -191,28 +191,28 @@ class WishlistService {
         }
         const data = wishlistItems.map((item) => ({
             id: item.id,
-            courseId: item.collectionId,
+            courseId: item.programId,
             course: {
-                id: item.collection.id,
-                title: item.collection.title,
-                description: item.collection.description || undefined,
-                price: item.collection.price,
-                thumbnailUrl: item.collection.thumbnailUrl || undefined,
-                category: item.collection.category
+                id: item.program.id,
+                title: item.program.title,
+                description: item.program.description || undefined,
+                price: item.program.price,
+                thumbnailUrl: item.program.thumbnailUrl || undefined,
+                category: item.program.category
                     ? {
-                        id: item.collection.category.id,
-                        name: item.collection.category.name,
-                        slug: item.collection.category.slug,
+                        id: item.program.category.id,
+                        name: item.program.category.name,
+                        slug: item.program.category.slug,
                     }
                     : undefined,
                 instructor: {
-                    id: item.collection.instructor.id,
-                    username: item.collection.instructor.username,
-                    email: item.collection.instructor.email,
+                    id: item.program.instructor.id,
+                    username: item.program.instructor.username,
+                    email: item.program.instructor.email,
                 },
-                averageRating: ratingsMap.get(item.collectionId) || 0,
-                reviewCount: item.collection._count.reviews,
-                enrollmentCount: item.collection._count.enrollments,
+                averageRating: ratingsMap.get(item.programId) || 0,
+                reviewCount: item.program._count.reviews,
+                enrollmentCount: item.program._count.enrollments,
             },
             createdAt: item.createdAt,
         }));
@@ -232,11 +232,11 @@ class WishlistService {
      * Check if a course is in user's wishlist
      */
     async isInWishlist(userId, courseId) {
-        const wishlistItem = await prisma_1.prisma.collectionWishlist.findUnique({
+        const wishlistItem = await prisma_1.prisma.programWishlist.findUnique({
             where: {
-                userId_collectionId: {
+                userId_programId: {
                     userId,
-                    collectionId: courseId,
+                    programId: courseId,
                 },
             },
         });
@@ -246,7 +246,7 @@ class WishlistService {
      * Get wishlist count for a user
      */
     async getWishlistCount(userId) {
-        return prisma_1.prisma.collectionWishlist.count({
+        return prisma_1.prisma.programWishlist.count({
             where: { userId },
         });
     }

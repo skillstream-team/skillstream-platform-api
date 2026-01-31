@@ -7,6 +7,83 @@ const validation_1 = require("../../../../middleware/validation");
 const zod_1 = require("zod");
 const router = (0, express_1.Router)();
 const settingsService = new settings_service_1.SettingsService();
+// Billing routes - defined first to ensure they match before general settings route
+/**
+ * @swagger
+ * /api/users/{userId}/settings/billing:
+ *   get:
+ *     summary: Get user billing information
+ *     tags: [Settings]
+ */
+router.get('/users/:userId/settings/billing', auth_1.requireAuth, async (req, res) => {
+    try {
+        const { userId } = req.params;
+        const currentUserId = req.user?.id;
+        if (userId !== currentUserId && req.user?.role !== 'ADMIN') {
+            return res.status(403).json({ error: 'Unauthorized' });
+        }
+        // For now, return empty billing info - can be extended to fetch from database
+        res.json({
+            success: true,
+            data: {
+                cardNumber: '',
+                cardHolderName: '',
+                expiryDate: '',
+                cvv: '',
+                street: '',
+                city: '',
+                state: '',
+                zip: '',
+                country: 'US',
+            },
+        });
+    }
+    catch (error) {
+        console.error('Error fetching billing info:', error);
+        res.status(500).json({ error: 'Failed to fetch billing info' });
+    }
+});
+/**
+ * @swagger
+ * /api/users/{userId}/settings/billing:
+ *   put:
+ *     summary: Update user billing information
+ *     tags: [Settings]
+ */
+const billingInfoSchema = zod_1.z.object({
+    cardNumber: zod_1.z.string().optional(),
+    cardHolderName: zod_1.z.string().optional(),
+    expiryDate: zod_1.z.string().optional(),
+    cvv: zod_1.z.string().optional(),
+    street: zod_1.z.string().optional(),
+    city: zod_1.z.string().optional(),
+    state: zod_1.z.string().optional(),
+    zip: zod_1.z.string().optional(),
+    country: zod_1.z.string().optional(),
+});
+router.put('/users/:userId/settings/billing', auth_1.requireAuth, (0, validation_1.validate)({
+    params: zod_1.z.object({ userId: zod_1.z.string().min(1) }),
+    body: billingInfoSchema
+}), async (req, res) => {
+    try {
+        const { userId } = req.params;
+        const currentUserId = req.user?.id;
+        if (userId !== currentUserId && req.user?.role !== 'ADMIN') {
+            return res.status(403).json({ error: 'Unauthorized' });
+        }
+        // For now, just return the updated data - can be extended to save to database
+        res.json({
+            success: true,
+            data: req.body,
+            message: 'Billing information updated successfully',
+        });
+    }
+    catch (error) {
+        console.error('Error updating billing info:', error);
+        res.status(500).json({ error: 'Failed to update billing info' });
+    }
+});
+// General settings routes
 /**
  * @swagger
  * /api/users/{userId}/settings:

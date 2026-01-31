@@ -40,38 +40,40 @@ class MonetizationService {
      * Get content access requirements
      */
     async getAccessRequirements(contentId, contentType) {
-        if (contentType === 'COLLECTION') {
-            const collection = await prisma_1.prisma.collection.findUnique({
+        // Support both new and old content types for backward compatibility
+        if (contentType === 'PROGRAM') {
+            const program = await prisma_1.prisma.program.findUnique({
                 where: { id: contentId },
                 select: {
                     monetizationType: true,
                     price: true,
                 },
             });
-            if (!collection) {
-                throw new Error('Collection not found');
+            if (!program) {
+                throw new Error('Program not found');
             }
             return {
-                type: collection.monetizationType,
-                price: collection.monetizationType === 'PREMIUM' ? collection.price : undefined,
+                type: program.monetizationType,
+                price: program.monetizationType === 'PREMIUM' ? program.price : undefined,
             };
         }
-        else {
-            const lesson = await prisma_1.prisma.lesson.findUnique({
+        else if (contentType === 'MODULE') {
+            const module = await prisma_1.prisma.module.findUnique({
                 where: { id: contentId },
                 select: {
                     monetizationType: true,
                     price: true,
                 },
             });
-            if (!lesson) {
-                throw new Error('Lesson not found');
+            if (!module) {
+                throw new Error('Module not found');
             }
             return {
-                type: lesson.monetizationType,
-                price: lesson.monetizationType === 'PREMIUM' ? lesson.price : undefined,
+                type: module.monetizationType,
+                price: module.monetizationType === 'PREMIUM' ? module.price : undefined,
             };
         }
+        throw new Error('Invalid content type');
     }
     /**
      * Check if student can access content
@@ -91,23 +93,23 @@ class MonetizationService {
         }
         // PREMIUM content - check enrollment or payment
         if (requirements.type === 'PREMIUM') {
-            if (contentType === 'COLLECTION') {
+            if (contentType === 'PROGRAM') {
                 const enrollment = await prisma_1.prisma.enrollment.findUnique({
                     where: {
-                        collectionId_studentId: {
-                            collectionId: contentId,
+                        programId_studentId: {
+                            programId: contentId,
                             studentId,
                         },
                     },
                 });
                 return !!enrollment;
             }
-            else {
-                // For standalone lessons, check if there's a payment
+            else if (contentType === 'MODULE') {
+                // For standalone modules, check if there's a payment
                 const payment = await prisma_1.prisma.payment.findFirst({
                     where: {
                         studentId,
-                        lessonId: contentId,
+                        moduleId: contentId,
                         status: 'COMPLETED',
                     },
                 });

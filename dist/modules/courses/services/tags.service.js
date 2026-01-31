@@ -10,16 +10,16 @@ class TagsService {
     async addTagsToCourse(courseId, tags) {
         // Remove duplicates and normalize
         const uniqueTags = [...new Set(tags.map((t) => t.toLowerCase().trim()))];
-        await prisma_1.prisma.$transaction(uniqueTags.map((tag) => prisma_1.prisma.collectionTag.upsert({
+        await prisma_1.prisma.$transaction(uniqueTags.map((tag) => prisma_1.prisma.programTag.upsert({
             where: {
-                collectionId_name: {
-                    collectionId: courseId,
+                programId_name: {
+                    programId: courseId,
                     name: tag,
                 },
             },
             update: {},
             create: {
-                collectionId: courseId,
+                programId: courseId,
                 name: tag,
             },
         })));
@@ -30,9 +30,9 @@ class TagsService {
      * Remove tags from a course
      */
     async removeTagsFromCourse(courseId, tags) {
-        await prisma_1.prisma.collectionTag.deleteMany({
+        await prisma_1.prisma.programTag.deleteMany({
             where: {
-                collectionId: courseId,
+                programId: courseId,
                 name: { in: tags.map((t) => t.toLowerCase().trim()) },
             },
         });
@@ -43,8 +43,8 @@ class TagsService {
      * Get all tags for a course
      */
     async getCourseTags(courseId) {
-        const tags = await prisma_1.prisma.collectionTag.findMany({
-            where: { collectionId: courseId },
+        const tags = await prisma_1.prisma.programTag.findMany({
+            where: { programId: courseId },
             select: { name: true },
             orderBy: { name: 'asc' },
         });
@@ -54,7 +54,7 @@ class TagsService {
      * Get all unique tags across platform
      */
     async getAllTags() {
-        const tags = await prisma_1.prisma.collectionTag.groupBy({
+        const tags = await prisma_1.prisma.programTag.groupBy({
             by: ['name'],
             _count: {
                 name: true,
@@ -77,7 +77,7 @@ class TagsService {
         const skip = (page - 1) * limit;
         const take = Math.min(limit, 100);
         const [courses, total] = await Promise.all([
-            prisma_1.prisma.collection.findMany({
+            prisma_1.prisma.program.findMany({
                 where: {
                     tags: {
                         some: {
@@ -93,7 +93,7 @@ class TagsService {
                 skip,
                 take,
             }),
-            prisma_1.prisma.collection.count({
+            prisma_1.prisma.program.count({
                 where: {
                     tags: {
                         some: {

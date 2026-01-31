@@ -56,6 +56,7 @@ const error_handler_1 = require("./middleware/error-handler");
 const security_1 = require("./middleware/security");
 const logger_1 = require("./middleware/logger");
 const request_id_1 = require("./middleware/request-id");
+const no_cache_1 = require("./middleware/no-cache");
 const prisma_1 = require("./utils/prisma");
 const redis_1 = __importDefault(require("./utils/redis"));
 const sentry_1 = require("./utils/sentry");
@@ -122,6 +123,8 @@ app.use(request_id_1.requestId);
 app.use((0, compression_1.default)());
 // Security middleware
 app.use(security_1.securityHeaders);
+// No-cache middleware - prevent all caching
+app.use(no_cache_1.noCache);
 // CORS
 app.use((0, cors_1.default)(security_1.corsOptions));
 // General rate limiting (applied to all routes)

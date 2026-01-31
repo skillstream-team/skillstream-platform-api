@@ -123,7 +123,7 @@ class BulkOperationsService {
      * Bulk export courses (CSV format)
      */
     async bulkExportCourses() {
-        const courses = await prisma_1.prisma.collection.findMany({
+        const courses = await prisma_1.prisma.program.findMany({
             select: {
                 id: true,
                 title: true,

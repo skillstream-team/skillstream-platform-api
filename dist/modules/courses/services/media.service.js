@@ -32,12 +32,12 @@ class MediaService {
             file: data.file,
             filename: data.filename,
             contentType: data.mimeType,
-            collectionId: data.collectionId,
+            programId: data.collectionId || data.programId,
             type: data.type,
         });
         const material = await prisma_1.prisma.material.create({
             data: {
-                collectionId: data.collectionId,
+                programId: data.collectionId || data.programId,
                 type: data.type,
                 key: uploadResult.key,
                 filename: data.filename,
@@ -50,7 +50,11 @@ class MediaService {
                 uploader: { select: { id: true, username: true, email: true } },
             },
         });
-        return material;
+        const materialWithRelations = material;
+        return {
+            ...materialWithRelations,
+            collectionId: materialWithRelations.programId,
+        };
     }
     /**
      * @swagger
@@ -61,11 +65,14 @@ class MediaService {
      */
     async getMaterialsByCourse(collectionId) {
         const materials = await prisma_1.prisma.material.findMany({
-            where: { collectionId },
+            where: { programId: collectionId },
             include: { uploader: { select: { id: true, username: true, email: true } } },
             orderBy: { createdAt: 'desc' },
         });
-        return materials;
+        return materials.map((m) => ({
+            ...m,
+            collectionId: m.programId,
+        }));
     }
     /**
      * @swagger
@@ -105,16 +112,25 @@ class MediaService {
         const streamVideo = await streamService.createVideo(data);
         const video = await prisma_1.prisma.video.create({
             data: {
-                ...data,
+                programId: data.collectionId,
+                title: data.title,
+                description: data.description,
+                type: data.type,
+                duration: data.duration,
+                uploadedBy: data.uploadedBy,
+                scheduledAt: data.scheduledAt,
                 streamId: streamVideo.streamId,
                 status: streamVideo.status,
                 playbackUrl: streamVideo.playbackUrl,
                 thumbnailUrl: streamVideo.thumbnailUrl,
-                duration: streamVideo.duration,
             },
             include: { uploader: { select: { id: true, username: true, email: true } } },
         });
-        return video;
+        const videoWithRelations = video;
+        return {
+            ...videoWithRelations,
+            collectionId: videoWithRelations.programId,
+        };
     }
     /**
      * @swagger
@@ -125,11 +141,14 @@ class MediaService {
      */
     async getVideosByCourse(collectionId) {
         const videos = await prisma_1.prisma.video.findMany({
-            where: { collectionId },
+            where: { programId: collectionId },
             include: { uploader: { select: { id: true, username: true, email: true } } },
             orderBy: { createdAt: 'desc' },
         });
-        return videos;
+        return videos.map((v) => ({
+            ...v,
+            collectionId: v.programId,
+        }));
     }
     /**
      * @swagger
@@ -167,7 +186,11 @@ class MediaService {
             },
             include: { uploader: { select: { id: true, username: true, email: true } } },
         });
-        return updatedVideo;
+        const videoWithRelations = updatedVideo;
+        return {
+            ...videoWithRelations,
+            collectionId: videoWithRelations.programId,
+        };
     }
     /**
      * @swagger
@@ -212,14 +235,22 @@ class MediaService {
         });
         const liveStream = await prisma_1.prisma.liveStream.create({
             data: {
-                ...data,
+                programId: data.collectionId,
+                title: data.title,
+                description: data.description,
+                createdBy: data.createdBy,
+                scheduledAt: data.scheduledAt,
                 streamId: streamData.streamId,
                 status: streamData.status,
                 playbackUrl: streamData.playbackUrl,
             },
             include: { creator: { select: { id: true, username: true, email: true } } },
         });
-        return liveStream;
+        const liveStreamWithRelations = liveStream;
+        return {
+            ...liveStreamWithRelations,
+            collectionId: liveStreamWithRelations.programId,
+        };
     }
     /**
      * @swagger
@@ -230,11 +261,14 @@ class MediaService {
      */
     async getLiveStreamsByCourse(collectionId) {
         const liveStreams = await prisma_1.prisma.liveStream.findMany({
-            where: { collectionId },
+            where: { programId: collectionId },
             include: { creator: { select: { id: true, username: true, email: true } } },
             orderBy: { createdAt: 'desc' },
         });
-        return liveStreams;
+        return liveStreams.map((ls) => ({
+            ...ls,
+            collectionId: ls.programId,
+        }));
     }
     /**
      * @swagger
@@ -252,7 +286,11 @@ class MediaService {
             data: { status: 'live', isActive: true, startedAt: new Date() },
             include: { creator: { select: { id: true, username: true, email: true } } },
         });
-        return updatedStream;
+        const updatedStreamWithRelations = updatedStream;
+        return {
+            ...updatedStreamWithRelations,
+            collectionId: updatedStreamWithRelations.programId,
+        };
     }
     /**
      * @swagger
@@ -271,7 +309,11 @@ class MediaService {
             data: { status: 'ended', isActive: false, endedAt: new Date() },
             include: { creator: { select: { id: true, username: true, email: true } } },
         });
-        return updatedStream;
+        const updatedStreamWithRelations = updatedStream;
+        return {
+            ...updatedStreamWithRelations,
+            collectionId: updatedStreamWithRelations.programId,
+        };
     }
     /**
      * @swagger

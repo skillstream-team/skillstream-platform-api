@@ -7,9 +7,9 @@ class ShareService {
      * Track course share
      */
     async shareCourse(data) {
-        await prisma_1.prisma.collectionShare.create({
+        await prisma_1.prisma.programShare.create({
             data: {
-                collectionId: data.courseId,
+                programId: data.courseId,
                 userId: data.userId,
                 platform: data.platform.toLowerCase(),
             },
@@ -19,8 +19,8 @@ class ShareService {
      * Get share statistics for a course
      */
     async getCourseShareStats(courseId) {
-        const shares = await prisma_1.prisma.collectionShare.findMany({
-            where: { collectionId: courseId },
+        const shares = await prisma_1.prisma.programShare.findMany({
+            where: { programId: courseId },
             select: {
                 platform: true,
             },

@@ -15,9 +15,9 @@ async function requireContentAccess(req, res, next) {
         const { collectionId, lessonId } = req.params;
         const monetizationService = new monetization_service_1.MonetizationService();
         if (collectionId) {
-            const canAccess = await monetizationService.canAccess(userId, collectionId, 'COLLECTION');
+            const canAccess = await monetizationService.canAccess(userId, collectionId, 'PROGRAM');
             if (!canAccess) {
-                const requirements = await monetizationService.getAccessRequirements(collectionId, 'COLLECTION');
+                const requirements = await monetizationService.getAccessRequirements(collectionId, 'PROGRAM');
                 return res.status(403).json({
                     error: 'Access denied',
                     requirements,
@@ -30,9 +30,9 @@ async function requireContentAccess(req, res, next) {
             }
         }
         if (lessonId) {
-            const canAccess = await monetizationService.canAccess(userId, lessonId, 'LESSON');
+            const canAccess = await monetizationService.canAccess(userId, lessonId, 'MODULE');
             if (!canAccess) {
-                const requirements = await monetizationService.getAccessRequirements(lessonId, 'LESSON');
+                const requirements = await monetizationService.getAccessRequirements(lessonId, 'MODULE');
                 return res.status(403).json({
                     error: 'Access denied',
                     requirements,

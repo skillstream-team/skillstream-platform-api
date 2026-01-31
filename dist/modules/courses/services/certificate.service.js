@@ -52,20 +52,20 @@ class CertificateService {
     async checkCourseCompletion(studentId, collectionId) {
         // Get all collection content
         const [modules, quizzes, assignments, progress] = await Promise.all([
-            prisma_1.prisma.collectionModule.findMany({
-                where: { collectionId },
+            prisma_1.prisma.programSection.findMany({
+                where: { programId: collectionId },
                 select: { id: true, title: true },
             }),
             prisma_1.prisma.quiz.findMany({
-                where: { collectionId, isPublished: true },
+                where: { programId: collectionId, isPublished: true },
                 select: { id: true, title: true, passingScore: true },
             }),
             prisma_1.prisma.assignment.findMany({
-                where: { collectionId, isPublished: true },
+                where: { programId: collectionId, isPublished: true },
                 select: { id: true, title: true },
             }),
             prisma_1.prisma.progress.findMany({
-                where: { studentId, collectionId },
+                where: { studentId, programId: collectionId },
                 select: { type: true, itemId: true, status: true },
             }),
         ]);
@@ -179,7 +179,7 @@ class CertificateService {
             const existingCertificate = await prisma_1.prisma.certificate.findFirst({
                 where: {
                     studentId,
-                    collectionId,
+                    programId: collectionId,
                 },
             });
             if (existingCertificate) {
@@ -198,26 +198,26 @@ class CertificateService {
                 };
             }
             // Get student and collection details
-            const [student, collection] = await Promise.all([
+            const [student, program] = await Promise.all([
                 prisma_1.prisma.user.findUnique({
                     where: { id: studentId },
                     select: { id: true, username: true, email: true, firstName: true, lastName: true },
                 }),
-                prisma_1.prisma.collection.findUnique({
+                prisma_1.prisma.program.findUnique({
                     where: { id: collectionId },
                     select: { id: true, title: true, description: true },
                 }),
             ]);
-            if (!student || !collection) {
-                throw new Error('Student or collection not found');
+            if (!student || !program) {
+                throw new Error('Student or program not found');
             }
             // Create certificate
             const certificate = await prisma_1.prisma.certificate.create({
                 data: {
                     studentId,
-                    collectionId,
-                    title: `Certificate of Completion - ${collection.title}`,
-                    description: `This certifies that ${student.username} has successfully completed ${collection.title}`,
+                    programId: collectionId,
+                    title: `Certificate of Completion - ${program.title}`,
+                    description: `This certifies that ${student.username} has successfully completed ${program.title}`,
                     issuedAt: new Date(),
                     isActive: true,
                 },
@@ -225,7 +225,7 @@ class CertificateService {
                     student: {
                         select: { id: true, username: true, email: true },
                     },
-                    collection: {
+                    program: {
                         select: { id: true, title: true, description: true },
                     },
                 },
@@ -233,7 +233,7 @@ class CertificateService {
             // Send certificate email
             try {
                 const certificateUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/collections/${collectionId}/certificates/${certificate.id}`;
-                await email_service_1.emailService.sendCertificateEmail(student.email, student.username, collection.title, certificateUrl);
+                await email_service_1.emailService.sendCertificateEmail(student.email, student.username, program.title, certificateUrl);
             }
             catch (emailError) {
                 console.warn('Failed to send certificate email:', emailError);
@@ -267,32 +267,32 @@ class CertificateService {
         const existing = await prisma_1.prisma.certificate.findFirst({
             where: {
                 studentId,
-                collectionId,
+                programId: collectionId,
                 isActive: true,
             },
         });
         if (existing) {
             throw new Error('Certificate already exists for this student and collection');
         }
-        const [student, collection] = await Promise.all([
+        const [student, program] = await Promise.all([
             prisma_1.prisma.user.findUnique({
                 where: { id: studentId },
                 select: { id: true, username: true, email: true },
             }),
-            prisma_1.prisma.collection.findUnique({
+            prisma_1.prisma.program.findUnique({
                 where: { id: collectionId },
                 select: { id: true, title: true, description: true },
             }),
         ]);
-        if (!student || !collection) {
-            throw new Error('Student or collection not found');
+        if (!student || !program) {
+            throw new Error('Student or program not found');
         }
         const certificate = await prisma_1.prisma.certificate.create({
             data: {
                 studentId,
-                collectionId,
-                title: title || `Certificate of Completion - ${collection.title}`,
-                description: description || `This certifies that ${student.username} has successfully completed ${collection.title}`,
+                programId: collectionId,
+                title: title || `Certificate of Completion - ${program.title}`,
+                description: description || `This certifies that ${student.username} has successfully completed ${program.title}`,
                 issuedAt: new Date(),
                 isActive: true,
             },
@@ -300,7 +300,7 @@ class CertificateService {
                 student: {
                     select: { id: true, username: true, email: true },
                 },
-                collection: {
+                program: {
                     select: { id: true, title: true, description: true },
                 },
             },
@@ -308,7 +308,7 @@ class CertificateService {
         // Send certificate email
         try {
             const certificateUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/collections/${collectionId}/certificates/${certificate.id}`;
-            await email_service_1.emailService.sendCertificateEmail(student.email, student.username, collection.title, certificateUrl);
+            await email_service_1.emailService.sendCertificateEmail(student.email, student.username, program.title, certificateUrl);
         }
         catch (emailError) {
             console.warn('Failed to send certificate email:', emailError);

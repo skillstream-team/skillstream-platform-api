@@ -175,7 +175,7 @@ const enrollmentQueries = {
             limit: { type: graphql_1.GraphQLInt, defaultValue: 20 },
         },
         resolve: async (_, args) => {
-            const result = await enrollmentService.getActiveUsersInCollection(args.collectionId, args.days || 7, args.page || 1, args.limit || 20);
+            const result = await enrollmentService.getActiveUsersInProgram(args.collectionId, args.days || 7);
             return {
                 data: result.data.map((user) => ({
                     ...user,

@@ -6,6 +6,7 @@ import { prisma } from '../../../../utils/prisma';
 import { logger } from '../../../../utils/logger';
 import { emailService } from '../../../users/services/email.service';
 import { ProgramsService } from '../../services/service';
+import { getStudentPrice } from '../../services/monetization.service';
 
 const router = Router();
 const service = new ProgramsService();
@@ -270,6 +271,7 @@ router.get('/modules/:id', requireAuth, async (req, res) => {
       ...module,
       description,
       sectionId,
+      studentPrice: getStudentPrice(module.price ?? 0),
     });
   } catch (error) {
     logger.error('Error fetching module', error);
@@ -472,11 +474,20 @@ router.get('/modules', requireAuth, async (req, res) => {
     
     logger.info(`Found ${regularModules.length} regular modules`);
 
+    const regularModulesWithStudentPrice = regularModules.map((m: any) => ({
+      ...m,
+      studentPrice: getStudentPrice(m.price ?? 0),
+    }));
+    const quickModulesWithStudentPrice = quickModules.map((m: any) => ({
+      ...m,
+      studentPrice: getStudentPrice(m.price ?? 0),
+    }));
+
     res.json({
       success: true,
       data: {
-        quickModules,
-        regularModules
+        quickModules: quickModulesWithStudentPrice,
+        regularModules: regularModulesWithStudentPrice,
       }
     });
   } catch (error) {

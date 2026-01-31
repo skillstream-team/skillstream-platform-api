@@ -7,36 +7,36 @@ class TeacherEarningsService {
         this.DEFAULT_PLATFORM_FEE = 0.30; // 30%
     }
     /**
-     * Record premium collection sale
+     * Record premium program sale
      */
-    async recordPremiumSale(collectionId, paymentId) {
-        const collection = await prisma_1.prisma.collection.findUnique({
-            where: { id: collectionId },
+    async recordPremiumSale(programId, paymentId) {
+        const program = await prisma_1.prisma.program.findUnique({
+            where: { id: programId },
             select: {
                 instructorId: true,
                 price: true,
             },
         });
-        if (!collection) {
-            throw new Error('Collection not found');
+        if (!program) {
+            throw new Error('Program not found');
         }
-        const platformFeeAmount = collection.price * this.DEFAULT_PLATFORM_FEE;
-        const netAmount = collection.price - platformFeeAmount;
+        const platformFeeAmount = program.price * this.DEFAULT_PLATFORM_FEE;
+        const netAmount = program.price - platformFeeAmount;
         const now = new Date();
         const period = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
         const periodStart = new Date(now.getFullYear(), now.getMonth(), 1);
         const periodEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
         const earnings = await prisma_1.prisma.teacherEarnings.create({
             data: {
-                teacherId: collection.instructorId,
-                collectionId,
+                teacherId: program.instructorId,
+                programId,
                 periodStart,
                 periodEnd,
                 period,
-                revenueSource: 'COLLECTION',
-                sourceId: collectionId,
-                sourceType: 'COLLECTION',
-                amount: collection.price,
+                revenueSource: 'PROGRAM',
+                sourceId: programId,
+                sourceType: 'PROGRAM',
+                amount: program.price,
                 platformFeePercent: this.DEFAULT_PLATFORM_FEE,
                 platformFeeAmount,
                 netAmount,
@@ -46,36 +46,40 @@ class TeacherEarningsService {
         });
         return earnings;
     }
+    // Backward compatibility alias
+    async recordCollectionSale(collectionId, paymentId) {
+        return this.recordPremiumSale(collectionId, paymentId);
+    }
     /**
-     * Record standalone lesson sale
+     * Record standalone module sale
      */
-    async recordLessonSale(lessonId, paymentId) {
-        const lesson = await prisma_1.prisma.lesson.findUnique({
-            where: { id: lessonId },
+    async recordModuleSale(moduleId, paymentId) {
+        const module = await prisma_1.prisma.module.findUnique({
+            where: { id: moduleId },
             select: {
                 teacherId: true,
                 price: true,
             },
         });
-        if (!lesson || !lesson.teacherId) {
-            throw new Error('Lesson not found or has no teacher');
+        if (!module || !module.teacherId) {
+            throw new Error('Module not found or has no teacher');
         }
-        const platformFeeAmount = lesson.price * this.DEFAULT_PLATFORM_FEE;
-        const netAmount = lesson.price - platformFeeAmount;
+        const platformFeeAmount = module.price * this.DEFAULT_PLATFORM_FEE;
+        const netAmount = module.price - platformFeeAmount;
         const now = new Date();
         const period = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
         const periodStart = new Date(now.getFullYear(), now.getMonth(), 1);
         const periodEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
         const earnings = await prisma_1.prisma.teacherEarnings.create({
             data: {
-                teacherId: lesson.teacherId,
+                teacherId: module.teacherId,
                 periodStart,
                 periodEnd,
                 period,
-                revenueSource: 'LESSON',
-                sourceId: lessonId,
-                sourceType: 'LESSON',
-                amount: lesson.price,
+                revenueSource: 'MODULE',
+                sourceId: moduleId,
+                sourceType: 'MODULE',
+                amount: module.price,
                 platformFeePercent: this.DEFAULT_PLATFORM_FEE,
                 platformFeeAmount,
                 netAmount,
@@ -84,6 +88,10 @@ class TeacherEarningsService {
             },
         });
         return earnings;
+    }
+    // Backward compatibility alias
+    async recordLessonSale(lessonId, paymentId) {
+        return this.recordModuleSale(lessonId, paymentId);
     }
     /**
      * Get teacher earnings breakdown
@@ -103,12 +111,13 @@ class TeacherEarningsService {
             premium: 0,
             subscription: 0,
             workshops: 0,
-            lessons: 0,
+            modules: 0,
             total: 0,
         };
         for (const earning of earnings) {
             switch (earning.revenueSource) {
-                case 'COLLECTION':
+                case 'PROGRAM':
+                case 'COLLECTION': // Backward compatibility
                     breakdown.premium += earning.netAmount;
                     break;
                 case 'SUBSCRIPTION':
@@ -117,8 +126,9 @@ class TeacherEarningsService {
                 case 'LIVE_WORKSHOP':
                     breakdown.workshops += earning.netAmount;
                     break;
-                case 'LESSON':
-                    breakdown.lessons += earning.netAmount;
+                case 'MODULE':
+                case 'LESSON': // Backward compatibility
+                    breakdown.modules += earning.netAmount;
                     break;
             }
             breakdown.total += earning.netAmount;
@@ -167,6 +177,12 @@ class TeacherEarningsService {
                 createdAt: 'desc',
             },
             include: {
+                program: {
+                    select: {
+                        id: true,
+                        title: true,
+                    },
+                },
                 collection: {
                     select: {
                         id: true,
@@ -187,6 +203,12 @@ class TeacherEarningsService {
             },
             take: limit,
             include: {
+                program: {
+                    select: {
+                        id: true,
+                        title: true,
+                    },
+                },
                 collection: {
                     select: {
                         id: true,

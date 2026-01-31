@@ -9,11 +9,11 @@ class LearningPathsService {
      */
     async createPath(data) {
         // Validate all collections exist
-        const collections = await prisma_1.prisma.collection.findMany({
+        const programs = await prisma_1.prisma.program.findMany({
             where: { id: { in: data.collectionIds } },
         });
-        if (collections.length !== data.collectionIds.length) {
-            throw new Error('One or more collections not found');
+        if (programs.length !== data.collectionIds.length) {
+            throw new Error('One or more programs not found');
         }
         const path = await prisma_1.prisma.learningPath.create({
             data: {
@@ -22,9 +22,9 @@ class LearningPathsService {
                 thumbnailUrl: data.thumbnailUrl,
                 categoryId: data.categoryId,
                 difficulty: data.difficulty,
-                collections: {
-                    create: data.collectionIds.map((collectionId, index) => ({
-                        collectionId,
+                programs: {
+                    create: data.collectionIds.map((programId, index) => ({
+                        programId,
                         order: index,
                         isRequired: true,
                     })),
@@ -38,9 +38,9 @@ class LearningPathsService {
                         slug: true,
                     },
                 },
-                collections: {
+                programs: {
                     include: {
-                        collection: {
+                        program: {
                             select: {
                                 id: true,
                                 title: true,
@@ -68,9 +68,9 @@ class LearningPathsService {
                         slug: true,
                     },
                 },
-                collections: {
+                programs: {
                     include: {
-                        collection: {
+                        program: {
                             select: {
                                 id: true,
                                 title: true,
@@ -99,9 +99,9 @@ class LearningPathsService {
                         slug: true,
                     },
                 },
-                collections: {
+                programs: {
                     include: {
-                        collection: {
+                        program: {
                             select: {
                                 id: true,
                                 title: true,
@@ -170,38 +170,40 @@ class LearningPathsService {
             throw new Error('Learning path not found');
         }
         // Get progress for each collection in the path
-        const collectionIds = path.collections.map((c) => c.collection.id);
+        const pathWithPrograms = path;
+        const programIds = pathWithPrograms.programs?.map((p) => p.program.id) || [];
         const certificates = await prisma_1.prisma.certificate.findMany({
             where: {
                 studentId,
-                collectionId: { in: collectionIds },
+                programId: { in: programIds },
             },
             select: {
-                collectionId: true,
+                programId: true,
             },
         });
-        const completedCollectionIds = new Set(certificates.map((c) => c.collectionId));
-        const collectionsProgress = await Promise.all(path.collections.map(async (pathCollection) => {
+        const completedProgramIds = new Set(certificates.map((c) => c.programId));
+        const programsProgress = await Promise.all((pathWithPrograms.programs || []).map(async (pathProgram) => {
             const progress = await prisma_1.prisma.progress.findMany({
                 where: {
                     studentId,
-                    collectionId: pathCollection.collection.id,
+                    programId: pathProgram.program.id,
                 },
             });
             const completed = progress.filter((p) => p.status === 'completed' || p.status === 'passed').length;
             const total = progress.length;
             const collectionProgress = total > 0 ? (completed / total) * 100 : 0;
-            const isCompleted = completedCollectionIds.has(pathCollection.collection.id);
+            const isCompleted = completedProgramIds.has(pathProgram.program.id);
             return {
-                collectionId: pathCollection.collection.id,
-                title: pathCollection.collection.title,
+                collectionId: pathProgram.program.id,
+                title: pathProgram.program.title,
                 progress: Math.round(collectionProgress),
                 isCompleted,
             };
         }));
-        const completedCollections = collectionsProgress.filter((c) => c.isCompleted).length;
-        const overallProgress = path.collections.length > 0
-            ? (completedCollections / path.collections.length) * 100
+        const completedCollections = programsProgress.filter((c) => c.isCompleted).length;
+        const totalPrograms = pathWithPrograms.programs?.length || 0;
+        const overallProgress = totalPrograms > 0
+            ? (completedCollections / totalPrograms) * 100
             : 0;
         // Update enrollment progress
         await prisma_1.prisma.learningPathEnrollment.update({
@@ -210,7 +212,7 @@ class LearningPathsService {
             },
             data: {
                 progress: overallProgress,
-                currentCollectionId: collectionsProgress.find((c) => !c.isCompleted)?.collectionId || null,
+                currentCollectionId: programsProgress.find((c) => !c.isCompleted)?.collectionId || null,
             },
         });
         return {
@@ -218,8 +220,8 @@ class LearningPathsService {
             progress: Math.round(overallProgress),
             currentCollectionId: enrollment.currentCollectionId || undefined,
             completedCollections,
-            totalCollections: path.collections.length,
-            collections: collectionsProgress,
+            totalCollections: totalPrograms,
+            collections: programsProgress,
         };
     }
     mapToDto(path) {

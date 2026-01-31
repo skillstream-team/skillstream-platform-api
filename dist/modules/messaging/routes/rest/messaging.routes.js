@@ -264,6 +264,65 @@ router.put('/conversations/:conversationId', auth_1.requireAuth, async (req, res
 });
 /**
  * @swagger
+ * /api/messaging/conversations/{conversationId}:
+ *   delete:
+ *     summary: Delete a conversation
+ *     tags: [Messaging]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: conversationId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Conversation ID
+ *     responses:
+ *       200:
+ *         description: Conversation deleted successfully
+ *       403:
+ *         description: Permission denied
+ *       404:
+ *         description: Conversation not found
+ *       500:
+ *         description: Server error
+ */
+router.delete('/conversations/:conversationId', auth_1.requireAuth, async (req, res) => {
+    try {
+        const userId = req.user?.id;
+        const conversationId = req.params.conversationId;
+        if (!userId) {
+            return res.status(401).json({ error: 'User not authenticated' });
+        }
+        if (!conversationId) {
+            return res.status(400).json({ error: 'Invalid conversation ID' });
+        }
+        await messagingService.deleteConversation(conversationId, userId);
+        res.json({
+            success: true,
+            message: 'Conversation deleted successfully',
+        });
+    }
+    catch (error) {
+        logger_1.logger.error('Error deleting conversation', error, {
+            userId: req.user?.id,
+            conversationId: req.params.conversationId,
+        });
+        if (error instanceof Error && error.message.includes('permission')) {
+            res.status(403).json({ error: error.message });
+        }
+        else if (error instanceof Error && error.message.includes('not found')) {
+            res.status(404).json({ error: error.message });
+        }
+        else {
+            res.status(500).json({
+                error: error instanceof Error ? error.message : 'Failed to delete conversation',
+            });
+        }
+    }
+});
+/**
+ * @swagger
  * /api/messaging/conversations/{conversationId}/participants:
  *   post:
  *     summary: Add participants to a conversation

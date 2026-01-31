@@ -24,19 +24,19 @@ class SubscriptionAccessService {
             expiresAt: accessExpiresAt,
             accessType,
         };
-        if (contentType === 'COLLECTION') {
-            accessData.collectionId = contentId;
+        if (contentType === 'PROGRAM') {
+            accessData.programId = contentId;
         }
         else {
-            accessData.lessonId = contentId;
+            accessData.moduleId = contentId;
         }
         // Use findFirst and create/update since unique constraint might not work with nulls
         const existing = await prisma_1.prisma.subscriptionAccess.findFirst({
             where: {
                 userId,
-                ...(contentType === 'COLLECTION'
-                    ? { collectionId: contentId, lessonId: null }
-                    : { lessonId: contentId, collectionId: null }),
+                ...(contentType === 'PROGRAM'
+                    ? { programId: contentId, moduleId: null }
+                    : { moduleId: contentId, programId: null }),
             },
         });
         const access = existing
@@ -59,21 +59,21 @@ class SubscriptionAccessService {
      */
     async hasAccess(userId, contentId, contentType) {
         // Check if content is FREE (always accessible)
-        if (contentType === 'COLLECTION') {
-            const collection = await prisma_1.prisma.collection.findUnique({
+        if (contentType === 'PROGRAM') {
+            const program = await prisma_1.prisma.program.findUnique({
                 where: { id: contentId },
                 select: { monetizationType: true },
             });
-            if (collection?.monetizationType === 'FREE') {
+            if (program?.monetizationType === 'FREE') {
                 return true;
             }
         }
         else {
-            const lesson = await prisma_1.prisma.lesson.findUnique({
+            const module = await prisma_1.prisma.module.findUnique({
                 where: { id: contentId },
                 select: { monetizationType: true },
             });
-            if (lesson?.monetizationType === 'FREE') {
+            if (module?.monetizationType === 'FREE') {
                 return true;
             }
         }
@@ -92,9 +92,9 @@ class SubscriptionAccessService {
         const access = await prisma_1.prisma.subscriptionAccess.findFirst({
             where: {
                 userId,
-                ...(contentType === 'COLLECTION'
-                    ? { collectionId: contentId, lessonId: null }
-                    : { lessonId: contentId, collectionId: null }),
+                ...(contentType === 'PROGRAM'
+                    ? { programId: contentId, moduleId: null }
+                    : { moduleId: contentId, programId: null }),
             },
         });
         if (!access) {
@@ -152,14 +152,14 @@ class SubscriptionAccessService {
                 ],
             },
             include: {
-                collection: {
+                program: {
                     select: {
                         id: true,
                         title: true,
                         thumbnailUrl: true,
                     },
                 },
-                lesson: {
+                module: {
                     select: {
                         id: true,
                         title: true,
@@ -169,9 +169,9 @@ class SubscriptionAccessService {
         });
         return {
             collections: accesses
-                .filter((a) => a.collectionId)
-                .map((a) => a.collection),
-            lessons: accesses.filter((a) => a.lessonId).map((a) => a.lesson),
+                .filter((a) => a.programId)
+                .map((a) => a.program),
+            lessons: accesses.filter((a) => a.moduleId).map((a) => a.module),
         };
     }
 }

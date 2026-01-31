@@ -16,14 +16,15 @@ class CloudflareR2Service {
         });
     }
     async uploadFile(data) {
-        const key = this.generateKey(data.collectionId, data.type, data.filename);
+        const courseId = data.programId || data.collectionId || '';
+        const key = this.generateKey(courseId, data.type, data.filename);
         const command = new client_s3_1.PutObjectCommand({
             Bucket: this.bucketName,
             Key: key,
             Body: data.file,
             ContentType: data.contentType,
             Metadata: {
-                collectionId: data.collectionId.toString(),
+                programId: courseId,
                 type: data.type,
                 originalFilename: data.filename,
             },

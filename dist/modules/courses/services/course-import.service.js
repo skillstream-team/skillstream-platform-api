@@ -27,7 +27,7 @@ class CourseImportService {
             throw new Error(`Unsupported platform: ${data.platform}. Supported platforms: ${supportedPlatforms.join(', ')}`);
         }
         // Create import job
-        const importJob = await prisma_1.prisma.collectionImport.create({
+        const importJob = await prisma_1.prisma.programImport.create({
             data: {
                 createdBy: userId,
                 platform: data.platform.toLowerCase(),
@@ -57,7 +57,7 @@ class CourseImportService {
         const processingPromise = (async () => {
             try {
                 // Update status to PROCESSING
-                await prisma_1.prisma.collectionImport.update({
+                await prisma_1.prisma.programImport.update({
                     where: { id: importId },
                     data: {
                         status: 'PROCESSING',
@@ -66,7 +66,7 @@ class CourseImportService {
                     },
                 });
                 // Get import job
-                const importJob = await prisma_1.prisma.collectionImport.findUnique({
+                const importJob = await prisma_1.prisma.programImport.findUnique({
                     where: { id: importId },
                     include: { creator: true },
                 });
@@ -80,18 +80,18 @@ class CourseImportService {
                 // Process based on platform
                 const course = await this.processPlatformImport(importJob);
                 // Update progress
-                await prisma_1.prisma.collectionImport.update({
+                await prisma_1.prisma.programImport.update({
                     where: { id: importId },
                     data: {
                         progress: 90,
                     },
                 });
                 // Link collection to import
-                await prisma_1.prisma.collectionImport.update({
+                await prisma_1.prisma.programImport.update({
                     where: { id: importId },
                     data: {
                         status: 'COMPLETED',
-                        importedCollectionId: course.id,
+                        importedProgramId: course.id,
                         progress: 100,
                         completedAt: new Date(),
                     },
@@ -99,7 +99,7 @@ class CourseImportService {
             }
             catch (error) {
                 console.error(`Error processing import job ${importId}:`, error);
-                await prisma_1.prisma.collectionImport.update({
+                await prisma_1.prisma.programImport.update({
                     where: { id: importId },
                     data: {
                         status: 'FAILED',
@@ -164,7 +164,7 @@ class CourseImportService {
         }
         await this.updateProgress(importJob.id, 30);
         // Transform and create collection
-        const course = await this.collectionsService.createCollection({
+        const course = await this.collectionsService.createProgram({
             title: courseData.title || 'Imported Course from Udemy',
             description: courseData.description || courseData.headline || '',
             price: courseData.price || courseData.price_detail?.price || 0,
@@ -269,7 +269,7 @@ class CourseImportService {
             }
         }
         await this.updateProgress(importJob.id, 30);
-        const course = await this.collectionsService.createCollection({
+        const course = await this.collectionsService.createProgram({
             title: courseData.title || courseData.name || 'Imported Collection from Coursera',
             description: courseData.description || courseData.shortDescription || '',
             price: courseData.price || 0,
@@ -404,7 +404,7 @@ class CourseImportService {
             }
         }
         await this.updateProgress(importJob.id, 30);
-        const course = await this.collectionsService.createCollection({
+        const course = await this.collectionsService.createProgram({
             title: courseData.title || courseData.name || 'Imported Collection from Pluralsight',
             description: courseData.description || courseData.shortDescription || '',
             price: courseData.price || 0,
@@ -524,7 +524,7 @@ class CourseImportService {
             // Import clips (lessons) if provided
             if (module.clips && Array.isArray(module.clips)) {
                 for (const [clipIndex, clip] of module.clips.entries()) {
-                    await prisma_1.prisma.lesson.create({
+                    await prisma_1.prisma.module.create({
                         data: {
                             title: clip.title || clip.name || `Lesson ${clipIndex + 1}`,
                             content: {
@@ -575,7 +575,7 @@ class CourseImportService {
             }
         }
         await this.updateProgress(importJob.id, 40);
-        const course = await this.collectionsService.createCollection({
+        const course = await this.collectionsService.createProgram({
             title: courseData.title || 'Imported Collection from YouTube',
             description: courseData.description || '',
             price: courseData.price || 0,
@@ -654,7 +654,7 @@ class CourseImportService {
      */
     async createYouTubeLesson(courseId, videoId) {
         // Create lesson
-        await prisma_1.prisma.lesson.create({
+        await prisma_1.prisma.module.create({
             data: {
                 title: 'Video Lesson',
                 content: {
@@ -676,7 +676,7 @@ class CourseImportService {
         if (!courseData.title) {
             throw new Error('Course title is required for custom imports');
         }
-        const course = await this.collectionsService.createCollection({
+        const course = await this.collectionsService.createProgram({
             title: courseData.title,
             description: courseData.description || '',
             price: courseData.price || 0,
@@ -767,7 +767,7 @@ class CourseImportService {
             // Import lessons if provided
             if (module.lessons && Array.isArray(module.lessons)) {
                 for (const [lessonIndex, lesson] of module.lessons.entries()) {
-                    await prisma_1.prisma.lesson.create({
+                    await prisma_1.prisma.module.create({
                         data: {
                             title: lesson.title || `Lesson ${lessonIndex + 1}`,
                             content: lesson.content || { description: lesson.description },
@@ -784,7 +784,7 @@ class CourseImportService {
      * Update import job progress
      */
     async updateProgress(importId, progress) {
-        await prisma_1.prisma.collectionImport.update({
+        await prisma_1.prisma.programImport.update({
             where: { id: importId },
             data: { progress: Math.min(100, Math.max(0, progress)) },
         });
@@ -793,7 +793,7 @@ class CourseImportService {
      * Get import job status
      */
     async getImportStatus(importId, userId) {
-        const importJob = await prisma_1.prisma.collectionImport.findFirst({
+        const importJob = await prisma_1.prisma.programImport.findFirst({
             where: {
                 id: importId,
                 createdBy: userId,
@@ -819,13 +819,13 @@ class CourseImportService {
             where.platform = options.platform.toLowerCase();
         }
         const [imports, total] = await Promise.all([
-            prisma_1.prisma.collectionImport.findMany({
+            prisma_1.prisma.programImport.findMany({
                 where,
                 skip,
                 take: limit,
                 orderBy: { createdAt: 'desc' },
             }),
-            prisma_1.prisma.collectionImport.count({ where }),
+            prisma_1.prisma.programImport.count({ where }),
         ]);
         return {
             data: imports.map(this.mapToStatus),
@@ -841,7 +841,7 @@ class CourseImportService {
      * Cancel an import job
      */
     async cancelImport(importId, userId) {
-        const importJob = await prisma_1.prisma.collectionImport.findFirst({
+        const importJob = await prisma_1.prisma.programImport.findFirst({
             where: {
                 id: importId,
                 createdBy: userId,
@@ -857,7 +857,7 @@ class CourseImportService {
             return this.mapToStatus(importJob);
         }
         // Update status to cancelled
-        const updated = await prisma_1.prisma.collectionImport.update({
+        const updated = await prisma_1.prisma.programImport.update({
             where: { id: importId },
             data: {
                 status: 'CANCELLED',
@@ -875,7 +875,7 @@ class CourseImportService {
             platform: importJob.platform,
             status: importJob.status,
             progress: importJob.progress,
-            importedCollectionId: importJob.importedCollectionId || undefined,
+            importedProgramId: importJob.importedProgramId || undefined,
             errorMessage: importJob.errorMessage || undefined,
             metadata: importJob.metadata || undefined,
             startedAt: importJob.startedAt || undefined,

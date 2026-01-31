@@ -31,9 +31,9 @@ class AdminService {
             prisma_1.prisma.user.count(),
             prisma_1.prisma.user.count({ where: { role: 'TEACHER' } }),
             prisma_1.prisma.user.count({ where: { role: 'STUDENT' } }),
-            prisma_1.prisma.collection.count(),
-            prisma_1.prisma.collection.count({ where: { isPublished: true } }),
-            prisma_1.prisma.collection.count({ where: { isPublished: false } }),
+            prisma_1.prisma.program.count(),
+            prisma_1.prisma.program.count({ where: { isPublished: true } }),
+            prisma_1.prisma.program.count({ where: { isPublished: false } }),
             prisma_1.prisma.payment.findMany({ where: { status: 'COMPLETED' } }),
             prisma_1.prisma.payment.findMany({
                 where: { status: 'COMPLETED', createdAt: { gte: startOfMonth } },
@@ -41,7 +41,7 @@ class AdminService {
             prisma_1.prisma.collectionReview.count({ where: { isPublished: false } }),
             prisma_1.prisma.contentFlag.count({ where: { status: 'PENDING' } }),
             prisma_1.prisma.user.count({ where: { createdAt: { gte: thirtyDaysAgo } } }),
-            prisma_1.prisma.collection.count({ where: { createdAt: { gte: startOfMonth } } }),
+            prisma_1.prisma.program.count({ where: { createdAt: { gte: startOfMonth } } }),
         ]);
         const totalRevenue = allPayments.reduce((sum, p) => sum + (p.amount || 0), 0);
         const monthlyRevenue = monthlyPayments.reduce((sum, p) => sum + (p.amount || 0), 0);
@@ -245,7 +245,7 @@ class AdminService {
                     },
                 },
             }),
-            prisma_1.prisma.collection.count({ where: { isPublished: false } }),
+            prisma_1.prisma.program.count({ where: { isPublished: false } }),
         ]);
         return {
             courses,
@@ -263,7 +263,7 @@ class AdminService {
      * Moderate collection (approve/reject)
      */
     async moderateCollection(courseId, status, rejectionReason, adminId) {
-        const course = await prisma_1.prisma.collection.findUnique({
+        const course = await prisma_1.prisma.program.findUnique({
             where: { id: courseId },
         });
         if (!course) {
@@ -276,7 +276,7 @@ class AdminService {
         if (status === 'APPROVED') {
             updateData.isPublished = true;
         }
-        const updatedCourse = await prisma_1.prisma.collection.update({
+        const updatedCourse = await prisma_1.prisma.program.update({
             where: { id: courseId },
             data: updateData,
             include: {
@@ -337,7 +337,7 @@ class AdminService {
             }
         }
         const [reviews, total] = await Promise.all([
-            prisma_1.prisma.collectionReview.findMany({
+            prisma_1.prisma.programReview.findMany({
                 where,
                 skip,
                 take: limit,
@@ -367,7 +367,7 @@ class AdminService {
                     },
                 },
             }),
-            prisma_1.prisma.collectionReview.count({ where }),
+            prisma_1.prisma.programReview.count({ where }),
         ]);
         return {
             reviews,
@@ -385,7 +385,7 @@ class AdminService {
      * Moderate review (approve/reject/hide/delete)
      */
     async moderateReview(reviewId, action, reason, adminId) {
-        const review = await prisma_1.prisma.collectionReview.findUnique({
+        const review = await prisma_1.prisma.programReview.findUnique({
             where: { id: reviewId },
         });
         if (!review) {
@@ -815,7 +815,7 @@ class AdminService {
         }
         for (const courseId of courseIds) {
             try {
-                await prisma_1.prisma.collection.update({
+                await prisma_1.prisma.program.update({
                     where: { id: courseId },
                     data: updateData,
                 });

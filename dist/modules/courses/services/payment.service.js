@@ -6,8 +6,8 @@ class PaymentService {
     mapPaymentToDto(payment) {
         return {
             ...payment,
-            courseId: payment.collectionId,
-            course: payment.collection,
+            courseId: payment.programId,
+            course: payment.program,
         };
     }
     /**
@@ -34,7 +34,7 @@ class PaymentService {
         const payment = await prisma_1.prisma.payment.create({
             data: {
                 studentId: data.studentId,
-                collectionId: data.courseId,
+                programId: data.courseId,
                 amount: data.amount,
                 currency: data.currency || 'USD',
                 status: data.status,
@@ -43,7 +43,7 @@ class PaymentService {
             },
             include: {
                 student: { select: { id: true, username: true, email: true } },
-                collection: { select: { id: true, title: true, price: true } },
+                program: { select: { id: true, title: true, price: true } },
             },
         });
         return this.mapPaymentToDto(payment);
@@ -84,7 +84,7 @@ class PaymentService {
             },
             include: {
                 student: { select: { id: true, username: true, email: true } },
-                collection: { select: { id: true, title: true, price: true } },
+                program: { select: { id: true, title: true, price: true } },
             },
         });
         return this.mapPaymentToDto(payment);
@@ -117,7 +117,7 @@ class PaymentService {
             where: { id: paymentId },
             include: {
                 student: { select: { id: true, username: true, email: true } },
-                collection: { select: { id: true, title: true, price: true } },
+                program: { select: { id: true, title: true, price: true } },
             },
         });
         return payment ? this.mapPaymentToDto(payment) : null;
@@ -150,7 +150,7 @@ class PaymentService {
             where: { studentId },
             include: {
                 student: { select: { id: true, username: true, email: true } },
-                collection: { select: { id: true, title: true, price: true } },
+                program: { select: { id: true, title: true, price: true } },
             },
             orderBy: { createdAt: 'desc' },
         });
@@ -181,10 +181,10 @@ class PaymentService {
      */
     async getPaymentsByCourse(courseId) {
         const payments = await prisma_1.prisma.payment.findMany({
-            where: { collectionId: courseId },
+            where: { programId: courseId },
             include: {
                 student: { select: { id: true, username: true, email: true } },
-                collection: { select: { id: true, title: true, price: true } },
+                program: { select: { id: true, title: true, price: true } },
             },
             orderBy: { createdAt: 'desc' },
         });
@@ -215,18 +215,14 @@ class PaymentService {
      */
     async getCompletedPaymentsByCollection(courseId) {
         const payments = await prisma_1.prisma.payment.findMany({
-            where: { collectionId: courseId, status: 'COMPLETED' },
+            where: { programId: courseId, status: 'COMPLETED' },
             include: {
                 student: { select: { id: true, username: true, email: true } },
-                collection: { select: { id: true, title: true, price: true } },
+                program: { select: { id: true, title: true, price: true } },
             },
             orderBy: { createdAt: 'desc' },
         });
-        return payments.map((p) => ({
-            ...p,
-            courseId: p.collectionId,
-            course: p.collection,
-        }));
+        return payments.map(p => this.mapPaymentToDto(p));
     }
 }
 exports.PaymentService = PaymentService;

@@ -140,12 +140,12 @@ class EngagementService {
         return prisma_1.prisma.studentEngagement.findMany({
             where: { period },
             include: {
-                collection: {
+                program: {
                     select: {
                         instructorId: true,
                     },
                 },
-                lesson: {
+                module: {
                     select: {
                         teacherId: true,
                     },
@@ -164,14 +164,14 @@ class EngagementService {
         return prisma_1.prisma.studentEngagement.findMany({
             where,
             include: {
-                collection: {
+                program: {
                     select: {
                         id: true,
                         title: true,
                         thumbnailUrl: true,
                     },
                 },
-                lesson: {
+                module: {
                     select: {
                         id: true,
                         title: true,

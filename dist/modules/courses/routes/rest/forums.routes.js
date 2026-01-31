@@ -6,6 +6,7 @@ const auth_1 = require("../../../../middleware/auth");
 const roles_1 = require("../../../../middleware/roles");
 const subscription_1 = require("../../../../middleware/subscription");
 const validation_1 = require("../../../../middleware/validation");
+const logger_1 = require("../../../../utils/logger");
 const zod_1 = require("zod");
 const router = (0, express_1.Router)();
 const forumsService = new forums_service_1.ForumsService();
@@ -39,7 +40,7 @@ router.post('/courses/:courseId/forum/posts', auth_1.requireAuth, subscription_1
         });
     }
     catch (error) {
-        console.error('Error creating post:', error);
+        logger_1.logger.error('Error creating post', error);
         res.status(500).json({ error: error.message || 'Failed to create post' });
     }
 });
@@ -70,7 +71,7 @@ router.get('/courses/:courseId/forum/posts', (0, validation_1.validate)({
         });
     }
     catch (error) {
-        console.error('Error fetching posts:', error);
+        logger_1.logger.error('Error fetching posts', error);
         res.status(500).json({ error: 'Failed to fetch posts' });
     }
 });
@@ -91,7 +92,7 @@ router.get('/forum/posts/:postId', (0, validation_1.validate)({ params: zod_1.z.
         });
     }
     catch (error) {
-        console.error('Error fetching post:', error);
+        logger_1.logger.error('Error fetching post', error);
         res.status(404).json({ error: error.message || 'Post not found' });
     }
 });
@@ -112,7 +113,7 @@ router.get('/forum/posts/:postId/replies', (0, validation_1.validate)({ params: 
         });
     }
     catch (error) {
-        console.error('Error fetching replies:', error);
+        logger_1.logger.error('Error fetching replies', error);
         res.status(500).json({ error: 'Failed to fetch replies' });
     }
 });
@@ -146,7 +147,7 @@ router.post('/forum/posts/:postId/replies', auth_1.requireAuth, (0, validation_1
         });
     }
     catch (error) {
-        console.error('Error creating reply:', error);
+        logger_1.logger.error('Error creating reply', error);
         res.status(500).json({ error: error.message || 'Failed to create reply' });
     }
 });
@@ -169,7 +170,7 @@ router.post('/forum/posts/:postId/upvote', auth_1.requireAuth, (0, validation_1.
         });
     }
     catch (error) {
-        console.error('Error upvoting post:', error);
+        logger_1.logger.error('Error upvoting post', error);
         res.status(500).json({ error: error.message || 'Failed to upvote post' });
     }
 });
@@ -192,7 +193,7 @@ router.post('/forum/replies/:replyId/upvote', auth_1.requireAuth, (0, validation
         });
     }
     catch (error) {
-        console.error('Error upvoting reply:', error);
+        logger_1.logger.error('Error upvoting reply', error);
         res.status(500).json({ error: error.message || 'Failed to upvote reply' });
     }
 });
@@ -221,7 +222,7 @@ router.post('/forum/posts/:postId/best-answer', auth_1.requireAuth, (0, roles_1.
         });
     }
     catch (error) {
-        console.error('Error marking best answer:', error);
+        logger_1.logger.error('Error marking best answer', error);
         res.status(500).json({ error: error.message || 'Failed to mark best answer' });
     }
 });
@@ -246,7 +247,7 @@ router.put('/forum/posts/:postId/pin', auth_1.requireAuth, (0, roles_1.requireRo
         });
     }
     catch (error) {
-        console.error('Error toggling pin:', error);
+        logger_1.logger.error('Error toggling pin', error);
         res.status(500).json({ error: error.message || 'Failed to toggle pin' });
     }
 });
@@ -271,7 +272,7 @@ router.put('/forum/posts/:postId/lock', auth_1.requireAuth, (0, roles_1.requireR
         });
     }
     catch (error) {
-        console.error('Error toggling lock:', error);
+        logger_1.logger.error('Error toggling lock', error);
         res.status(500).json({ error: error.message || 'Failed to toggle lock' });
     }
 });

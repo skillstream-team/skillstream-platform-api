@@ -119,37 +119,37 @@ class SubscriptionService {
         try {
             const { SubscriptionAccessService } = await Promise.resolve().then(() => __importStar(require('./subscription-access.service')));
             const accessService = new SubscriptionAccessService();
-            // Get all subscription-marked collections
-            const subscriptionCollections = await prisma_1.prisma.collection.findMany({
+            // Get all subscription-marked programs
+            const subscriptionPrograms = await prisma_1.prisma.program.findMany({
                 where: {
                     monetizationType: 'SUBSCRIPTION',
                     isPublished: true,
                 },
                 select: { id: true },
             });
-            // Get all subscription-marked lessons
-            const subscriptionLessons = await prisma_1.prisma.lesson.findMany({
+            // Get all subscription-marked modules
+            const subscriptionModules = await prisma_1.prisma.module.findMany({
                 where: {
                     monetizationType: 'SUBSCRIPTION',
                 },
                 select: { id: true },
             });
-            // Grant access to collections
-            for (const collection of subscriptionCollections) {
+            // Grant access to programs
+            for (const program of subscriptionPrograms) {
                 try {
-                    await accessService.grantAccess(userId, collection.id, 'COLLECTION', 'SUBSCRIPTION', result.expiresAt || undefined);
+                    await accessService.grantAccess(userId, program.id, 'PROGRAM', 'SUBSCRIPTION', result.expiresAt || undefined);
                 }
                 catch (error) {
-                    console.warn(`Failed to grant access to collection ${collection.id}:`, error);
+                    console.warn(`Failed to grant access to program ${program.id}:`, error);
                 }
             }
-            // Grant access to lessons
-            for (const lesson of subscriptionLessons) {
+            // Grant access to modules
+            for (const module of subscriptionModules) {
                 try {
-                    await accessService.grantAccess(userId, lesson.id, 'LESSON', 'SUBSCRIPTION', result.expiresAt || undefined);
+                    await accessService.grantAccess(userId, module.id, 'MODULE', 'SUBSCRIPTION', result.expiresAt || undefined);
                 }
                 catch (error) {
-                    console.warn(`Failed to grant access to lesson ${lesson.id}:`, error);
+                    console.warn(`Failed to grant access to module ${module.id}:`, error);
                 }
             }
         }

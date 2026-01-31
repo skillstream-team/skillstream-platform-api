@@ -11,7 +11,7 @@ class InstructorQAService {
         // Verify student is enrolled
         const enrollment = await prisma_1.prisma.enrollment.findFirst({
             where: {
-                collectionId: data.collectionId,
+                programId: data.collectionId,
                 studentId: data.studentId,
             },
         });
@@ -20,12 +20,12 @@ class InstructorQAService {
         }
         const qa = await prisma_1.prisma.instructorQA.create({
             data: {
-                collectionId: data.collectionId,
+                programId: data.collectionId,
                 studentId: data.studentId,
                 question: data.question,
             },
             include: {
-                collection: {
+                program: {
                     select: {
                         id: true,
                         title: true,
@@ -61,7 +61,7 @@ class InstructorQAService {
         const qa = await prisma_1.prisma.instructorQA.findUnique({
             where: { id: data.qaId },
             include: {
-                collection: {
+                program: {
                     select: {
                         id: true,
                         title: true,
@@ -74,7 +74,7 @@ class InstructorQAService {
             throw new Error('Question not found');
         }
         // Verify instructor is the collection instructor
-        if (qa.collection.instructorId !== data.instructorId) {
+        if (qa.program.instructorId !== data.instructorId) {
             throw new Error('Only the collection instructor can answer questions');
         }
         const answer = await prisma_1.prisma.instructorQAAnswer.create({
@@ -92,7 +92,7 @@ class InstructorQAService {
             },
         });
         // Invalidate cache
-        await (0, cache_1.deleteCache)(`collection:${qa.collectionId}`);
+        await (0, cache_1.deleteCache)(`collection:${qa.programId}`);
         return this.getQuestionById(data.qaId);
     }
     /**
@@ -102,7 +102,7 @@ class InstructorQAService {
         const qa = await prisma_1.prisma.instructorQA.findUnique({
             where: { id: qaId },
             include: {
-                collection: {
+                program: {
                     select: {
                         id: true,
                         title: true,
@@ -140,7 +140,7 @@ class InstructorQAService {
     async getCourseQuestions(collectionId, page = 1, limit = 20, answeredOnly) {
         const skip = (page - 1) * limit;
         const take = Math.min(limit, 100);
-        const where = { collectionId };
+        const where = { programId: collectionId };
         if (answeredOnly !== undefined) {
             where.isAnswered = answeredOnly;
         }
@@ -150,7 +150,7 @@ class InstructorQAService {
                 skip,
                 take,
                 include: {
-                    collection: {
+                    program: {
                         select: {
                             id: true,
                             title: true,
@@ -202,7 +202,7 @@ class InstructorQAService {
                 skip,
                 take,
                 include: {
-                    collection: {
+                    program: {
                         select: {
                             id: true,
                             title: true,
@@ -245,10 +245,10 @@ class InstructorQAService {
     mapToDto(qa) {
         return {
             id: qa.id,
-            collectionId: qa.collectionId,
+            collectionId: qa.programId, // Backward compatibility
             collection: {
-                id: qa.collection.id,
-                title: qa.collection.title,
+                id: qa.program.id,
+                title: qa.program.title,
             },
             studentId: qa.studentId,
             student: {

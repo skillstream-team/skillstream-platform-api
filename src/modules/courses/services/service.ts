@@ -2,6 +2,7 @@ import { Prisma } from '@prisma/client';
 import { CreateQuizQuestionDto } from '../dtos/learning.dto';
 import { prisma } from '../../../utils/prisma';
 import { getCache, setCache, deleteCache, deleteCachePattern, cacheKeys, CACHE_TTL } from '../../../utils/cache';
+import { getStudentPrice } from './monetization.service';
 
 export class CollectionsService {
     // ============================================================
@@ -429,6 +430,7 @@ export class CollectionsService {
         const programsWithTags = programsWithRatings.map((program) => ({
             ...program,
             tags: tagsMap.get(program.id) || [],
+            studentPrice: getStudentPrice(program.price ?? 0),
         }));
 
         const result = {
@@ -572,6 +574,7 @@ export class CollectionsService {
         const programWithRating = {
             ...program,
             averageRating,
+            studentPrice: getStudentPrice(program.price ?? 0),
             reviewCount: program._count.reviews,
             prerequisites: prerequisites.map((p) => ({
                 id: p.id,

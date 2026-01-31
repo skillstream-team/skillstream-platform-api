@@ -43,7 +43,7 @@ const validation_1 = require("../../../../middleware/validation");
 const validation_schemas_1 = require("../../../../utils/validation-schemas");
 const prisma_1 = require("../../../../utils/prisma");
 const router = (0, express_1.Router)();
-const service = new service_1.CollectionsService();
+const service = new service_1.ProgramsService();
 const enrollmentService = new enrollment_service_1.EnrollmentService();
 /**
  * @swagger
@@ -104,15 +104,15 @@ router.post('/', auth_1.requireAuth, (0, roles_1.requireRole)('TEACHER'), (0, va
         };
         // Auto-generate order if not provided (get max order + 1 for this instructor)
         if (payload.order == null) {
-            const maxOrderCollection = await prisma_1.prisma.collection.findFirst({
+            const maxOrderProgram = await prisma_1.prisma.program.findFirst({
                 where: { instructorId: payload.instructorId },
                 orderBy: { order: 'desc' },
                 select: { order: true },
             });
-            payload.order = (maxOrderCollection?.order ?? -1) + 1;
+            payload.order = (maxOrderProgram?.order ?? -1) + 1;
         }
-        const collection = await service.createCollection(payload);
-        res.json(collection);
+        const program = await service.createProgram(payload);
+        res.json(program);
     }
     catch (err) {
         const error = err;
@@ -194,17 +194,17 @@ router.post('/', auth_1.requireAuth, (0, roles_1.requireRole)('TEACHER'), (0, va
  */
 router.get('/:id/modules', auth_1.requireAuth, (0, validation_1.validate)({ params: validation_schemas_1.courseIdParamSchema }), async (req, res) => {
     try {
-        const modules = await service.getCollectionModulesWithLessons(req.params.id);
-        res.json(modules);
+        const sections = await service.getProgramSectionsWithModules(req.params.id);
+        res.json(sections);
     }
     catch (err) {
         res.status(400).json({ error: err.message });
     }
 });
-router.post('/:id/modules', auth_1.requireAuth, (0, roles_1.requireRole)('TEACHER'), (0, validation_1.validate)({ params: validation_schemas_1.courseIdParamSchema, body: validation_schemas_1.createModuleSchema }), async (req, res) => {
+router.post('/:id/sections', auth_1.requireAuth, (0, roles_1.requireRole)('TEACHER'), (0, validation_1.validate)({ params: validation_schemas_1.courseIdParamSchema, body: validation_schemas_1.createModuleSchema }), async (req, res) => {
     try {
-        const collectionModule = await service.addModuleToCollection(req.params.id, req.body);
-        res.json(collectionModule);
+        const programSection = await service.addSectionToProgram(req.params.id, req.body);
+        res.json(programSection);
     }
     catch (err) {
         res.status(400).json({ error: err.message });
@@ -255,8 +255,8 @@ router.post('/:id/modules', auth_1.requireAuth, (0, roles_1.requireRole)('TEACHE
  */
 router.put('/:id/modules/:moduleId', auth_1.requireAuth, (0, roles_1.requireRole)('TEACHER'), (0, validation_1.validate)({ params: validation_schemas_1.courseIdParamSchema }), async (req, res) => {
     try {
-        const module = await service.updateModuleInCollection(req.params.id, req.params.moduleId, req.body);
-        res.json(module);
+        const section = await service.updateSectionInProgram(req.params.id, req.params.moduleId, req.body);
+        res.json(section);
     }
     catch (err) {
         res.status(400).json({ error: err.message });
@@ -264,21 +264,21 @@ router.put('/:id/modules/:moduleId', auth_1.requireAuth, (0, roles_1.requireRole
 });
 /**
  * @swagger
- * /api/courses/{id}/modules/{moduleId}:
+ * /api/courses/{id}/sections/{sectionId}:
  *   delete:
- *     summary: Delete a module
- *     description: Delete a module from a course. Only teachers can delete modules.
+ *     summary: Delete a section
+ *     description: Delete a section from a program. Only teachers can delete sections.
  *     tags: [Courses]
  *     security:
  *       - bearerAuth: []
  */
-router.delete('/:id/modules/:moduleId', auth_1.requireAuth, (0, roles_1.requireRole)('TEACHER'), (0, validation_1.validate)({ params: validation_schemas_1.courseIdParamSchema }), async (req, res) => {
+router.delete('/:id/sections/:sectionId', auth_1.requireAuth, (0, roles_1.requireRole)('TEACHER'), (0, validation_1.validate)({ params: validation_schemas_1.courseIdParamSchema }), async (req, res) => {
     try {
-        await service.deleteModule(req.params.moduleId);
+        await service.deleteSection(req.params.sectionId);
         const { deleteCache } = await Promise.resolve().then(() => __importStar(require('../../../../utils/cache')));
         const { cacheKeys } = await Promise.resolve().then(() => __importStar(require('../../../../utils/cache')));
-        await deleteCache(cacheKeys.collection(req.params.id));
-        res.json({ success: true, message: 'Module deleted successfully' });
+        await deleteCache(cacheKeys.program(req.params.id));
+        res.json({ success: true, message: 'Section deleted successfully' });
     }
     catch (err) {
         res.status(400).json({ error: err.message });
@@ -344,13 +344,13 @@ router.delete('/:id/modules/:moduleId', auth_1.requireAuth, (0, roles_1.requireR
  */
 router.post('/:id/modules/:moduleId/lessons', auth_1.requireAuth, (0, roles_1.requireRole)('TEACHER'), async (req, res) => {
     try {
-        // Add collectionId from route params to the request body
-        const lessonData = {
+        // Add programId from route params to the request body
+        const moduleData = {
             ...req.body,
-            collectionId: req.params.id,
+            programId: req.params.id,
         };
-        const lesson = await service.addLessonToModule(req.params.moduleId, lessonData);
-        res.json(lesson);
+        const module = await service.addModuleToSection(req.params.moduleId, moduleData);
+        res.json(module);
     }
     catch (err) {
         res.status(400).json({ error: err.message });
@@ -424,9 +424,9 @@ router.post('/:id/modules/:moduleId/lessons', auth_1.requireAuth, (0, roles_1.re
  *       403:
  *         description: Forbidden - Teacher role required
  */
-router.post('/:id/lessons/:lessonId/quiz', auth_1.requireAuth, (0, roles_1.requireRole)('TEACHER'), async (req, res) => {
+router.post('/:id/modules/:moduleId/quiz', auth_1.requireAuth, (0, roles_1.requireRole)('TEACHER'), async (req, res) => {
     try {
-        const quiz = await service.addQuizToLesson(req.params.lessonId, req.body);
+        const quiz = await service.addQuizToModule(req.params.moduleId, req.body);
         res.json(quiz);
     }
     catch (err) {
@@ -561,6 +561,10 @@ router.get('/', async (req, res) => {
         const sortBy = req.query.sortBy || 'createdAt';
         const sortOrder = req.query.sortOrder || 'desc';
         const result = await service.getAllCollections(page, limit, search, minPrice, maxPrice, instructorId, categoryId, difficulty, minRating, maxRating, minDuration, maxDuration, language, tags, sortBy, sortOrder);
+        // Add cache-control headers to prevent stale data
+        res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+        res.setHeader('Pragma', 'no-cache');
+        res.setHeader('Expires', '0');
         res.json(result);
     }
     catch (err) {
@@ -649,17 +653,17 @@ router.get('/', async (req, res) => {
  */
 router.get('/:id/preview', async (req, res) => {
     try {
-        const collectionId = req.params.id;
-        const collection = await service.getCollectionById(collectionId);
-        if (!collection) {
-            return res.status(404).json({ error: 'Collection not found' });
+        const programId = req.params.id;
+        const program = await service.getProgramById(programId);
+        if (!program) {
+            return res.status(404).json({ error: 'Program not found' });
         }
         // Get preview content
-        // First get CollectionLesson records, then get the lessons
-        const collectionLessons = await prisma_1.prisma.collectionLesson.findMany({
-            where: { collectionId },
+        // First get ProgramModule records, then get the modules
+        const programModules = await prisma_1.prisma.programModule.findMany({
+            where: { programId },
             include: {
-                lesson: {
+                module: {
                     select: {
                         id: true,
                         title: true,
@@ -672,12 +676,12 @@ router.get('/:id/preview', async (req, res) => {
             },
             orderBy: { order: 'asc' },
         });
-        const previewLessonsData = collectionLessons
-            .filter((cl) => cl.lesson && cl.lesson.isPreview)
-            .map((cl) => cl.lesson);
+        const previewModulesData = programModules
+            .filter((pm) => pm.module && pm.module.isPreview)
+            .map((pm) => pm.module);
         const previewVideos = await prisma_1.prisma.video.findMany({
             where: {
-                collectionId,
+                programId,
                 isPreview: true,
             },
             select: {
@@ -692,16 +696,16 @@ router.get('/:id/preview', async (req, res) => {
             orderBy: { createdAt: 'asc' },
         });
         res.json({
-            collection: {
-                id: collection.id,
-                title: collection.title,
-                description: collection.description,
-                thumbnailUrl: collection.thumbnailUrl,
-                difficulty: collection.difficulty,
-                instructor: collection.instructor,
+            program: {
+                id: program.id,
+                title: program.title,
+                description: program.description,
+                thumbnailUrl: program.thumbnailUrl,
+                difficulty: program.difficulty,
+                instructor: program.instructor,
             },
             previewContent: {
-                lessons: previewLessonsData,
+                modules: previewModulesData,
                 videos: previewVideos,
             },
         });
@@ -748,10 +752,10 @@ router.get('/:id/preview', async (req, res) => {
  */
 router.get('/:id', auth_1.requireAuth, subscription_1.requireSubscription, (0, validation_1.validate)({ params: validation_schemas_1.courseIdParamSchema }), async (req, res) => {
     try {
-        const collection = await service.getCollectionById(req.params.id);
-        if (!collection)
+        const program = await service.getProgramById(req.params.id);
+        if (!program)
             return res.status(404).json({ error: 'Not found' });
-        res.json(collection);
+        res.json(program);
     }
     catch (err) {
         res.status(500).json({ error: 'Failed to fetch course' });
@@ -823,8 +827,8 @@ router.get('/:id', auth_1.requireAuth, subscription_1.requireSubscription, (0, v
  */
 router.put('/:id', auth_1.requireAuth, (0, roles_1.requireRole)('TEACHER'), (0, validation_1.validate)({ params: validation_schemas_1.courseIdParamSchema, body: validation_schemas_1.updateCourseSchema }), async (req, res) => {
     try {
-        const collection = await service.updateCollection(req.params.id, req.body);
-        res.json(collection);
+        const program = await service.updateProgram(req.params.id, req.body);
+        res.json(program);
     }
     catch (err) {
         res.status(400).json({ error: err.message });
@@ -866,7 +870,7 @@ router.put('/:id', auth_1.requireAuth, (0, roles_1.requireRole)('TEACHER'), (0, 
  */
 router.delete('/:id', auth_1.requireAuth, (0, roles_1.requireRole)('TEACHER'), (0, validation_1.validate)({ params: validation_schemas_1.courseIdParamSchema }), async (req, res) => {
     try {
-        await service.deleteCollection(req.params.id);
+        await service.deleteProgram(req.params.id);
         res.json({ success: true });
     }
     catch (err) {
@@ -933,11 +937,11 @@ router.delete('/:id', auth_1.requireAuth, (0, roles_1.requireRole)('TEACHER'), (
  */
 router.get('/:id/active-users', auth_1.requireAuth, (0, roles_1.requireRole)('TEACHER'), (0, validation_1.validate)({ params: validation_schemas_1.courseIdParamSchema }), async (req, res) => {
     try {
-        const collectionId = req.params.id;
+        const programId = req.params.id;
         const days = parseInt(req.query.days) || 7;
         const page = parseInt(req.query.page) || 1;
         const limit = parseInt(req.query.limit) || 20;
-        const result = await enrollmentService.getActiveUsersInCollection(collectionId, days, page, limit);
+        const result = await enrollmentService.getActiveUsersInProgram(programId, days, page, limit);
         res.json(result);
     }
     catch (err) {
@@ -991,10 +995,10 @@ router.get('/:id/active-users', auth_1.requireAuth, (0, roles_1.requireRole)('TE
  */
 router.get('/:id/enrollments', auth_1.requireAuth, (0, roles_1.requireRole)('TEACHER'), (0, validation_1.validate)({ params: validation_schemas_1.courseIdParamSchema }), async (req, res) => {
     try {
-        const collectionId = req.params.id;
+        const programId = req.params.id;
         const page = parseInt(req.query.page) || 1;
         const limit = parseInt(req.query.limit) || 20;
-        const result = await enrollmentService.getCollectionEnrollments(collectionId, page, limit);
+        const result = await enrollmentService.getProgramEnrollments(programId, page, limit);
         res.json(result);
     }
     catch (err) {

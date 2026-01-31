@@ -18,53 +18,55 @@ class DashboardService {
         const enrollments = await prisma_1.prisma.enrollment.findMany({
             where: { studentId: userId },
             include: {
-                collection: {
+                program: {
                     include: {
                         _count: {
                             select: {
-                                collectionLessons: true,
-                                modules: true,
+                                programModules: true,
+                                sections: true,
                             },
                         },
                     },
                 },
             },
         });
-        // Get progress for all enrolled collections
-        const collectionIds = enrollments.map((e) => e.collectionId);
+        // Get progress for all enrolled programs
+        const programIds = enrollments.map((e) => e.programId).filter(Boolean);
         const progressRecords = await prisma_1.prisma.progress.findMany({
             where: {
                 studentId: userId,
-                collectionId: { in: collectionIds },
+                programId: { in: programIds },
             },
             orderBy: { lastAccessed: 'desc' },
         });
-        // Calculate progress per collection
+        // Calculate progress per program
         const enrolledCourses = await Promise.all(enrollments.map(async (enrollment) => {
-            const collectionProgress = progressRecords.filter((p) => p.collectionId === enrollment.collectionId);
-            const completed = collectionProgress.filter((p) => p.status === 'completed' || p.status === 'passed').length;
-            const total = enrollment.collection._count.collectionLessons + enrollment.collection._count.modules;
+            const program = enrollment.program;
+            const programId = enrollment.programId;
+            const programProgress = progressRecords.filter((p) => p.programId === programId);
+            const completed = programProgress.filter((p) => p.status === 'completed' || p.status === 'passed').length;
+            const total = (program?._count?.programModules || 0) + (program?._count?.sections || 0);
             const progress = total > 0 ? (completed / total) * 100 : 0;
-            // Get next lesson (from collection lessons)
-            const collectionLessons = await prisma_1.prisma.collectionLesson.findMany({
-                where: { collectionId: enrollment.collectionId },
-                include: { lesson: true },
+            // Get next module (from program modules)
+            const programModules = await prisma_1.prisma.programModule.findMany({
+                where: { programId },
+                include: { module: true },
                 orderBy: { order: 'asc' },
             });
-            const completedLessonIds = collectionProgress
-                .filter((p) => p.type === 'lesson' && p.status === 'completed')
+            const completedModuleIds = programProgress
+                .filter((p) => p.type === 'module' && p.status === 'completed')
                 .map((p) => p.itemId);
-            const nextLessonData = collectionLessons.find((cl) => !completedLessonIds.includes(cl.lessonId));
-            const lastProgress = collectionProgress[0];
+            const nextModuleData = programModules.find((pm) => !completedModuleIds.includes(pm.moduleId));
+            const lastProgress = programProgress[0];
             return {
-                id: enrollment.collection.id,
-                title: enrollment.collection.title,
-                thumbnailUrl: enrollment.collection.thumbnailUrl || undefined,
+                id: program?.id || programId,
+                title: program?.title || '',
+                thumbnailUrl: program?.thumbnailUrl || undefined,
                 progress: Math.round(progress),
                 lastAccessed: lastProgress?.lastAccessed,
-                nextLesson: nextLessonData ? {
-                    id: nextLessonData.lesson.id,
-                    title: nextLessonData.lesson.title,
+                nextLesson: nextModuleData ? {
+                    id: nextModuleData.module.id,
+                    title: nextModuleData.module.title,
                 } : undefined,
             };
         }));
@@ -72,12 +74,12 @@ class DashboardService {
         const now = new Date();
         const upcomingAssignments = await prisma_1.prisma.assignment.findMany({
             where: {
-                collectionId: { in: collectionIds },
+                programId: { in: programIds },
                 dueDate: { gte: now },
                 isPublished: true,
             },
             include: {
-                collection: {
+                program: {
                     select: {
                         id: true,
                         title: true,
@@ -91,15 +93,15 @@ class DashboardService {
             id: assignment.id,
             type: 'assignment',
             title: assignment.title,
-            collectionId: assignment.collection.id,
-            collectionTitle: assignment.collection.title,
+            programId: assignment.program?.id || assignment.programId || '',
+            programTitle: assignment.program?.title || '',
             dueDate: assignment.dueDate,
         }));
         // Get recent activity
         const recentActivity = await prisma_1.prisma.progress.findMany({
             where: { studentId: userId },
             include: {
-                collection: {
+                program: {
                     select: {
                         id: true,
                         title: true,
@@ -113,15 +115,15 @@ class DashboardService {
             id: p.id,
             type: p.type,
             title: `${p.type} activity`,
-            collectionId: p.collection.id,
-            collectionTitle: p.collection.title,
+            programId: p.program?.id || p.programId || '',
+            programTitle: p.program?.title || '',
             timestamp: p.lastAccessed,
         }));
         // Get recommendations (using existing recommendation service logic)
-        const recommendations = await prisma_1.prisma.collectionRecommendation.findMany({
+        const recommendations = await prisma_1.prisma.programRecommendation.findMany({
             where: { userId },
             include: {
-                collection: {
+                program: {
                     include: {
                         _count: {
                             select: {
@@ -135,31 +137,31 @@ class DashboardService {
             take: 5,
         });
         // Calculate average ratings for recommendations
-        const recCollectionIds = recommendations.map((r) => r.collection.id);
-        const recReviews = await prisma_1.prisma.collectionReview.findMany({
+        const recProgramIds = recommendations.map((r) => r.program.id);
+        const recReviews = await prisma_1.prisma.programReview.findMany({
             where: {
-                collectionId: { in: recCollectionIds },
+                programId: { in: recProgramIds },
                 isPublished: true,
             },
             select: {
-                collectionId: true,
+                programId: true,
                 rating: true,
             },
         });
         const ratingsMap = new Map();
-        for (const collectionId of recCollectionIds) {
-            const collectionReviews = recReviews.filter((r) => r.collectionId === collectionId);
-            const average = collectionReviews.length > 0
-                ? collectionReviews.reduce((sum, r) => sum + r.rating, 0) / collectionReviews.length
+        for (const programId of recProgramIds) {
+            const programReviews = recReviews.filter((r) => r.programId === programId);
+            const average = programReviews.length > 0
+                ? programReviews.reduce((sum, r) => sum + r.rating, 0) / programReviews.length
                 : 0;
-            ratingsMap.set(collectionId, Math.round(average * 10) / 10);
+            ratingsMap.set(programId, Math.round(average * 10) / 10);
         }
         const recs = recommendations.map((rec) => ({
-            id: rec.collection.id,
-            title: rec.collection.title,
-            thumbnailUrl: rec.collection.thumbnailUrl || undefined,
-            difficulty: rec.collection.difficulty || undefined,
-            averageRating: ratingsMap.get(rec.collection.id) || 0,
+            id: rec.program.id,
+            title: rec.program.title,
+            thumbnailUrl: rec.program.thumbnailUrl || undefined,
+            difficulty: rec.program.difficulty || undefined,
+            averageRating: ratingsMap.get(rec.program.id) || 0,
         }));
         // Get statistics
         const certificates = await prisma_1.prisma.certificate.count({

@@ -68,6 +68,12 @@ class RealtimeMessagingService {
             socket.on('join_conversation', async (data) => {
                 try {
                     const { conversationId, userId } = data;
+                    // Check if already in the room to prevent duplicate joins
+                    const rooms = Array.from(socket.rooms);
+                    if (rooms.includes(`conversation-${conversationId}`)) {
+                        // Already joined, skip
+                        return;
+                    }
                     // Verify user is a participant
                     await this.messagingService.getConversationById(conversationId, userId);
                     socket.join(`conversation-${conversationId}`);

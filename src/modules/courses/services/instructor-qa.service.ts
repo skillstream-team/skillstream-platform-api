@@ -51,7 +51,7 @@ export class InstructorQAService {
     // Verify student is enrolled
     const enrollment = await prisma.enrollment.findFirst({
       where: {
-        collectionId: data.collectionId,
+        programId: data.collectionId,
         studentId: data.studentId,
       },
     });
@@ -62,12 +62,12 @@ export class InstructorQAService {
 
     const qa = await prisma.instructorQA.create({
       data: {
-        collectionId: data.collectionId,
+        programId: data.collectionId,
         studentId: data.studentId,
         question: data.question,
       },
       include: {
-        collection: {
+        program: {
           select: {
             id: true,
             title: true,
@@ -105,7 +105,7 @@ export class InstructorQAService {
     const qa = await prisma.instructorQA.findUnique({
       where: { id: data.qaId },
       include: {
-        collection: {
+        program: {
           select: {
             id: true,
             title: true,
@@ -120,7 +120,7 @@ export class InstructorQAService {
     }
 
     // Verify instructor is the collection instructor
-    if (qa.collection.instructorId !== data.instructorId) {
+    if (qa.program.instructorId !== data.instructorId) {
       throw new Error('Only the collection instructor can answer questions');
     }
 
@@ -141,7 +141,7 @@ export class InstructorQAService {
     });
 
     // Invalidate cache
-    await deleteCache(`collection:${qa.collectionId}`);
+    await deleteCache(`collection:${qa.programId}`);
 
     return this.getQuestionById(data.qaId);
   }
@@ -153,7 +153,7 @@ export class InstructorQAService {
     const qa = await prisma.instructorQA.findUnique({
       where: { id: qaId },
       include: {
-        collection: {
+        program: {
           select: {
             id: true,
             title: true,
@@ -208,7 +208,7 @@ export class InstructorQAService {
     const skip = (page - 1) * limit;
     const take = Math.min(limit, 100);
 
-    const where: any = { collectionId };
+    const where: any = { programId: collectionId };
     if (answeredOnly !== undefined) {
       where.isAnswered = answeredOnly;
     }
@@ -219,7 +219,7 @@ export class InstructorQAService {
         skip,
         take,
         include: {
-          collection: {
+          program: {
             select: {
               id: true,
               title: true,
@@ -286,7 +286,7 @@ export class InstructorQAService {
         skip,
         take,
         include: {
-          collection: {
+          program: {
             select: {
               id: true,
               title: true,
@@ -331,10 +331,10 @@ export class InstructorQAService {
   private mapToDto(qa: any): QAResponseDto {
     return {
       id: qa.id,
-      collectionId: qa.collectionId,
+      collectionId: qa.programId, // Backward compatibility
       collection: {
-        id: qa.collection.id,
-        title: qa.collection.title,
+        id: qa.program.id,
+        title: qa.program.title,
       },
       studentId: qa.studentId,
       student: {

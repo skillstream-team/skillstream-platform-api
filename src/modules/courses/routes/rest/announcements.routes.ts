@@ -48,14 +48,14 @@ router.get('/', requireAuth, async (req, res) => {
       where.scope = 'global';
     } else if (scope === 'course' && collectionId) {
       where.scope = 'course';
-      where.collectionId = collectionId;
+      where.programId = collectionId;
     } else if (scope === 'user' && userId) {
-      const collectionIds = await getUserCollectionIds(userId);
+      const programIds = await getUserCollectionIds(userId);
       where.AND.push({
         OR: [
           { scope: 'global' },
           { scope: 'user', targetUserId: userId },
-          { scope: 'course', collectionId: { in: collectionIds } }
+          { scope: 'course', programId: { in: programIds } }
         ]
       });
     }
@@ -73,7 +73,7 @@ router.get('/', requireAuth, async (req, res) => {
         creator: {
           select: { id: true, username: true, email: true }
         },
-        collection: {
+        program: {
           select: { id: true, title: true }
         }
       },
@@ -125,7 +125,7 @@ router.get('/users/:userId/announcements', requireAuth, async (req, res) => {
             OR: [
               { scope: 'global' },
               { scope: 'user', targetUserId: userId },
-              { scope: 'course', collectionId: { in: collectionIds } }
+              { scope: 'course', programId: { in: collectionIds } }
             ]
           },
           {
@@ -146,7 +146,7 @@ router.get('/users/:userId/announcements', requireAuth, async (req, res) => {
         creator: {
           select: { id: true, username: true, email: true }
         },
-        collection: {
+        program: {
           select: { id: true, title: true }
         }
       },
@@ -189,7 +189,7 @@ router.get('/collections/:collectionId/announcements', requireAuth, async (req, 
     const skip = (page - 1) * limit;
 
     const where = {
-        collectionId,
+        programId: collectionId,
         isActive: true,
         OR: [
           { expiresAt: null },
@@ -206,7 +206,7 @@ router.get('/collections/:collectionId/announcements', requireAuth, async (req, 
         creator: {
           select: { id: true, username: true, email: true }
         },
-        collection: {
+        program: {
           select: { id: true, title: true }
         }
       },
@@ -236,9 +236,9 @@ router.get('/collections/:collectionId/announcements', requireAuth, async (req, 
 async function getUserCollectionIds(userId: string): Promise<string[]> {
   const enrollments = await prisma.enrollment.findMany({
     where: { studentId: userId },
-    select: { collectionId: true }
+    select: { programId: true }
   });
-  return enrollments.map(e => e.collectionId);
+  return enrollments.map(e => e.programId);
 }
 
 export default router;

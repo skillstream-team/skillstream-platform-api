@@ -41,17 +41,15 @@ router.get('/users/:userId/progress', requireAuth, requireSubscription, async (r
     const enrollments = await prisma.enrollment.findMany({
       where: { studentId: userId },
       select: { 
-        programId: true, 
-        collectionId: true, // Backward compatibility
-        program: { select: { id: true, title: true } },
-        collection: { select: { id: true, title: true } } // Backward compatibility
+        programId: true,
+        program: { select: { id: true, title: true } }
       }
     });
     
     // Get progress for each enrollment (with pagination per course)
     const progressData = await Promise.all(
       enrollments.map(async (enrollment: any) => {
-        const programId = enrollment.programId || enrollment.collectionId;
+        const programId = enrollment.programId;
         const [progress, total] = await Promise.all([
           prisma.progress.findMany({
           where: {
@@ -68,9 +66,7 @@ router.get('/users/:userId/progress', requireAuth, requireSubscription, async (r
               timeSpent: true,
               lastAccessed: true,
               completedAt: true,
-              program: { select: { id: true, title: true } },
-              collection: { select: { id: true, title: true } }, // Backward compatibility
-              module: { select: { id: true, title: true } }
+              program: { select: { id: true, title: true } }
             },
             orderBy: { lastAccessed: 'desc' }
           }),
@@ -84,8 +80,8 @@ router.get('/users/:userId/progress', requireAuth, requireSubscription, async (r
         return {
           programId: programId,
           collectionId: programId, // Backward compatibility
-          program: enrollment.program || enrollment.collection,
-          collection: enrollment.program || enrollment.collection, // Backward compatibility
+          program: enrollment.program,
+          collection: enrollment.program, // Backward compatibility
           progress: progress || [],
           pagination: {
             page,
@@ -163,15 +159,13 @@ router.get('/users/:userId/progress/courses', requireAuth, requireSubscription, 
       where: { studentId: userId },
       select: { 
         programId: true, 
-        collectionId: true, // Backward compatibility
-        program: { select: { id: true, title: true } },
-        collection: { select: { id: true, title: true } } // Backward compatibility
+        program: { select: { id: true, title: true } }
       }
     });
     
     const programsWithProgress = await Promise.all(
       enrollments.map(async (enrollment: any) => {
-        const programId = enrollment.programId || enrollment.collectionId;
+        const programId = enrollment.programId;
         const progress = await prisma.progress.findMany({
           where: {
             studentId: userId,
@@ -193,8 +187,8 @@ router.get('/users/:userId/progress/courses', requireAuth, requireSubscription, 
         return {
           programId: programId,
           collectionId: programId, // Backward compatibility
-          program: enrollment.program || enrollment.collection,
-          collection: enrollment.program || enrollment.collection, // Backward compatibility
+          program: enrollment.program,
+          collection: enrollment.program, // Backward compatibility
           status: programStatus,
           completionRate,
           completedItems,
@@ -272,9 +266,7 @@ router.get('/programs/:programId/progress', requireAuth, requireSubscription, as
           timeSpent: true,
           lastAccessed: true,
           completedAt: true,
-          program: { select: { id: true, title: true } },
-          collection: { select: { id: true, title: true } }, // Backward compatibility
-          module: { select: { id: true, title: true } }
+          program: { select: { id: true, title: true } }
         },
         orderBy: { lastAccessed: 'desc' }
       }),
@@ -334,9 +326,7 @@ router.get('/collections/:collectionId/progress', requireAuth, requireSubscripti
           timeSpent: true,
           lastAccessed: true,
           completedAt: true,
-          program: { select: { id: true, title: true } },
-          collection: { select: { id: true, title: true } }, // Backward compatibility
-          module: { select: { id: true, title: true } }
+          program: { select: { id: true, title: true } }
         },
         orderBy: { lastAccessed: 'desc' }
       }),

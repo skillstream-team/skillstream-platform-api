@@ -226,7 +226,8 @@ export interface AssignmentResponseDto {
  */
 export interface CreateProgressDto {
   studentId: string;
-  collectionId: string;
+  collectionId?: string;
+  programId?: string;
   moduleId?: string;
   type: 'module' | 'quiz' | 'assignment' | 'video' | 'material';
   itemId: string;

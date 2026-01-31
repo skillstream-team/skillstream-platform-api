@@ -196,7 +196,7 @@ router.post('/modules', requireAuth, requireRole('TEACHER'), async (req, res) =>
     const module = await prisma.module.create({
       data: {
         title: title.trim(),
-        content: lessonContent,
+        content: moduleContent,
         duration: duration || null,
         price: price || 0,
         isPreview: isPreview || false,

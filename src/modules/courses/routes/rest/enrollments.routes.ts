@@ -75,14 +75,14 @@ router.get('/', requireAuth, async (req, res) => {
     // Build where clause
     const where: any = { studentId };
     if (collectionId) {
-      where.collectionId = collectionId;
+      where.programId = collectionId;
     }
 
     const skip = (page - 1) * limit;
     const take = limit;
 
     const include = {
-      collection: {
+      program: {
         select: {
           id: true,
           title: true,
@@ -131,11 +131,11 @@ router.get('/', requireAuth, async (req, res) => {
     // Transform to match frontend expected format
     const formattedEnrollments = enrollments.map((enrollment) => ({
       id: enrollment.id,
-      collectionId: enrollment.collectionId,
+      collectionId: enrollment.programId, // Backward compatibility
       studentId: enrollment.studentId,
       paymentId: enrollment.paymentId,
       createdAt: enrollment.createdAt.toISOString(),
-      collection: enrollment.collection,
+      collection: enrollment.program, // Backward compatibility
       student: enrollment.student,
       payment: enrollment.payment,
     }));
@@ -193,7 +193,7 @@ router.get('/:id', requireAuth, async (req, res) => {
     const enrollmentId = req.params.id;
 
     const include = {
-      collection: {
+      program: {
         select: {
           id: true,
           title: true,
@@ -244,11 +244,11 @@ router.get('/:id', requireAuth, async (req, res) => {
 
     const formattedEnrollment = {
       id: enrollment.id,
-      collectionId: enrollment.collectionId,
+      collectionId: enrollment.programId, // Backward compatibility
       studentId: enrollment.studentId,
       paymentId: enrollment.paymentId,
       createdAt: enrollment.createdAt.toISOString(),
-      collection: enrollment.collection,
+      collection: enrollment.program, // Backward compatibility
       student: enrollment.student,
       payment: enrollment.payment,
     };
@@ -304,19 +304,19 @@ router.post('/', requireAuth, requireSubscription, async (req, res) => {
     }
 
     // Get collection to get price
-    const collection = await prisma.collection.findUnique({
+    const program = await prisma.program.findUnique({
       where: { id: collectionId },
       select: { id: true, title: true, price: true },
     });
 
-    if (!collection) {
-      return res.status(404).json({ error: 'Collection not found' });
+    if (!program) {
+      return res.status(404).json({ error: 'Program not found' });
     }
 
     // Check if already enrolled
     const existingEnrollment = await prisma.enrollment.findFirst({
       where: {
-        collectionId,
+        programId: collectionId,
         studentId: user.id,
       },
     });
@@ -327,9 +327,9 @@ router.post('/', requireAuth, requireSubscription, async (req, res) => {
 
     // Create enrollment using the service
     const enrollmentData = {
-      collectionId,
+      programId: collectionId,
       studentId: user.id,
-      amount: collection.price || 0,
+      amount: program.price || 0,
       currency: 'USD',
       provider: 'internal',
       transactionId: paymentId,
@@ -340,11 +340,11 @@ router.post('/', requireAuth, requireSubscription, async (req, res) => {
     // Format response
     const formattedEnrollment = {
       id: enrollment.id,
-      collectionId: enrollment.collectionId,
+      collectionId: enrollment.programId, // Backward compatibility
       studentId: enrollment.studentId,
       paymentId: enrollment.paymentId,
       createdAt: enrollment.createdAt.toISOString(),
-      collection: enrollment.collection,
+      collection: enrollment.program, // Backward compatibility
       student: enrollment.student,
       payment: enrollment.payment,
     };
@@ -402,7 +402,7 @@ router.delete('/:id', requireAuth, async (req, res) => {
 
     const enrollment = await prisma.enrollment.findUnique({
       where: { id: enrollmentId },
-      select: { id: true, studentId: true, collectionId: true },
+      select: { id: true, studentId: true, programId: true },
     });
 
     if (!enrollment) {

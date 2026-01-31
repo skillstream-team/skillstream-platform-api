@@ -47,6 +47,10 @@ export class EnrollmentService {
         }
 
         const programId = data.programId || data.collectionId;
+        
+        if (!programId) {
+            throw new Error('Program ID or Collection ID is required');
+        }
 
         // Check access based on monetization type
         const { MonetizationService } = await import('./monetization.service');
@@ -124,18 +128,21 @@ export class EnrollmentService {
         await deleteCachePattern(`enrollments:*`);
         await deleteCachePattern(`dashboard:${data.studentId}`);
 
+        // Type assertion for result with includes
+        const enrollmentResult = result as any;
+
         // Send enrollment confirmation email
         try {
             const student = await prisma.user.findUnique({
                 where: { id: data.studentId },
                 select: { email: true, username: true },
             });
-            if (student) {
+            if (student && enrollmentResult.program) {
                 await emailService.sendEnrollmentConfirmation(
                     student.email,
                     student.username,
-                    result.program.title,
-                    result.program.id
+                    enrollmentResult.program.title,
+                    enrollmentResult.program.id
                 );
             }
         } catch (emailError) {
@@ -144,11 +151,11 @@ export class EnrollmentService {
         }
 
         // Record teacher earnings for premium programs
-        if (program.monetizationType === 'PREMIUM' && result.payment) {
+        if (program.monetizationType === 'PREMIUM' && enrollmentResult.payment) {
             try {
                 const { TeacherEarningsService } = await import('../../earnings/services/teacher-earnings.service');
                 const earningsService = new TeacherEarningsService();
-                await earningsService.recordPremiumSale(programId, result.payment.id);
+                await earningsService.recordPremiumSale(programId, enrollmentResult.payment.id);
             } catch (earningsError) {
                 console.warn('Failed to record teacher earnings:', earningsError);
                 // Don't fail enrollment if earnings recording fails
@@ -167,7 +174,12 @@ export class EnrollmentService {
             // Don't fail enrollment if referral tracking fails
         }
 
-        return result as EnrollmentResponseDto;
+        // Map to DTO with backward compatibility
+        return {
+            ...enrollmentResult,
+            collectionId: enrollmentResult.programId, // Backward compatibility
+            collection: enrollmentResult.program, // Backward compatibility
+        } as EnrollmentResponseDto;
     }
 
     /**
@@ -316,7 +328,7 @@ export class EnrollmentService {
                 skip,
                 take,
                 include: {
-                    collection: { select: { id: true, title: true, price: true } },
+                    program: { select: { id: true, title: true, price: true } },
                     student: { select: { id: true, username: true, email: true } },
                     payment: true,
                 },
@@ -759,7 +771,7 @@ export class EnrollmentService {
 
         // Get enrolled user IDs
         const enrollments = await prisma.enrollment.findMany({
-            where: { collectionId },
+            where: { programId },
             select: { studentId: true },
         });
         const enrolledUserIds = enrollments.map(e => e.studentId);
@@ -768,19 +780,19 @@ export class EnrollmentService {
             return 0;
         }
 
-        // Get collection videos and forum posts for filtering
-        const [collectionVideos, collectionForumPosts] = await Promise.all([
+        // Get program videos and forum posts for filtering
+        const [programVideos, programForumPosts] = await Promise.all([
             prisma.video.findMany({
-                where: { collectionId },
+                where: { programId },
                 select: { id: true },
             }),
             prisma.forumPost.findMany({
-                where: { collectionId },
+                where: { programId },
                 select: { id: true },
             }),
         ]);
-        const videoIds = collectionVideos.map(v => v.id);
-        const forumPostIds = collectionForumPosts.map(p => p.id);
+        const videoIds = programVideos.map((v: any) => v.id);
+        const forumPostIds = programForumPosts.map((p: any) => p.id);
 
         // Query all activity sources
         const [
@@ -862,5 +874,18 @@ export class EnrollmentService {
         videoAnalytics.forEach(a => activeUserIds.add(a.userId));
 
         return activeUserIds.size;
+    }
+
+    // Backward compatibility aliases
+    async getCollectionEnrollments(collectionId: string, page: number = 1, limit: number = 20) {
+        return this.getProgramEnrollments(collectionId, page, limit);
+    }
+
+    async getCollectionStats(collectionId: string) {
+        return this.getProgramStats(collectionId);
+    }
+
+    async getActiveUsersInCollection(collectionId: string, days: number = 30) {
+        return this.getActiveUsersInProgram(collectionId, days);
     }
 }

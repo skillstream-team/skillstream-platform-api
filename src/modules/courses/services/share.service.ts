@@ -11,9 +11,9 @@ export class ShareService {
    * Track course share
    */
   async shareCourse(data: ShareCourseDto): Promise<void> {
-    await prisma.collectionShare.create({
+    await prisma.programShare.create({
       data: {
-        collectionId: data.courseId,
+        programId: data.courseId,
         userId: data.userId,
         platform: data.platform.toLowerCase(),
       },
@@ -27,8 +27,8 @@ export class ShareService {
     totalShares: number;
     byPlatform: Record<string, number>;
   }> {
-    const shares = await prisma.collectionShare.findMany({
-      where: { collectionId: courseId },
+    const shares = await prisma.programShare.findMany({
+      where: { programId: courseId },
       select: {
         platform: true,
       },

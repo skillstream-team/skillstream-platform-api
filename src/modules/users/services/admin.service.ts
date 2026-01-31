@@ -47,9 +47,9 @@ export class AdminService {
       prisma.user.count(),
       prisma.user.count({ where: { role: 'TEACHER' } }),
       prisma.user.count({ where: { role: 'STUDENT' } }),
-      prisma.collection.count(),
-      prisma.collection.count({ where: { isPublished: true } }),
-      prisma.collection.count({ where: { isPublished: false } }),
+      prisma.program.count(),
+      prisma.program.count({ where: { isPublished: true } }),
+      prisma.program.count({ where: { isPublished: false } }),
       prisma.payment.findMany({ where: { status: 'COMPLETED' } }),
       prisma.payment.findMany({
         where: { status: 'COMPLETED', createdAt: { gte: startOfMonth } },
@@ -57,7 +57,7 @@ export class AdminService {
       prisma.collectionReview.count({ where: { isPublished: false } }),
       prisma.contentFlag.count({ where: { status: 'PENDING' } }),
       prisma.user.count({ where: { createdAt: { gte: thirtyDaysAgo } } }),
-      prisma.collection.count({ where: { createdAt: { gte: startOfMonth } } }),
+      prisma.program.count({ where: { createdAt: { gte: startOfMonth } } }),
     ]);
 
     const totalRevenue = allPayments.reduce((sum, p) => sum + (p.amount || 0), 0);
@@ -294,7 +294,7 @@ export class AdminService {
           },
         },
       }),
-      prisma.collection.count({ where: { isPublished: false } }),
+      prisma.program.count({ where: { isPublished: false } }),
     ]);
 
     return {
@@ -319,7 +319,7 @@ export class AdminService {
     rejectionReason?: string,
     adminId?: string
   ) {
-    const course = await prisma.collection.findUnique({
+    const course = await prisma.program.findUnique({
       where: { id: courseId },
     });
 
@@ -335,7 +335,7 @@ export class AdminService {
       updateData.isPublished = true;
     }
 
-    const updatedCourse = await prisma.collection.update({
+    const updatedCourse = await prisma.program.update({
       where: { id: courseId },
       data: updateData,
       include: {
@@ -407,7 +407,7 @@ export class AdminService {
     }
 
     const [reviews, total] = await Promise.all([
-      prisma.collectionReview.findMany({
+      prisma.programReview.findMany({
         where,
         skip,
         take: limit,
@@ -437,7 +437,7 @@ export class AdminService {
           },
         },
       }),
-      prisma.collectionReview.count({ where }),
+      prisma.programReview.count({ where }),
     ]);
 
     return {
@@ -462,7 +462,7 @@ export class AdminService {
     reason?: string,
     adminId?: string
   ) {
-    const review = await prisma.collectionReview.findUnique({
+    const review = await prisma.programReview.findUnique({
       where: { id: reviewId },
     });
 
@@ -967,7 +967,7 @@ export class AdminService {
 
     for (const courseId of courseIds) {
       try {
-        await prisma.collection.update({
+        await prisma.program.update({
           where: { id: courseId },
           data: updateData,
         });

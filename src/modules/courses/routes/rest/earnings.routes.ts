@@ -28,16 +28,16 @@ router.get('/users/:userId/earnings-report', requireAuth, requireRole('TEACHER')
     const startOfYear = new Date(now.getFullYear(), 0, 1);
 
     // Get all payments for collections taught by this teacher
-    const tutorCollections = await prisma.collection.findMany({
+    const tutorPrograms = await prisma.program.findMany({
       where: { instructorId: userId },
       select: { id: true }
     });
-    const collectionIds = tutorCollections.map((c: any) => c.id);
+    const programIds = tutorPrograms.map((c: any) => c.id);
 
     // Current month earnings
     const currentMonthPayments = await prisma.payment.findMany({
       where: {
-        collectionId: { in: collectionIds },
+        programId: { in: programIds },
         status: 'COMPLETED',
         createdAt: { gte: startOfMonth }
       }
@@ -46,7 +46,7 @@ router.get('/users/:userId/earnings-report', requireAuth, requireRole('TEACHER')
     // Previous month earnings
     const previousMonthPayments = await prisma.payment.findMany({
       where: {
-        collectionId: { in: collectionIds },
+        programId: { in: programIds },
         status: 'COMPLETED',
         createdAt: { gte: startOfLastMonth, lte: endOfLastMonth }
       }
@@ -55,7 +55,7 @@ router.get('/users/:userId/earnings-report', requireAuth, requireRole('TEACHER')
     // Year to date earnings
     const yearToDatePayments = await prisma.payment.findMany({
       where: {
-        collectionId: { in: collectionIds },
+        programId: { in: programIds },
         status: 'COMPLETED',
         createdAt: { gte: startOfYear }
       }
@@ -64,7 +64,7 @@ router.get('/users/:userId/earnings-report', requireAuth, requireRole('TEACHER')
     // Lifetime earnings
     const lifetimePayments = await prisma.payment.findMany({
       where: {
-        collectionId: { in: collectionIds },
+        programId: { in: programIds },
         status: 'COMPLETED'
       }
     });
@@ -80,7 +80,7 @@ router.get('/users/:userId/earnings-report', requireAuth, requireRole('TEACHER')
     const lifetime = calculateTotal(lifetimePayments);
 
     // Get collections with earnings
-    const collections = await prisma.collection.findMany({
+    const programs = await prisma.program.findMany({
       where: { instructorId: userId },
       include: {
         payments: {
@@ -98,7 +98,7 @@ router.get('/users/:userId/earnings-report', requireAuth, requireRole('TEACHER')
       
       const monthPayments = await prisma.payment.findMany({
         where: {
-          collectionId: { in: collectionIds },
+          programId: { in: programIds },
           status: 'COMPLETED',
           createdAt: { gte: monthStart, lte: monthEnd }
         }
@@ -114,11 +114,11 @@ router.get('/users/:userId/earnings-report', requireAuth, requireRole('TEACHER')
     // Get transactions
     const transactions = await prisma.payment.findMany({
       where: {
-        collectionId: { in: collectionIds },
+        programId: { in: programIds },
         status: 'COMPLETED'
       },
       include: {
-        collection: {
+        program: {
           select: { id: true, title: true }
         },
         student: {
@@ -137,7 +137,7 @@ router.get('/users/:userId/earnings-report', requireAuth, requireRole('TEACHER')
         yearToDate,
         lifetime,
         tutorShare,
-        collections: collections.map((c: any) => ({
+        collections: tutorPrograms.map((c: any) => ({
           id: c.id,
           title: c.title,
           totalEarnings: calculateTotal(c.payments),

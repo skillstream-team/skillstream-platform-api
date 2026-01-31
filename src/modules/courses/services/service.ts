@@ -335,29 +335,29 @@ export class CollectionsService {
             prisma.program.count({ where }),
         ]);
         
-        // Fetch average ratings for all collections
-        const collectionIds = collections.map(c => c.id);
-        const reviews = await prisma.collectionReview.findMany({
+        // Fetch average ratings for all programs
+        const programIds = programs.map(c => c.id);
+        const reviews = await prisma.programReview.findMany({
             where: {
-                collectionId: { in: collectionIds },
+                programId: { in: programIds },
                 isPublished: true,
             },
             select: {
-                collectionId: true,
+                programId: true,
                 rating: true,
             },
         });
 
-        // Calculate average rating per collection
+        // Calculate average rating per program
         const ratingsMap = new Map<string, { average: number; count: number }>();
-        for (const collectionId of collectionIds) {
-            const collectionReviews = reviews.filter(r => r.collectionId === collectionId);
-            const average = collectionReviews.length > 0
-                ? collectionReviews.reduce((sum, r) => sum + r.rating, 0) / collectionReviews.length
+        for (const programId of programIds) {
+            const programReviews = reviews.filter(r => r.programId === programId);
+            const average = programReviews.length > 0
+                ? programReviews.reduce((sum, r) => sum + r.rating, 0) / programReviews.length
                 : 0;
-            ratingsMap.set(collectionId, {
+            ratingsMap.set(programId, {
                 average: Math.round(average * 10) / 10,
-                count: collectionReviews.length,
+                count: programReviews.length,
             });
         }
 
@@ -562,33 +562,33 @@ export class CollectionsService {
             },
             orderBy: { createdAt: 'asc' },
         });
-
-        // Get tags for collection
+        
+        // Get tags for program
         const programTags = await prisma.programTag.findMany({
             where: { programId: id },
             select: { name: true },
         });
-
-        const collectionWithRating = {
-            ...collection,
+        
+        const programWithRating = {
+            ...program,
             averageRating,
-            reviewCount: collection._count.reviews,
+            reviewCount: program._count.reviews,
             prerequisites: prerequisites.map((p) => ({
                 id: p.id,
                 prerequisiteId: p.prerequisiteId,
                 prerequisite: p.prerequisite,
                 isRequired: p.isRequired,
             })),
-            tags: collectionTags.map((t) => t.name),
-            learningObjectives: collection.learningObjectives ? (collection.learningObjectives as any) : undefined,
-            requirements: collection.requirements ? (collection.requirements as any) : undefined,
+            tags: programTags.map((t) => t.name),
+            learningObjectives: program.learningObjectives ? (program.learningObjectives as any) : undefined,
+            requirements: program.requirements ? (program.requirements as any) : undefined,
         };
-
+        
         // Cache result
-        // Use short cache TTL for individual collection queries
-        await setCache(cacheKey, collectionWithRating, CACHE_TTL.SHORT);
-
-        return collectionWithRating;
+        // Use short cache TTL for individual program queries
+        await setCache(cacheKey, programWithRating, CACHE_TTL.SHORT);
+        
+        return programWithRating;
     }
 
     /**
@@ -642,10 +642,10 @@ export class CollectionsService {
      *     tags: [Courses]
      */
     async deleteCollection(id: string) {
-        // Check if collection exists first
-        const collection = await prisma.collection.findUnique({ where: { id } });
-        if (!collection) {
-            throw new Error('Collection not found');
+        // Check if program exists first
+        const program = await prisma.program.findUnique({ where: { id } });
+        if (!program) {
+            throw new Error('Program not found');
         }
         
         // Delete related records that don't have cascade delete
@@ -1205,4 +1205,58 @@ export class CollectionsService {
     }
 
     // (Continue in same style for updateAssignment, deleteAssignment, materials, enrollments, progress, achievements, etc.)
+
+    // Backward compatibility aliases for GraphQL and other consumers
+    async getAllCollections(page?: number, limit?: number, ...args: any[]) {
+        return this.getAllPrograms(page, limit, ...args);
+    }
+
+    async getCollectionById(id: string) {
+        return this.getProgramById(id);
+    }
+
+    async createCollection(data: any) {
+        return this.createProgram(data);
+    }
+
+    async updateCollection(id: string, data: any) {
+        return this.updateProgram(id, data);
+    }
+
+    async deleteProgram(id: string) {
+        return this.deleteCollection(id);
+    }
+
+    async addModuleToCollection(programId: string, data: any) {
+        // Get or create default section for the program
+        const sections = await prisma.programSection.findMany({
+            where: { programId },
+            orderBy: { order: 'asc' },
+            take: 1
+        });
+        
+        let sectionId = sections[0]?.id;
+        if (!sectionId) {
+            // Create a default section
+            const defaultSection = await prisma.programSection.create({
+                data: {
+                    programId,
+                    title: 'Modules',
+                    description: '',
+                    order: 0,
+                    createdBy: data.createdBy || programId, // Fallback if createdBy not provided
+                }
+            });
+            sectionId = defaultSection.id;
+        }
+        
+        // Add programId to data and call addModuleToSection
+        return this.addModuleToSection(sectionId, {
+            ...data,
+            programId
+        });
+    }
 }
+
+// Backward compatibility: export ProgramsService as alias
+export const ProgramsService = CollectionsService;

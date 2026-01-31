@@ -11,16 +11,16 @@ export class TagsService {
 
     await prisma.$transaction(
       uniqueTags.map((tag) =>
-        prisma.collectionTag.upsert({
+        prisma.programTag.upsert({
           where: {
-            collectionId_name: {
-              collectionId: courseId,
+            programId_name: {
+              programId: courseId,
               name: tag,
             },
           },
           update: {},
           create: {
-            collectionId: courseId,
+            programId: courseId,
             name: tag,
           },
         })
@@ -35,9 +35,9 @@ export class TagsService {
    * Remove tags from a course
    */
   async removeTagsFromCourse(courseId: string, tags: string[]): Promise<void> {
-    await prisma.collectionTag.deleteMany({
+    await prisma.programTag.deleteMany({
       where: {
-        collectionId: courseId,
+        programId: courseId,
         name: { in: tags.map((t) => t.toLowerCase().trim()) },
       },
     });
@@ -50,8 +50,8 @@ export class TagsService {
    * Get all tags for a course
    */
   async getCourseTags(courseId: string): Promise<string[]> {
-    const tags = await prisma.collectionTag.findMany({
-      where: { collectionId: courseId },
+    const tags = await prisma.programTag.findMany({
+      where: { programId: courseId },
       select: { name: true },
       orderBy: { name: 'asc' },
     });
@@ -63,7 +63,7 @@ export class TagsService {
    * Get all unique tags across platform
    */
   async getAllTags(): Promise<Array<{ name: string; count: number }>> {
-    const tags = await prisma.collectionTag.groupBy({
+    const tags = await prisma.programTag.groupBy({
       by: ['name'],
       _count: {
         name: true,
@@ -101,7 +101,7 @@ export class TagsService {
     const take = Math.min(limit, 100);
 
     const [courses, total] = await Promise.all([
-      prisma.collection.findMany({
+      prisma.program.findMany({
         where: {
           tags: {
             some: {
@@ -117,7 +117,7 @@ export class TagsService {
         skip,
         take,
       }),
-      prisma.collection.count({
+      prisma.program.count({
         where: {
           tags: {
             some: {

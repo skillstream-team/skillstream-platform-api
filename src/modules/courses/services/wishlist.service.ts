@@ -44,21 +44,21 @@ export class WishlistService {
    * Add a course to user's wishlist
    */
   async addToWishlist(userId: string, courseId: string): Promise<WishlistItemDto> {
-    // Check if collection exists
-    const course = await prisma.collection.findUnique({
+    // Check if program exists
+    const course = await prisma.program.findUnique({
       where: { id: courseId },
     });
 
     if (!course) {
-      throw new Error('Collection not found');
+      throw new Error('Program not found');
     }
 
     // Check if already in wishlist
-    const existing = await prisma.collectionWishlist.findUnique({
+    const existing = await prisma.programWishlist.findUnique({
       where: {
-        userId_collectionId: {
+        userId_programId: {
           userId,
-          collectionId: courseId,
+          programId: courseId,
         },
       },
     });
@@ -68,13 +68,13 @@ export class WishlistService {
     }
 
     // Add to wishlist
-    const wishlistItem = await prisma.collectionWishlist.create({
+    const wishlistItem = await prisma.programWishlist.create({
       data: {
         userId,
-        collectionId: courseId,
+        programId: courseId,
       },
       include: {
-        collection: {
+        program: {
           include: {
             category: {
               select: {
@@ -102,9 +102,9 @@ export class WishlistService {
     });
 
     // Calculate average rating
-    const reviews = await prisma.collectionReview.findMany({
+    const reviews = await prisma.programReview.findMany({
       where: {
-        collectionId: courseId,
+        programId: courseId,
         isPublished: true,
       },
       select: {
@@ -123,28 +123,28 @@ export class WishlistService {
     const item = wishlistItem as any;
     return {
       id: item.id,
-      courseId: item.collectionId,
+      courseId: item.programId,
       course: {
-        id: item.collection.id,
-        title: item.collection.title,
-        description: item.collection.description || undefined,
-        price: item.collection.price,
-        thumbnailUrl: item.collection.thumbnailUrl || undefined,
-        category: item.collection.category
+        id: item.program.id,
+        title: item.program.title,
+        description: item.program.description || undefined,
+        price: item.program.price,
+        thumbnailUrl: item.program.thumbnailUrl || undefined,
+        category: item.program.category
           ? {
-              id: item.collection.category.id,
-              name: item.collection.category.name,
-              slug: item.collection.category.slug,
+              id: item.program.category.id,
+              name: item.program.category.name,
+              slug: item.program.category.slug,
             }
           : undefined,
         instructor: {
-          id: item.collection.instructor.id,
-          username: item.collection.instructor.username,
-          email: item.collection.instructor.email,
+          id: item.program.instructor.id,
+          username: item.program.instructor.username,
+          email: item.program.instructor.email,
         },
         averageRating,
-        reviewCount: item.collection._count.reviews,
-        enrollmentCount: item.collection._count.enrollments,
+        reviewCount: item.program._count.reviews,
+        enrollmentCount: item.program._count.enrollments,
       },
       createdAt: item.createdAt,
     };
@@ -154,11 +154,11 @@ export class WishlistService {
    * Remove a course from user's wishlist
    */
   async removeFromWishlist(userId: string, courseId: string): Promise<void> {
-    const wishlistItem = await prisma.collectionWishlist.findUnique({
+    const wishlistItem = await prisma.programWishlist.findUnique({
       where: {
-        userId_collectionId: {
+        userId_programId: {
           userId,
-          collectionId: courseId,
+          programId: courseId,
         },
       },
     });
@@ -167,7 +167,7 @@ export class WishlistService {
       throw new Error('Course is not in your wishlist');
     }
 
-    await prisma.collectionWishlist.delete({
+    await prisma.programWishlist.delete({
       where: {
         id: wishlistItem.id,
       },
@@ -189,12 +189,12 @@ export class WishlistService {
     const take = Math.min(limit, 100);
 
     const [wishlistItems, total] = await Promise.all([
-      prisma.collectionWishlist.findMany({
+      prisma.programWishlist.findMany({
         where: { userId },
         skip,
         take,
         include: {
-          collection: {
+          program: {
             include: {
               category: {
                 select: {
@@ -221,14 +221,14 @@ export class WishlistService {
         },
         orderBy: { createdAt: 'desc' },
       }),
-      prisma.collectionWishlist.count({ where: { userId } }),
+      prisma.programWishlist.count({ where: { userId } }),
     ]);
 
     // Calculate average ratings for all collections
-    const courseIds = wishlistItems.map((item) => item.collectionId);
-    const reviews = await prisma.collectionReview.findMany({
+    const courseIds = wishlistItems.map((item) => item.programId);
+    const reviews = await prisma.programReview.findMany({
       where: {
-        collectionId: { in: courseIds },
+        programId: { in: courseIds },
         isPublished: true,
       },
       select: {
@@ -240,7 +240,7 @@ export class WishlistService {
     // Calculate average rating per collection
     const ratingsMap = new Map<string, number>();
     for (const courseId of courseIds) {
-      const courseReviews = reviews.filter((r: any) => r.collectionId === courseId);
+      const courseReviews = reviews.filter((r: any) => r.programId === courseId);
       const average =
         courseReviews.length > 0
           ? courseReviews.reduce((sum: number, r: any) => sum + r.rating, 0) / courseReviews.length
@@ -250,28 +250,28 @@ export class WishlistService {
 
     const data: WishlistItemDto[] = wishlistItems.map((item: any) => ({
       id: item.id,
-      courseId: item.collectionId,
+      courseId: item.programId,
       course: {
-        id: item.collection.id,
-        title: item.collection.title,
-        description: item.collection.description || undefined,
-        price: item.collection.price,
-        thumbnailUrl: item.collection.thumbnailUrl || undefined,
-        category: item.collection.category
+        id: item.program.id,
+        title: item.program.title,
+        description: item.program.description || undefined,
+        price: item.program.price,
+        thumbnailUrl: item.program.thumbnailUrl || undefined,
+        category: item.program.category
           ? {
-              id: item.collection.category.id,
-              name: item.collection.category.name,
-              slug: item.collection.category.slug,
+              id: item.program.category.id,
+              name: item.program.category.name,
+              slug: item.program.category.slug,
             }
           : undefined,
         instructor: {
-          id: item.collection.instructor.id,
-          username: item.collection.instructor.username,
-          email: item.collection.instructor.email,
+          id: item.program.instructor.id,
+          username: item.program.instructor.username,
+          email: item.program.instructor.email,
         },
-        averageRating: ratingsMap.get(item.collectionId) || 0,
-        reviewCount: item.collection._count.reviews,
-        enrollmentCount: item.collection._count.enrollments,
+        averageRating: ratingsMap.get(item.programId) || 0,
+        reviewCount: item.program._count.reviews,
+        enrollmentCount: item.program._count.enrollments,
       },
       createdAt: item.createdAt,
     }));
@@ -293,11 +293,11 @@ export class WishlistService {
    * Check if a course is in user's wishlist
    */
   async isInWishlist(userId: string, courseId: string): Promise<boolean> {
-    const wishlistItem = await prisma.collectionWishlist.findUnique({
+    const wishlistItem = await prisma.programWishlist.findUnique({
       where: {
-        userId_collectionId: {
+        userId_programId: {
           userId,
-          collectionId: courseId,
+          programId: courseId,
         },
       },
     });
@@ -309,7 +309,7 @@ export class WishlistService {
    * Get wishlist count for a user
    */
   async getWishlistCount(userId: string): Promise<number> {
-    return prisma.collectionWishlist.count({
+    return prisma.programWishlist.count({
       where: { userId },
     });
   }

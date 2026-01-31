@@ -100,7 +100,7 @@ router.get('/',
 
       const where: any = {};
       if (targetCollectionId) {
-        where.collectionId = targetCollectionId;
+        where.programId = targetCollectionId;
       }
       if (isActive !== undefined) {
         where.isActive = isActive;

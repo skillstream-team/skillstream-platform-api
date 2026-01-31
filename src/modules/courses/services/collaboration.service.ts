@@ -87,7 +87,7 @@ export class CollaborationService {
   async createStudyGroup(data: CreateStudyGroupDto): Promise<StudyGroupDto> {
     const group = await prisma.studyGroup.create({
       data: {
-        collectionId: data.collectionId,
+        programId: data.collectionId,
         name: data.name,
         description: data.description,
         createdBy: data.createdBy,
@@ -95,7 +95,7 @@ export class CollaborationService {
         isPublic: data.isPublic !== false,
       },
       include: {
-        collection: {
+        program: {
           select: {
             id: true,
             title: true,
@@ -161,12 +161,12 @@ export class CollaborationService {
         skip,
         take,
         include: {
-          collection: {
-            select: {
-              id: true,
-              title: true,
-            },
+        program: {
+          select: {
+            id: true,
+            title: true,
           },
+        },
           creator: {
             select: {
               id: true,
@@ -285,7 +285,7 @@ export class CollaborationService {
     const workspace = await prisma.sharedWorkspace.create({
       data: {
         groupId: data.groupId,
-        collectionId: data.collectionId,
+        programId: data.collectionId,
         userId: data.userId,
         name: data.name,
         description: data.description,

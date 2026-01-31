@@ -40,12 +40,12 @@ export class LearningPathsService {
    */
   async createPath(data: CreateLearningPathDto): Promise<LearningPathResponseDto> {
     // Validate all collections exist
-    const collections = await prisma.collection.findMany({
+    const programs = await prisma.program.findMany({
       where: { id: { in: data.collectionIds } },
     });
 
-    if (collections.length !== data.collectionIds.length) {
-      throw new Error('One or more collections not found');
+    if (programs.length !== data.collectionIds.length) {
+      throw new Error('One or more programs not found');
     }
 
     const path = await prisma.learningPath.create({
@@ -55,9 +55,9 @@ export class LearningPathsService {
         thumbnailUrl: data.thumbnailUrl,
         categoryId: data.categoryId,
         difficulty: data.difficulty,
-        collections: {
-          create: data.collectionIds.map((collectionId, index) => ({
-            collectionId,
+        programs: {
+          create: data.collectionIds.map((programId, index) => ({
+            programId,
             order: index,
             isRequired: true,
           })),
@@ -71,9 +71,9 @@ export class LearningPathsService {
             slug: true,
           },
         },
-        collections: {
+        programs: {
           include: {
-            collection: {
+            program: {
               select: {
                 id: true,
                 title: true,
@@ -103,9 +103,9 @@ export class LearningPathsService {
             slug: true,
           },
         },
-        collections: {
+        programs: {
           include: {
-            collection: {
+            program: {
               select: {
                 id: true,
                 title: true,
@@ -136,9 +136,9 @@ export class LearningPathsService {
             slug: true,
           },
         },
-        collections: {
+        programs: {
           include: {
-            collection: {
+            program: {
               select: {
                 id: true,
                 title: true,
@@ -234,25 +234,26 @@ export class LearningPathsService {
     }
 
     // Get progress for each collection in the path
-    const collectionIds = path.collections.map((c: any) => c.collection.id);
+    const pathWithPrograms = path as any;
+    const programIds = pathWithPrograms.programs?.map((p: any) => p.program.id) || [];
     const certificates = await prisma.certificate.findMany({
       where: {
         studentId,
-        collectionId: { in: collectionIds },
+        programId: { in: programIds },
       },
       select: {
-        collectionId: true,
+        programId: true,
       },
     });
 
-    const completedCollectionIds = new Set(certificates.map((c: any) => c.collectionId));
+    const completedProgramIds = new Set(certificates.map((c: any) => c.programId));
 
-    const collectionsProgress = await Promise.all(
-      path.collections.map(async (pathCollection: any) => {
+    const programsProgress = await Promise.all(
+      (pathWithPrograms.programs || []).map(async (pathProgram: any) => {
         const progress = await prisma.progress.findMany({
           where: {
             studentId,
-            collectionId: pathCollection.collection.id,
+            programId: pathProgram.program.id,
           },
         });
 
@@ -261,20 +262,21 @@ export class LearningPathsService {
         ).length;
         const total = progress.length;
         const collectionProgress = total > 0 ? (completed / total) * 100 : 0;
-        const isCompleted = completedCollectionIds.has(pathCollection.collection.id);
+        const isCompleted = completedProgramIds.has(pathProgram.program.id);
 
         return {
-          collectionId: pathCollection.collection.id,
-          title: pathCollection.collection.title,
+          collectionId: pathProgram.program.id,
+          title: pathProgram.program.title,
           progress: Math.round(collectionProgress),
           isCompleted,
         };
       })
     );
 
-    const completedCollections = collectionsProgress.filter((c: any) => c.isCompleted).length;
-    const overallProgress = path.collections.length > 0
-      ? (completedCollections / path.collections.length) * 100
+    const completedCollections = programsProgress.filter((c: any) => c.isCompleted).length;
+    const totalPrograms = pathWithPrograms.programs?.length || 0;
+    const overallProgress = totalPrograms > 0
+      ? (completedCollections / totalPrograms) * 100
       : 0;
 
     // Update enrollment progress
@@ -284,7 +286,7 @@ export class LearningPathsService {
       },
       data: {
         progress: overallProgress,
-        currentCollectionId: collectionsProgress.find((c: any) => !c.isCompleted)?.collectionId || null,
+        currentCollectionId: programsProgress.find((c: any) => !c.isCompleted)?.collectionId || null,
       },
     });
 
@@ -293,8 +295,8 @@ export class LearningPathsService {
       progress: Math.round(overallProgress),
       currentCollectionId: enrollment.currentCollectionId || undefined,
       completedCollections,
-      totalCollections: path.collections.length,
-      collections: collectionsProgress,
+      totalCollections: totalPrograms,
+      collections: programsProgress,
     };
   }
 

@@ -43,7 +43,6 @@ export class ReviewsService {
     const enrollment = await prisma.enrollment.findFirst({
       where: {
         programId: data.courseId,
-        collectionId: data.courseId, // Backward compatibility
         studentId: data.studentId,
       },
     });
@@ -56,7 +55,6 @@ export class ReviewsService {
     const existing = await prisma.programReview.findFirst({
       where: {
         programId: data.courseId,
-        collectionId: data.courseId, // Backward compatibility
         studentId: data.studentId,
       },
     });
@@ -73,7 +71,6 @@ export class ReviewsService {
     const review = await prisma.programReview.create({
       data: {
         programId: data.courseId,
-        collectionId: data.courseId, // Backward compatibility
         studentId: data.studentId,
         rating: data.rating,
         title: data.title,
@@ -83,12 +80,6 @@ export class ReviewsService {
       },
       include: {
         program: {
-          select: {
-            id: true,
-            title: true,
-          },
-        },
-        collection: { // Backward compatibility
           select: {
             id: true,
             title: true,
@@ -106,7 +97,6 @@ export class ReviewsService {
 
     // Invalidate course cache
     await deleteCache(`program:${data.courseId}`);
-    await deleteCache(`collection:${data.courseId}`); // Backward compatibility
 
     return this.mapToDto(review);
   }
@@ -134,7 +124,6 @@ export class ReviewsService {
     const take = Math.min(limit, 100);
 
     const where: any = {
-      courseId,
       isPublished: true,
     };
 
@@ -146,19 +135,12 @@ export class ReviewsService {
       prisma.programReview.findMany({
         where: {
           ...where,
-          programId: where.courseId,
-          collectionId: where.courseId, // Backward compatibility
+          programId: courseId,
         },
         skip,
         take,
         include: {
           program: {
-            select: {
-              id: true,
-              title: true,
-            },
-          },
-          collection: { // Backward compatibility
             select: {
               id: true,
               title: true,
@@ -180,12 +162,11 @@ export class ReviewsService {
       prisma.programReview.count({ 
         where: { 
           ...where, 
-          programId: where.courseId,
-          collectionId: where.courseId 
+          programId: courseId,
         } 
       }),
       prisma.programReview.findMany({
-        where: { programId: courseId, collectionId: courseId, isPublished: true }, // Backward compatibility
+        where: { programId: courseId, isPublished: true },
         select: { rating: true },
       }),
     ]);
@@ -223,12 +204,6 @@ export class ReviewsService {
       where: { id: reviewId },
       include: {
         program: {
-          select: {
-            id: true,
-            title: true,
-          },
-        },
-        collection: { // Backward compatibility
           select: {
             id: true,
             title: true,
@@ -287,12 +262,6 @@ export class ReviewsService {
             title: true,
           },
         },
-        collection: { // Backward compatibility
-          select: {
-            id: true,
-            title: true,
-          },
-        },
         student: {
           select: {
             id: true,
@@ -303,8 +272,7 @@ export class ReviewsService {
       },
     });
 
-    await deleteCache(`program:${updated.programId || updated.collectionId}`);
-    await deleteCache(`collection:${updated.collectionId}`); // Backward compatibility
+    await deleteCache(`program:${updated.programId}`);
 
     return this.mapToDto(updated);
   }
@@ -313,7 +281,7 @@ export class ReviewsService {
    * Delete review
    */
   async deleteReview(reviewId: string, studentId: string): Promise<void> {
-    const review = await prisma.collectionReview.findFirst({
+    const review = await prisma.programReview.findFirst({
       where: { id: reviewId, studentId },
     });
 
@@ -325,8 +293,7 @@ export class ReviewsService {
       where: { id: reviewId },
     });
 
-    await deleteCache(`program:${review.programId || review.collectionId}`);
-    await deleteCache(`collection:${review.collectionId}`); // Backward compatibility
+    await deleteCache(`program:${review.programId}`);
   }
 
   /**
@@ -394,11 +361,6 @@ export class ReviewsService {
             instructorId: true,
           },
         },
-        collection: { // Backward compatibility
-          select: {
-            instructorId: true,
-          },
-        },
       },
     });
 
@@ -406,7 +368,7 @@ export class ReviewsService {
       throw new Error('Review not found');
     }
 
-    const program = review.program || review.collection
+    const program = review.program;
     if (program.instructorId !== instructorId) {
       throw new Error('Only the program instructor can respond to reviews');
     }
@@ -419,12 +381,6 @@ export class ReviewsService {
       },
       include: {
         program: {
-          select: {
-            id: true,
-            title: true,
-          },
-        },
-        collection: { // Backward compatibility
           select: {
             id: true,
             title: true,
@@ -449,8 +405,8 @@ export class ReviewsService {
   private mapToDto(review: any): ReviewResponseDto {
     return {
       id: review.id,
-      courseId: review.programId || review.collectionId,
-      course: review.program || review.collection,
+      courseId: review.programId,
+      course: review.program,
       studentId: review.studentId,
       student: review.student,
       rating: review.rating,

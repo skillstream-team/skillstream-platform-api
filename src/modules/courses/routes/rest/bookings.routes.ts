@@ -140,7 +140,7 @@ router.get('/lesson-slots', requireAuth, async (req, res) => {
       where.teacherId = teacherId;
     }
 
-    const slots = await prisma.lessonSlot.findMany({
+    const slots = await prisma.moduleSlot.findMany({
       where,
       include: {
         teacher: {
@@ -213,7 +213,7 @@ router.post('/lesson-slots/:slotId/bookings', requireAuth, async (req, res) => {
     const { price, subject, notes } = req.body;
 
     // Check if slot is available
-    const slot = await prisma.lessonSlot.findUnique({
+    const slot = await prisma.moduleSlot.findUnique({
       where: { id: slotId },
       include: { booking: true }
     });
@@ -259,7 +259,7 @@ router.post('/lesson-slots/:slotId/bookings', requireAuth, async (req, res) => {
     });
 
     // Update slot as booked
-    await prisma.lessonSlot.update({
+    await prisma.moduleSlot.update({
       where: { id: slotId },
       data: { isBooked: true }
     });
@@ -344,7 +344,7 @@ router.delete('/bookings/:bookingId', requireAuth, async (req, res) => {
     });
 
     // Make slot available again
-    await prisma.lessonSlot.update({
+    await prisma.moduleSlot.update({
       where: { id: booking.slotId },
       data: { isBooked: false }
     });

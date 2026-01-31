@@ -16,7 +16,7 @@ router.get('/collections/:id/monetization', requireAuth, async (req, res) => {
   try {
     const requirements = await monetizationService.getAccessRequirements(
       req.params.id,
-      'COLLECTION'
+      'PROGRAM'
     );
     res.json(requirements);
   } catch (error: any) {
@@ -34,7 +34,7 @@ router.get('/lessons/:id/monetization', requireAuth, async (req, res) => {
   try {
     const requirements = await monetizationService.getAccessRequirements(
       req.params.id,
-      'LESSON'
+      'MODULE'
     );
     res.json(requirements);
   } catch (error: any) {
@@ -57,7 +57,7 @@ router.put('/collections/:id/monetization', requireAuth, requireRole('TEACHER'),
       return res.status(400).json({ error: 'Invalid monetization type' });
     }
 
-    const collection = await prisma.collection.update({
+    const program = await prisma.program.update({
       where: { id: req.params.id },
       data: {
         monetizationType,
@@ -65,7 +65,7 @@ router.put('/collections/:id/monetization', requireAuth, requireRole('TEACHER'),
       },
     });
 
-    res.json(collection);
+    res.json(program);
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }
@@ -86,12 +86,12 @@ router.put('/lessons/:id/monetization', requireAuth, requireRole('TEACHER'), asy
       return res.status(400).json({ error: 'Invalid monetization type' });
     }
 
-    const lesson = await prisma.lesson.update({
+    const module = await prisma.module.update({
       where: { id: req.params.id },
       data: { monetizationType },
     });
 
-    res.json(lesson);
+    res.json(module);
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }
@@ -108,14 +108,14 @@ router.get('/content/:type/:id/access', requireAuth, async (req, res) => {
     const userId = (req as any).user?.id;
     const { type, id } = req.params;
 
-    if (!['COLLECTION', 'LESSON'].includes(type)) {
+    if (!['PROGRAM', 'MODULE'].includes(type)) {
       return res.status(400).json({ error: 'Invalid content type' });
     }
 
     const canAccess = await monetizationService.canAccess(
       userId,
       id,
-      type as 'COLLECTION' | 'LESSON'
+      type as 'PROGRAM' | 'MODULE'
     );
 
     res.json({ canAccess });

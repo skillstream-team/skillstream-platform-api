@@ -24,7 +24,7 @@ export class CalendarService {
         endTime: eventData.endTime,
         isAllDay: eventData.isAllDay || false,
         location: eventData.location,
-        collectionId: eventData.courseId, // Note: DTO still uses courseId, but we map to collectionId
+        programId: eventData.courseId, // Note: DTO still uses courseId, but we map to programId
         assignmentId: eventData.assignmentId,
         quizId: eventData.quizId,
         isRecurring: eventData.isRecurring || false,
@@ -39,7 +39,7 @@ export class CalendarService {
       },
       include: {
         creator: { select: { id: true, username: true } },
-        collection: { select: { id: true, title: true } },
+        program: { select: { id: true, title: true } },
         assignment: { select: { id: true, title: true } },
         quiz: { select: { id: true, title: true } },
         attendees: {
@@ -94,7 +94,7 @@ export class CalendarService {
       },
       include: {
         creator: { select: { id: true, username: true } },
-        collection: { select: { id: true, title: true } },
+        program: { select: { id: true, title: true } },
         assignment: { select: { id: true, title: true } },
         quiz: { select: { id: true, title: true } },
         attendees: {
@@ -144,7 +144,7 @@ export class CalendarService {
     const skip = (page - 1) * limit;
 
     const where: any = {
-      ...(filters.courseId && { collectionId: filters.courseId }),
+      ...(filters.courseId && { programId: filters.courseId }),
       ...(filters.type && { type: filters.type }),
       ...(filters.startDate && filters.endDate && {
         OR: [
@@ -178,7 +178,7 @@ export class CalendarService {
         take: limit,
         include: {
           creator: { select: { id: true, username: true } },
-          collection: { select: { id: true, title: true } },
+          program: { select: { id: true, title: true } },
           assignment: { select: { id: true, title: true } },
           quiz: { select: { id: true, title: true } },
           attendees: {
@@ -212,10 +212,10 @@ export class CalendarService {
     // Get user's enrolled collections
     const enrollments = await prisma.enrollment.findMany({
       where: { studentId: userId },
-      select: { collectionId: true }
+      select: { programId: true }
     });
 
-    const collectionIds = enrollments.map((e: any) => e.collectionId);
+    const programIds = enrollments.map((e: any) => e.programId);
 
     // Get events for enrolled courses and events where user is an attendee
     const eventsResult = await this.getEvents({
@@ -228,12 +228,12 @@ export class CalendarService {
     // Get upcoming assignment deadlines
     const upcomingAssignments = await prisma.assignment.findMany({
       where: {
-        collectionId: { in: collectionIds },
+        programId: { in: programIds },
         dueDate: { gte: new Date() },
         isPublished: true
       },
       include: {
-        collection: { select: { title: true } }
+        program: { select: { title: true } }
       },
       orderBy: { dueDate: 'asc' },
       take: 10
@@ -242,12 +242,12 @@ export class CalendarService {
     // Get upcoming quiz deadlines
     const upcomingQuizzes = await prisma.quiz.findMany({
       where: {
-        collectionId: { in: collectionIds },
+        programId: { in: programIds },
         dueDate: { gte: new Date() },
         isPublished: true
       },
       include: {
-        collection: { select: { title: true } }
+        program: { select: { title: true } }
       },
       orderBy: { dueDate: 'asc' },
       take: 10
@@ -394,7 +394,7 @@ export class CalendarService {
         isPublished: true,
         events: { none: {} }
       },
-      include: { collection: true }
+      include: { program: true }
     });
 
     for (const assignment of assignmentsWithoutEvents) {
@@ -404,7 +404,7 @@ export class CalendarService {
         type: 'assignment_due',
         startTime: assignment.dueDate!,
         isAllDay: true,
-        courseId: assignment.collectionId, // Note: DTO uses courseId but we pass collectionId
+        courseId: assignment.programId, // Note: DTO uses courseId but we pass programId
         assignmentId: assignment.id
       });
     }
@@ -416,7 +416,7 @@ export class CalendarService {
         isPublished: true,
         events: { none: {} }
       },
-      include: { collection: true }
+      include: { program: true }
     });
 
     for (const quiz of quizzesWithoutEvents) {
@@ -426,7 +426,7 @@ export class CalendarService {
         type: 'quiz_due',
         startTime: quiz.dueDate!,
         isAllDay: true,
-        courseId: quiz.collectionId, // Note: DTO uses courseId but we pass collectionId
+        courseId: quiz.programId, // Note: DTO uses courseId but we pass programId
         quizId: quiz.id
       });
     }
@@ -445,7 +445,7 @@ export class CalendarService {
       endTime: event.endTime,
       isAllDay: event.isAllDay,
       location: event.location,
-      courseId: event.collectionId, // Note: DTO uses courseId but we map from collectionId
+      courseId: event.programId, // Note: DTO uses courseId but we map from programId
       assignmentId: event.assignmentId,
       quizId: event.quizId,
       isRecurring: event.isRecurring,

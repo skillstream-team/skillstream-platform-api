@@ -22,13 +22,13 @@ router.get('/collections/:collectionId/certificates/:userId', requireAuth, async
     const certificate = await prisma.certificate.findFirst({
       where: {
         studentId: userId,
-        collectionId: collectionId
+        programId: collectionId
       },
       include: {
         student: {
           select: { id: true, username: true, email: true }
         },
-        collection: {
+        program: {
           select: { id: true, title: true, description: true }
         }
       }
@@ -62,13 +62,13 @@ router.get('/collections/:collectionId/certificates/:userId/download', requireAu
     const certificate = await prisma.certificate.findFirst({
       where: {
         studentId: userId,
-        collectionId: collectionId
+        programId: collectionId
       },
       include: {
         student: {
           select: { id: true, username: true, email: true }
         },
-        collection: {
+        program: {
           select: { id: true, title: true, description: true }
         }
       }
@@ -80,25 +80,26 @@ router.get('/collections/:collectionId/certificates/:userId/download', requireAu
 
     // Generate PDF certificate
     try {
+      const certWithRelations = certificate as any;
       const pdfStream = await certificateService.generatePDFStream({
-        id: certificate.id,
+        id: certWithRelations.id,
         student: {
-          username: certificate.student.username || 'Student',
-          email: certificate.student.email || ''
+          username: certWithRelations.student?.username || 'Student',
+          email: certWithRelations.student?.email || ''
         },
         course: {
-          title: certificate.collection.title,
-          description: certificate.collection.description || undefined
+          title: certWithRelations.program?.title || '',
+          description: certWithRelations.program?.description || undefined
         },
-        issuedAt: certificate.issuedAt || new Date(),
-        certificateNumber: certificate.id.substring(0, 8).toUpperCase()
+        issuedAt: certWithRelations.issuedAt || new Date(),
+        certificateNumber: certWithRelations.id.substring(0, 8).toUpperCase()
       });
 
       // Set headers for PDF download
       res.setHeader('Content-Type', 'application/pdf');
       res.setHeader(
         'Content-Disposition',
-        `attachment; filename="certificate-${certificate.collection.title.replace(/[^a-z0-9]/gi, '_')}-${certificate.id.substring(0, 8)}.pdf"`
+        `attachment; filename="certificate-${(certWithRelations.program?.title || 'certificate').replace(/[^a-z0-9]/gi, '_')}-${certWithRelations.id.substring(0, 8)}.pdf"`
       );
 
       // Pipe PDF to response

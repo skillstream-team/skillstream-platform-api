@@ -97,8 +97,8 @@ export class SubscriptionService {
       const { SubscriptionAccessService } = await import('./subscription-access.service');
       const accessService = new SubscriptionAccessService();
 
-      // Get all subscription-marked collections
-      const subscriptionCollections = await prisma.collection.findMany({
+      // Get all subscription-marked programs
+      const subscriptionPrograms = await prisma.program.findMany({
         where: {
           monetizationType: 'SUBSCRIPTION',
           isPublished: true,
@@ -106,29 +106,29 @@ export class SubscriptionService {
         select: { id: true },
       });
 
-      // Get all subscription-marked lessons
-      const subscriptionLessons = await prisma.lesson.findMany({
+      // Get all subscription-marked modules
+      const subscriptionModules = await prisma.module.findMany({
         where: {
           monetizationType: 'SUBSCRIPTION',
         },
         select: { id: true },
       });
 
-      // Grant access to collections
-      for (const collection of subscriptionCollections) {
+      // Grant access to programs
+      for (const program of subscriptionPrograms) {
         try {
-          await accessService.grantAccess(userId, collection.id, 'COLLECTION', 'SUBSCRIPTION', result.expiresAt || undefined);
+          await accessService.grantAccess(userId, program.id, 'PROGRAM', 'SUBSCRIPTION', result.expiresAt || undefined);
         } catch (error) {
-          console.warn(`Failed to grant access to collection ${collection.id}:`, error);
+          console.warn(`Failed to grant access to program ${program.id}:`, error);
         }
       }
 
-      // Grant access to lessons
-      for (const lesson of subscriptionLessons) {
+      // Grant access to modules
+      for (const module of subscriptionModules) {
         try {
-          await accessService.grantAccess(userId, lesson.id, 'LESSON', 'SUBSCRIPTION', result.expiresAt || undefined);
+          await accessService.grantAccess(userId, module.id, 'MODULE', 'SUBSCRIPTION', result.expiresAt || undefined);
         } catch (error) {
-          console.warn(`Failed to grant access to lesson ${lesson.id}:`, error);
+          console.warn(`Failed to grant access to module ${module.id}:`, error);
         }
       }
     } catch (accessError) {

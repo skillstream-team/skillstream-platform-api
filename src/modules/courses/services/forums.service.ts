@@ -67,13 +67,13 @@ export class ForumsService {
   async createPost(data: CreateForumPostDto): Promise<ForumPostResponseDto> {
     const post = await prisma.forumPost.create({
       data: {
-        collectionId: data.collectionId,
+        programId: data.collectionId,
         authorId: data.authorId,
         title: data.title,
         content: data.content,
       },
       include: {
-        collection: {
+        program: {
           select: {
             id: true,
             title: true,
@@ -128,7 +128,7 @@ export class ForumsService {
         skip,
         take,
         include: {
-          collection: {
+          program: {
             select: {
               id: true,
               title: true,
@@ -169,7 +169,7 @@ export class ForumsService {
     const post = await prisma.forumPost.findUnique({
       where: { id: postId },
       include: {
-        collection: {
+        program: {
           select: {
             id: true,
             title: true,
@@ -370,7 +370,7 @@ export class ForumsService {
     const post = await prisma.forumPost.findUnique({
       where: { id: postId },
       include: {
-        collection: {
+        program: {
           select: {
             instructorId: true,
           },
@@ -382,7 +382,7 @@ export class ForumsService {
       throw new Error('Post not found');
     }
 
-    if (post.collection?.instructorId !== instructorId) {
+    if (post.program?.instructorId !== instructorId) {
       throw new Error('Only the collection instructor can mark best answer');
     }
 
@@ -426,7 +426,7 @@ export class ForumsService {
       where: { id: postId },
       data: { isPinned },
       include: {
-        collection: {
+        program: {
           select: {
             id: true,
             title: true,
@@ -453,7 +453,7 @@ export class ForumsService {
       where: { id: postId },
       data: { isLocked },
       include: {
-        collection: {
+        program: {
           select: {
             id: true,
             title: true,
@@ -478,8 +478,8 @@ export class ForumsService {
   private mapPostToDto(post: any): ForumPostResponseDto {
     return {
       id: post.id,
-      collectionId: post.collectionId,
-      collection: post.collection,
+      collectionId: post.programId, // Backward compatibility
+      collection: post.program, // Backward compatibility
       authorId: post.authorId,
       author: post.author,
       title: post.title,

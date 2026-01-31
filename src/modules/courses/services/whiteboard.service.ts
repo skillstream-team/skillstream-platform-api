@@ -13,13 +13,13 @@ export class WhiteboardService {
    * Create a new whiteboard
    */
   async createWhiteboard(data: CreateWhiteboardDto, userId: string): Promise<WhiteboardResponseDto> {
-    // Validate collection or liveStream exists
+    // Validate program or liveStream exists
     if (data.courseId) {
-      const course = await prisma.collection.findUnique({
+      const course = await prisma.program.findUnique({
         where: { id: data.courseId },
       });
       if (!course) {
-        throw new Error('Collection not found');
+        throw new Error('Program not found');
       }
     }
 
@@ -34,7 +34,7 @@ export class WhiteboardService {
 
     const whiteboard = await prisma.whiteboard.create({
       data: {
-        collectionId: data.courseId,
+        programId: data.courseId,
         liveStreamId: data.liveStreamId,
         title: data.title,
         description: data.description,
@@ -134,7 +134,7 @@ export class WhiteboardService {
 
     const [whiteboards, total] = await Promise.all([
       prisma.whiteboard.findMany({
-        where: { collectionId: courseId },
+        where: { programId: courseId },
         skip,
         take,
         include: {
@@ -153,7 +153,7 @@ export class WhiteboardService {
         },
         orderBy: { createdAt: 'desc' },
       }),
-      prisma.whiteboard.count({ where: { collectionId: courseId } }),
+      prisma.whiteboard.count({ where: { programId: courseId } }),
     ]);
 
     return {
@@ -341,7 +341,7 @@ export class WhiteboardService {
   private mapToResponseDto(whiteboard: any): WhiteboardResponseDto {
     return {
       id: whiteboard.id,
-      courseId: whiteboard.collectionId,
+      courseId: whiteboard.programId,
       liveStreamId: whiteboard.liveStreamId,
       title: whiteboard.title,
       description: whiteboard.description,

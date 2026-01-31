@@ -1,5 +1,6 @@
 export interface CreateEnrollmentDto {
-  collectionId: string;
+  collectionId?: string; // Backward compatibility
+  programId?: string;
   studentId: string;
   amount: number;
   currency?: string;
@@ -9,11 +10,17 @@ export interface CreateEnrollmentDto {
 
 export interface EnrollmentResponseDto {
   id: string;
-  collectionId: string;
+  collectionId?: string; // Backward compatibility
+  programId?: string;
   studentId: string;
   paymentId: string | null;
   createdAt: Date;
-  collection: {
+  collection?: { // Backward compatibility
+    id: string;
+    title: string;
+    price: number;
+  };
+  program?: {
     id: string;
     title: string;
     price: number;

@@ -34,7 +34,7 @@ export class BundlesService {
    */
   async createBundle(data: CreateBundleDto): Promise<BundleResponseDto> {
     // Validate all collections exist
-    const collections = await prisma.collection.findMany({
+    const programs = await prisma.program.findMany({
       where: { id: { in: data.collectionIds } },
       select: {
         id: true,
@@ -44,23 +44,23 @@ export class BundlesService {
       },
     });
 
-    if (collections.length !== data.collectionIds.length) {
-      throw new Error('One or more collections not found');
+    if (programs.length !== data.collectionIds.length) {
+      throw new Error('One or more programs not found');
     }
 
     // Calculate total value
-    const totalValue = collections.reduce((sum: number, collection: any) => sum + collection.price, 0);
+    const totalValue = programs.reduce((sum: number, program: any) => sum + program.price, 0);
     const savings = totalValue - data.price;
 
-    const bundle = await prisma.collectionBundle.create({
+    const bundle = await prisma.programBundle.create({
       data: {
         title: data.title,
         description: data.description,
         price: data.price,
         thumbnailUrl: data.thumbnailUrl,
         items: {
-          create: data.collectionIds.map((collectionId, index) => ({
-            collectionId,
+          create: data.collectionIds.map((programId, index) => ({
+            programId,
             order: index,
           })),
         },
@@ -68,7 +68,7 @@ export class BundlesService {
       include: {
         items: {
           include: {
-            collection: {
+            program: {
               select: {
                 id: true,
                 title: true,
@@ -89,12 +89,12 @@ export class BundlesService {
    * Get all active bundles
    */
   async getAllBundles(): Promise<BundleResponseDto[]> {
-    const bundles = await prisma.collectionBundle.findMany({
+    const bundles = await prisma.programBundle.findMany({
       where: { isActive: true },
       include: {
         items: {
           include: {
-            collection: {
+            program: {
               select: {
                 id: true,
                 title: true,
@@ -123,12 +123,12 @@ export class BundlesService {
    * Get bundle by ID
    */
   async getBundleById(bundleId: string): Promise<BundleResponseDto | null> {
-    const bundle = await prisma.collectionBundle.findUnique({
+    const bundle = await prisma.programBundle.findUnique({
       where: { id: bundleId },
       include: {
         items: {
           include: {
-            collection: {
+            program: {
               select: {
                 id: true,
                 title: true,
@@ -146,7 +146,7 @@ export class BundlesService {
       return null;
     }
 
-    const totalValue = bundle.items.reduce((sum: number, item: any) => sum + item.collection.price, 0);
+    const totalValue = bundle.items.reduce((sum: number, item: any) => sum + (item.program?.price || 0), 0);
     const savings = totalValue - bundle.price;
 
     return this.mapToDto(bundle, totalValue, savings);
@@ -159,12 +159,12 @@ export class BundlesService {
     bundleId: string,
     studentId: string
   ): Promise<{ enrolled: number; alreadyEnrolled: number }> {
-    const bundle = await prisma.collectionBundle.findUnique({
+    const bundle = await prisma.programBundle.findUnique({
       where: { id: bundleId },
       include: {
         items: {
           select: {
-            collectionId: true,
+            programId: true,
           },
         },
       },
@@ -178,21 +178,21 @@ export class BundlesService {
       throw new Error('Bundle is not active');
     }
 
-    const collectionIds = bundle.items.map((item: any) => item.collectionId);
+    const programIds = bundle.items.map((item: any) => item.programId);
 
     // Check existing enrollments
     const existingEnrollments = await prisma.enrollment.findMany({
       where: {
         studentId,
-        collectionId: { in: collectionIds },
+        programId: { in: programIds },
       },
       select: {
-        collectionId: true,
+        programId: true,
       },
     });
 
-    const existingCollectionIds = new Set(existingEnrollments.map((e) => e.collectionId));
-    const newCollectionIds = collectionIds.filter((id) => !existingCollectionIds.has(id));
+    const existingProgramIds = new Set(existingEnrollments.map((e) => e.programId));
+    const newProgramIds = programIds.filter((id: string) => !existingProgramIds.has(id));
 
     // Create bundle enrollment
     await prisma.bundleEnrollment.create({
@@ -206,8 +206,8 @@ export class BundlesService {
     // This just tracks bundle enrollment
 
     return {
-      enrolled: newCollectionIds.length,
-      alreadyEnrolled: existingCollectionIds.size,
+      enrolled: newProgramIds.length,
+      alreadyEnrolled: existingProgramIds.size,
     };
   }
 

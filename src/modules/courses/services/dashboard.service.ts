@@ -84,21 +84,11 @@ export class DashboardService {
             },
           },
         },
-        collection: { // Backward compatibility
-          include: {
-            _count: {
-              select: {
-                collectionLessons: true,
-                modules: true,
-              },
-            },
-          },
-        },
       },
     });
 
     // Get progress for all enrolled programs
-    const programIds = enrollments.map((e) => e.programId || e.collectionId).filter(Boolean);
+    const programIds = enrollments.map((e) => e.programId).filter(Boolean);
     const progressRecords = await prisma.progress.findMany({
       where: {
         studentId: userId,
@@ -110,16 +100,15 @@ export class DashboardService {
     // Calculate progress per program
     const enrolledCourses = await Promise.all(
       enrollments.map(async (enrollment) => {
-        const program = enrollment.program || enrollment.collection;
-        const programId = enrollment.programId || enrollment.collectionId;
+        const program = enrollment.program;
+        const programId = enrollment.programId;
         const programProgress = progressRecords.filter(
           (p) => p.programId === programId
         );
         const completed = programProgress.filter(
           (p) => p.status === 'completed' || p.status === 'passed'
         ).length;
-        const total = (program?._count?.programModules || 0) + (program?._count?.sections || 0) + 
-                     (program?._count?.collectionLessons || 0) + (program?._count?.modules || 0);
+        const total = (program?._count?.programModules || 0) + (program?._count?.sections || 0);
         const progress = total > 0 ? (completed / total) * 100 : 0;
 
         // Get next module (from program modules)

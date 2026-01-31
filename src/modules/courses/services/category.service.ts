@@ -62,7 +62,7 @@ export class CategoryService {
       include: {
         _count: {
           select: {
-            collections: true,
+            programs: true,
           },
         },
       },
@@ -77,7 +77,7 @@ export class CategoryService {
       color: cat.color || undefined,
       order: cat.order,
       isActive: cat.isActive,
-      courseCount: cat._count.collections,
+      courseCount: cat._count.programs,
       createdAt: cat.createdAt,
       updatedAt: cat.updatedAt,
     }));
@@ -102,7 +102,7 @@ export class CategoryService {
       include: {
         _count: {
           select: {
-            collections: true,
+            programs: true,
           },
         },
       },
@@ -121,7 +121,7 @@ export class CategoryService {
       color: category.color || undefined,
       order: category.order,
       isActive: category.isActive,
-      courseCount: category._count.collections,
+      courseCount: category._count.programs,
       createdAt: category.createdAt,
       updatedAt: category.updatedAt,
     };
@@ -156,7 +156,7 @@ export class CategoryService {
       include: {
         _count: {
           select: {
-            collections: true,
+            programs: true,
           },
         },
       },
@@ -174,7 +174,7 @@ export class CategoryService {
       color: category.color || undefined,
       order: category.order,
       isActive: category.isActive,
-      courseCount: category._count.collections,
+      courseCount: category._count.programs,
       createdAt: category.createdAt,
       updatedAt: category.updatedAt,
     };
@@ -218,7 +218,7 @@ export class CategoryService {
       include: {
         _count: {
           select: {
-            collections: true,
+            programs: true,
           },
         },
       },
@@ -236,7 +236,7 @@ export class CategoryService {
       color: category.color || undefined,
       order: category.order,
       isActive: category.isActive,
-      courseCount: category._count.collections,
+      courseCount: category._count.programs,
       createdAt: category.createdAt,
       updatedAt: category.updatedAt,
     };
@@ -251,7 +251,7 @@ export class CategoryService {
       include: {
         _count: {
           select: {
-            collections: true,
+            programs: true,
           },
         },
       },
@@ -261,8 +261,8 @@ export class CategoryService {
       throw new Error('Category not found');
     }
 
-    if (category._count.collections > 0) {
-      throw new Error(`Cannot delete category. It has ${category._count.collections} collection(s) associated with it. Please reassign or delete collections first.`);
+    if (category._count.programs > 0) {
+      throw new Error(`Cannot delete category. It has ${category._count.programs} program(s) associated with it. Please reassign or delete programs first.`);
     }
 
     await prisma.category.delete({
@@ -426,7 +426,7 @@ export class CategoryService {
           include: {
             _count: {
               select: {
-                collections: true,
+                programs: true,
               },
             },
           },
@@ -441,7 +441,7 @@ export class CategoryService {
           color: category.color || undefined,
           order: category.order,
           isActive: category.isActive,
-          courseCount: category._count.collections,
+          courseCount: category._count.programs,
           createdAt: category.createdAt,
           updatedAt: category.updatedAt,
         });

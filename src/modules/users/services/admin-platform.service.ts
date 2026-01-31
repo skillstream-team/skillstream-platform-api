@@ -864,7 +864,7 @@ export class AdminPlatformService {
     }
 
     const [bundles, total] = await Promise.all([
-      prisma.collectionBundle.findMany({
+      prisma.programBundle.findMany({
         where,
         skip,
         take: limit,
@@ -917,7 +917,7 @@ export class AdminPlatformService {
   }
 
   async getBundle(id: string) {
-    const bundle = await prisma.collectionBundle.findUnique({
+    const bundle = await prisma.programBundle.findUnique({
       where: { id },
       include: {
         items: {
@@ -971,7 +971,7 @@ export class AdminPlatformService {
     const totalPrice = courses.reduce((sum: number, c: any) => sum + (c.price || 0), 0);
     const finalPrice = data.price || (data.discount ? totalPrice * (1 - data.discount / 100) : totalPrice);
 
-    const bundle = await prisma.collectionBundle.create({
+    const bundle = await prisma.programBundle.create({
       data: {
         title: data.name,
         description: data.description,
@@ -1027,12 +1027,12 @@ export class AdminPlatformService {
     // Update courses if provided
     if (data.courseIds) {
       // Delete existing items
-      await prisma.collectionBundleItem.deleteMany({
+      await prisma.programBundleItem.deleteMany({
         where: { bundleId: id },
       });
 
       // Create new items
-      await prisma.collectionBundleItem.createMany({
+      await prisma.programBundleItem.createMany({
         data: data.courseIds.map((courseId, index) => ({
           bundleId: id,
           collectionId: courseId,
@@ -1069,7 +1069,7 @@ export class AdminPlatformService {
   }
 
   async deleteBundle(id: string) {
-    await prisma.collectionBundle.delete({
+    await prisma.programBundle.delete({
       where: { id },
     });
 

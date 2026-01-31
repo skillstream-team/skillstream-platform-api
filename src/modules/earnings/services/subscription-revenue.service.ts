@@ -89,12 +89,12 @@ export class SubscriptionRevenueService {
     const engagements = await prisma.studentEngagement.findMany({
       where: { period },
       include: {
-        collection: {
+        program: {
           select: {
             instructorId: true,
           },
         },
-        lesson: {
+        module: {
           select: {
             teacherId: true,
           },
@@ -108,7 +108,7 @@ export class SubscriptionRevenueService {
 
     for (const engagement of engagements) {
       const teacherId =
-        engagement.collection?.instructorId || engagement.lesson?.teacherId;
+        engagement.program?.instructorId || engagement.module?.teacherId;
       if (!teacherId) continue;
 
       const currentWatchTime = teacherWatchTime.get(teacherId) || 0;

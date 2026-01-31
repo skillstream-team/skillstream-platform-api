@@ -283,19 +283,6 @@ router.delete('/modules/:moduleId/resources/:resourceId', requireAuth, async (re
 
 // Backward compatibility routes for /lessons endpoints
 router.get('/lessons/:lessonId/resources', requireAuth, async (req, res) => {
-  // Redirect to modules endpoint
-  req.params.moduleId = req.params.lessonId;
-  return router.handle(req, res);
-});
-
-router.post('/lessons/:lessonId/resources/upload', requireAuth, async (req, res) => {
-  // Redirect to modules endpoint
-  req.params.moduleId = req.params.lessonId;
-  return router.handle(req, res);
-});
-
-// Backward compatibility routes for /lessons endpoints
-router.get('/lessons/:lessonId/resources', requireAuth, async (req, res) => {
   try {
     const { lessonId } = req.params;
     const moduleId = lessonId;

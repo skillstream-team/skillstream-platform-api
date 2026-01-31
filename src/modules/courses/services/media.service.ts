@@ -46,13 +46,13 @@ export class MediaService {
             file: data.file,
             filename: data.filename,
             contentType: data.mimeType,
-            collectionId: data.collectionId,
+            programId: (data as any).collectionId || (data as any).programId,
             type: data.type,
         });
 
         const material = await prisma.material.create({
             data: {
-                collectionId: data.collectionId,
+                programId: (data as any).collectionId || (data as any).programId,
                 type: data.type,
                 key: uploadResult.key,
                 filename: data.filename,
@@ -66,7 +66,11 @@ export class MediaService {
             },
         });
 
-        return material as MaterialResponseDto;
+        const materialWithRelations = material as any;
+        return {
+            ...materialWithRelations,
+            collectionId: materialWithRelations.programId,
+        } as MaterialResponseDto;
     }
 
     /**
@@ -78,12 +82,15 @@ export class MediaService {
      */
     async getMaterialsByCourse(collectionId: string): Promise<MaterialResponseDto[]> {
         const materials = await prisma.material.findMany({
-            where: { collectionId },
+            where: { programId: collectionId },
             include: { uploader: { select: { id: true, username: true, email: true } } },
             orderBy: { createdAt: 'desc' },
         });
 
-        return materials as MaterialResponseDto[];
+        return materials.map((m: any) => ({
+            ...m,
+            collectionId: m.programId,
+        })) as MaterialResponseDto[];
     }
 
     /**
@@ -124,17 +131,26 @@ export class MediaService {
         const streamVideo = await streamService.createVideo(data);
         const video = await prisma.video.create({
             data: {
-                ...data,
+                programId: data.collectionId,
+                title: data.title,
+                description: data.description,
+                type: data.type,
+                duration: data.duration,
+                uploadedBy: data.uploadedBy,
+                scheduledAt: data.scheduledAt,
                 streamId: streamVideo.streamId!,
                 status: streamVideo.status,
                 playbackUrl: streamVideo.playbackUrl,
                 thumbnailUrl: streamVideo.thumbnailUrl,
-                duration: streamVideo.duration,
             },
             include: { uploader: { select: { id: true, username: true, email: true } } },
         });
 
-        return video as VideoResponseDto;
+        const videoWithRelations = video as any;
+        return {
+            ...videoWithRelations,
+            collectionId: videoWithRelations.programId,
+        } as VideoResponseDto;
     }
 
     /**
@@ -146,12 +162,15 @@ export class MediaService {
      */
     async getVideosByCourse(collectionId: string): Promise<VideoResponseDto[]> {
         const videos = await prisma.video.findMany({
-            where: { collectionId },
+            where: { programId: collectionId },
             include: { uploader: { select: { id: true, username: true, email: true } } },
             orderBy: { createdAt: 'desc' },
         });
 
-        return videos as VideoResponseDto[];
+        return videos.map((v: any) => ({
+            ...v,
+            collectionId: v.programId,
+        })) as VideoResponseDto[];
     }
 
     /**
@@ -193,7 +212,11 @@ export class MediaService {
             include: { uploader: { select: { id: true, username: true, email: true } } },
         });
 
-        return updatedVideo as VideoResponseDto;
+        const videoWithRelations = updatedVideo as any;
+        return {
+            ...videoWithRelations,
+            collectionId: videoWithRelations.programId,
+        } as VideoResponseDto;
     }
 
     /**
@@ -242,7 +265,11 @@ export class MediaService {
 
         const liveStream = await prisma.liveStream.create({
             data: {
-                ...data,
+                programId: data.collectionId,
+                title: data.title,
+                description: data.description,
+                createdBy: data.createdBy,
+                scheduledAt: data.scheduledAt,
                 streamId: streamData.streamId!,
                 status: streamData.status,
                 playbackUrl: streamData.playbackUrl,
@@ -250,7 +277,11 @@ export class MediaService {
             include: { creator: { select: { id: true, username: true, email: true } } },
         });
 
-        return liveStream as LiveStreamResponseDto;
+        const liveStreamWithRelations = liveStream as any;
+        return {
+            ...liveStreamWithRelations,
+            collectionId: liveStreamWithRelations.programId,
+        } as LiveStreamResponseDto;
     }
 
     /**
@@ -262,12 +293,15 @@ export class MediaService {
      */
     async getLiveStreamsByCourse(collectionId: string): Promise<LiveStreamResponseDto[]> {
         const liveStreams = await prisma.liveStream.findMany({
-            where: { collectionId },
+            where: { programId: collectionId },
             include: { creator: { select: { id: true, username: true, email: true } } },
             orderBy: { createdAt: 'desc' },
         });
 
-        return liveStreams as LiveStreamResponseDto[];
+        return liveStreams.map((ls: any) => ({
+            ...ls,
+            collectionId: ls.programId,
+        })) as LiveStreamResponseDto[];
     }
 
     /**
@@ -286,8 +320,11 @@ export class MediaService {
             data: { status: 'live', isActive: true, startedAt: new Date() },
             include: { creator: { select: { id: true, username: true, email: true } } },
         });
-
-        return updatedStream as LiveStreamResponseDto;
+        const updatedStreamWithRelations = updatedStream as any;
+        return {
+            ...updatedStreamWithRelations,
+            collectionId: updatedStreamWithRelations.programId,
+        } as LiveStreamResponseDto;
     }
 
     /**
@@ -307,8 +344,11 @@ export class MediaService {
             data: { status: 'ended', isActive: false, endedAt: new Date() },
             include: { creator: { select: { id: true, username: true, email: true } } },
         });
-
-        return updatedStream as LiveStreamResponseDto;
+        const updatedStreamWithRelations = updatedStream as any;
+        return {
+            ...updatedStreamWithRelations,
+            collectionId: updatedStreamWithRelations.programId,
+        } as LiveStreamResponseDto;
     }
 
     /**

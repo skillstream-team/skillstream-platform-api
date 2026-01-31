@@ -64,8 +64,8 @@ router.get('/teachers/students', requireAuth, requireRole('TEACHER'), async (req
 
     const skip = (page - 1) * limit;
 
-    // Get all collections created by this teacher
-    const teacherCollections = await prisma.collection.findMany({
+    // Get all programs created by this teacher
+    const teacherCollections = await prisma.program.findMany({
       where: { instructorId: teacherId },
       select: { id: true },
     });
@@ -88,7 +88,7 @@ router.get('/teachers/students', requireAuth, requireRole('TEACHER'), async (req
 
     // Build where clause for enrollments
     const where: any = {
-      collectionId: { in: collectionIds },
+      programId: { in: collectionIds },
     };
 
     // Get unique students enrolled in teacher's courses
@@ -106,7 +106,7 @@ router.get('/teachers/students', requireAuth, requireRole('TEACHER'), async (req
             createdAt: true,
           },
         },
-        collection: {
+        program: {
           select: {
             id: true,
             title: true,
@@ -212,8 +212,8 @@ router.get('/teachers/students/stats', requireAuth, requireRole('TEACHER'), asyn
       return res.status(401).json({ error: 'User not authenticated' });
     }
 
-    // Get all collections created by this teacher
-    const teacherCollections = await prisma.collection.findMany({
+    // Get all programs created by this teacher
+    const teacherCollections = await prisma.program.findMany({
       where: { instructorId: teacherId },
       select: { id: true },
     });
@@ -231,7 +231,7 @@ router.get('/teachers/students/stats', requireAuth, requireRole('TEACHER'), asyn
 
     // Get all enrollments
     const enrollments = await prisma.enrollment.findMany({
-      where: { collectionId: { in: collectionIds } },
+      where: { programId: { in: collectionIds } },
       select: { studentId: true },
     });
 
@@ -243,7 +243,7 @@ router.get('/teachers/students/stats', requireAuth, requireRole('TEACHER'), asyn
     // Get total revenue from completed payments
     const revenueResult = await prisma.payment.aggregate({
       where: {
-        collectionId: { in: collectionIds },
+        programId: { in: collectionIds },
         status: 'COMPLETED',
       },
       _sum: {
@@ -302,8 +302,8 @@ router.get('/teachers/students/:studentId', requireAuth, requireRole('TEACHER'),
       return res.status(401).json({ error: 'User not authenticated' });
     }
 
-    // Get all collections created by this teacher
-    const teacherCollections = await prisma.collection.findMany({
+    // Get all programs created by this teacher
+    const teacherCollections = await prisma.program.findMany({
       where: { instructorId: teacherId },
       select: { id: true },
     });
@@ -318,7 +318,7 @@ router.get('/teachers/students/:studentId', requireAuth, requireRole('TEACHER'),
     const enrollment = await prisma.enrollment.findFirst({
       where: {
         studentId,
-        collectionId: { in: collectionIds },
+        programId: { in: collectionIds },
       },
       include: {
         student: true,

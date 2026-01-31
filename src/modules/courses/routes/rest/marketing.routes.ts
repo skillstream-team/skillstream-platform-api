@@ -15,15 +15,19 @@ router.get('/collections/:collectionId/marketing', requireAuth, async (req, res)
   try {
     const { collectionId } = req.params;
 
-    const collection = await prisma.collection.findUnique({
+    const program = await prisma.program.findUnique({
       where: { id: collectionId },
       include: {
         instructor: {
           select: { id: true, username: true, email: true }
         },
         enrollments: true,
-        modules: {
-          where: { isPublished: true },
+        programModules: {
+          include: {
+            module: {
+              select: { id: true, title: true, order: true }
+            }
+          },
           orderBy: { order: 'asc' }
         },
         progress: {
@@ -32,18 +36,18 @@ router.get('/collections/:collectionId/marketing', requireAuth, async (req, res)
       }
     });
 
-    if (!collection) {
-      return res.status(404).json({ error: 'Collection not found' });
+    if (!program) {
+      return res.status(404).json({ error: 'Program not found' });
     }
 
     // Calculate marketing stats
-    const totalEnrollments = collection.enrollments.length;
-    const completedCount = collection.progress.filter((p: any) => p.status === 'completed').length;
+    const totalEnrollments = program.enrollments?.length || 0;
+    const completedCount = program.progress?.filter((p: any) => p.status === 'completed').length || 0;
     const completionRate = totalEnrollments > 0 ? (completedCount / totalEnrollments) * 100 : 0;
 
     // Get recent enrollments (for trend analysis)
     const recentEnrollments = await prisma.enrollment.findMany({
-      where: { collectionId },
+      where: { programId: collectionId },
       orderBy: { createdAt: 'desc' },
       take: 10
     });
@@ -53,7 +57,7 @@ router.get('/collections/:collectionId/marketing', requireAuth, async (req, res)
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
     const recentEnrollmentsCount = await prisma.enrollment.count({
       where: {
-        collectionId,
+        programId: collectionId,
         createdAt: { gte: thirtyDaysAgo }
       }
     });
@@ -61,7 +65,7 @@ router.get('/collections/:collectionId/marketing', requireAuth, async (req, res)
     res.json({
       success: true,
       data: {
-        ...collection,
+        ...program,
         marketing: {
           totalEnrollments,
           completedCount,

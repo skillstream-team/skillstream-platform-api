@@ -82,7 +82,7 @@ export class CouponsService {
         usageLimit: data.usageLimit,
         expiresAt: data.expiresAt,
         applicableTo: data.applicableTo,
-        collectionId: data.collectionId,
+        programId: data.collectionId,
         bundleId: data.bundleId,
       },
     });
@@ -171,7 +171,7 @@ export class CouponsService {
     }
 
     // Check specific collection/bundle match
-    if (coupon.applicableTo === 'COURSE' && coupon.collectionId !== courseId) {
+    if (coupon.applicableTo === 'COURSE' && coupon.programId !== courseId) {
       return {
         valid: false,
         discountAmount: 0,

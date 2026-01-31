@@ -34,7 +34,7 @@ export class WaitlistService {
     // Check if already on waitlist
     const existing = await prisma.waitlistEntry.findFirst({
       where: {
-        ...(data.courseId ? { collectionId: data.courseId } : { eventId: data.eventId }),
+        ...(data.courseId ? { programId: data.courseId } : { eventId: data.eventId }),
         userId: data.userId,
       },
     });
@@ -45,12 +45,12 @@ export class WaitlistService {
 
     // Get current position
     const count = await prisma.waitlistEntry.count({
-      where: data.courseId ? { collectionId: data.courseId } : { eventId: data.eventId },
+      where: data.courseId ? { programId: data.courseId } : { eventId: data.eventId },
     });
 
     const entry = await prisma.waitlistEntry.create({
       data: {
-        collectionId: data.courseId,
+        programId: data.courseId,
         eventId: data.eventId,
         userId: data.userId,
         position: count + 1,
@@ -81,7 +81,7 @@ export class WaitlistService {
     }
 
     const entries = await prisma.waitlistEntry.findMany({
-      where: courseId ? { collectionId: courseId } : { eventId },
+      where: courseId ? { programId: courseId } : { eventId },
       include: {
         user: {
           select: {
@@ -106,7 +106,7 @@ export class WaitlistService {
     userId: string
   ): Promise<void> {
     const where: any = { userId };
-    if (courseId) where.courseId = courseId;
+    if (courseId) where.programId = courseId;
     if (eventId) where.eventId = eventId;
 
     await prisma.waitlistEntry.deleteMany({ where });
@@ -146,7 +146,7 @@ export class WaitlistService {
     eventId?: string | null
   ): Promise<void> {
     const where: any = {};
-    if (courseId) where.courseId = courseId;
+    if (courseId) where.programId = courseId;
     if (eventId) where.eventId = eventId;
 
     const entries = await prisma.waitlistEntry.findMany({
@@ -168,7 +168,7 @@ export class WaitlistService {
   private mapToDto(entry: any): WaitlistEntryDto {
     return {
       id: entry.id,
-      courseId: entry.collectionId || undefined,
+      courseId: entry.programId || undefined,
       eventId: entry.eventId || undefined,
       userId: entry.userId,
       user: entry.user,

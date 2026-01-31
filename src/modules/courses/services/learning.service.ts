@@ -102,11 +102,11 @@ export class LearningService {
   async createCourseModule(data: CreateCourseModuleDto): Promise<CourseModuleResponseDto> {
     try {
       // Validate collection exists
-      const collection = await prisma.collection.findUnique({
+      const program = await prisma.program.findUnique({
         where: { id: data.collectionId },
       });
 
-      if (!collection) {
+      if (!program) {
         throw new Error('Collection not found');
       }
 
@@ -119,48 +119,47 @@ export class LearningService {
         throw new Error('User not found');
       }
 
-      // Create module
-      const module = await prisma.collectionModule.create({
+      // Create standalone module and link it to the program via ProgramModule
+      const module = await prisma.module.create({
         data: {
           title: data.title,
-          collectionId: data.collectionId,
-          description: data.description,
+          teacherId: data.createdBy,
           order: data.order,
-          createdBy: data.createdBy,
+          price: 0,
         },
         include: {
-          creator: {
-            select: {
-              id: true,
-              username: true,
-              email: true,
-            },
-          },
-          quizzes: {
-            include: {
-              creator: {
-                select: {
-                  id: true,
-                  username: true,
-                  email: true,
-                },
+        quizzes: {
+          include: {
+            creator: {
+              select: {
+                id: true,
+                username: true,
+                email: true,
               },
-              questions: true,
-              attempts: {
-                include: {
-                  student: {
-                    select: {
-                      id: true,
-                      username: true,
-                      email: true,
-                    },
+            },
+            questions: true,
+            attempts: {
+              include: {
+                student: {
+                  select: {
+                    id: true,
+                    username: true,
+                    email: true,
                   },
                 },
               },
             },
           },
-          assignments: true,
-          progress: true,
+        },
+      },
+      });
+
+      // Link module to program
+      await prisma.programModule.create({
+        data: {
+          programId: program.id,
+          moduleId: module.id,
+          order: data.order,
         },
       });
 
@@ -199,28 +198,80 @@ export class LearningService {
    */
   async getCourseModule(moduleId: string): Promise<CourseModuleResponseDto | null> {
     try {
-      const module = await prisma.collectionModule.findUnique({
+      const programModule = await prisma.programModule.findUnique({
         where: { id: moduleId },
         include: {
-          creator: {
-            select: {
-              id: true,
-              username: true,
-              email: true,
-            },
-          },
-          quizzes: {
+          module: {
             include: {
-              questions: true,
-              attempts: true,
+              quizzes: {
+                include: {
+                  creator: {
+                    select: {
+                      id: true,
+                      username: true,
+                      email: true,
+                    },
+                  },
+                  questions: true,
+                  attempts: {
+                    include: {
+                      student: {
+                        select: {
+                          id: true,
+                          username: true,
+                          email: true,
+                        },
+                      },
+                    },
+                  },
+                },
+              },
             },
           },
-          assignments: true,
-          progress: true,
+          program: {
+            include: {
+              instructor: {
+                select: {
+                  id: true,
+                  username: true,
+                  email: true,
+                },
+              },
+            },
+          },
         },
       });
 
-      return module as CourseModuleResponseDto | null;
+      if (!programModule) {
+        return null;
+      }
+
+      const module = (programModule as any).module;
+      const program = (programModule as any).program;
+
+      const response: CourseModuleResponseDto = {
+        id: programModule.id,
+        collectionId: program?.id ?? programModule.programId,
+        title: module?.title ?? '',
+        description: (module as any)?.description,
+        order: programModule.order,
+        isPublished: true,
+        publishedAt: undefined,
+        createdBy: program?.instructorId ?? program?.createdBy ?? '',
+        creator: {
+          id: program?.instructor?.id ?? '',
+          username: program?.instructor?.username ?? '',
+          email: program?.instructor?.email ?? '',
+        },
+        createdAt: program?.createdAt ?? new Date(),
+        updatedAt: program?.updatedAt ?? new Date(),
+        lessons: [],
+        quizzes: (module?.quizzes ?? []) as any,
+        assignments: [],
+        progress: [],
+      };
+
+      return response;
     } catch (error) {
       throw new Error(`Failed to get course module: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
@@ -257,46 +308,68 @@ export class LearningService {
    */
   async getCourseModules(collectionId: string): Promise<CourseModuleResponseDto[]> {
     try {
-      const modules = await prisma.collectionModule.findMany({
-        where: { collectionId },
+      const modules = await prisma.programModule.findMany({
+        where: { programId: collectionId },
         include: {
-          creator: {
-            select: {
-              id: true,
-              username: true,
-              email: true,
-            },
-          },
-          quizzes: {
+          module: {
             include: {
-              creator: {
-                select: {
-                  id: true,
-                  username: true,
-                  email: true,
-                },
-              },
-              questions: true,
-              attempts: {
+              quizzes: {
                 include: {
-                  student: {
+                  creator: {
                     select: {
                       id: true,
                       username: true,
                       email: true,
                     },
                   },
+                  questions: true,
+                  attempts: {
+                    include: {
+                      student: {
+                        select: {
+                          id: true,
+                          username: true,
+                          email: true,
+                        },
+                      },
+                    },
+                  },
                 },
               },
             },
           },
-          assignments: true,
-          progress: true,
         },
         orderBy: { order: 'asc' },
       });
 
-      return modules.map(module => ({ ...module, lessons: [] })) as unknown as CourseModuleResponseDto[];
+      return modules.map((pm: any) => {
+        const module = pm.module || {};
+        const program = pm.program || {};
+
+        const result: CourseModuleResponseDto = {
+          id: pm.id,
+          collectionId: program.id || pm.programId,
+          title: module.title || '',
+          description: (module as any).description,
+          order: pm.order,
+          isPublished: true,
+          publishedAt: undefined,
+          createdBy: program.instructorId || program.createdBy || '',
+          creator: {
+            id: program.instructor?.id || '',
+            username: program.instructor?.username || '',
+            email: program.instructor?.email || '',
+          },
+          createdAt: program.createdAt || new Date(),
+          updatedAt: program.updatedAt || new Date(),
+          lessons: [],
+          quizzes: (module.quizzes || []) as any,
+          assignments: [],
+          progress: [],
+        };
+
+        return result;
+      });
     } catch (error) {
       throw new Error(`Failed to get course modules: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
@@ -379,7 +452,7 @@ export class LearningService {
   async createQuiz(data: CreateQuizDto): Promise<QuizResponseDto> {
     try {
       // Validate course exists
-      const course = await prisma.collection.findUnique({
+      const course = await prisma.program.findUnique({
         where: { id: data.collectionId },
       });
 
@@ -389,7 +462,7 @@ export class LearningService {
 
       // Validate module exists if provided
       if (data.moduleId) {
-        const module = await prisma.collectionModule.findUnique({
+        const module = await prisma.programModule.findUnique({
           where: { id: data.moduleId },
         });
 
@@ -401,7 +474,7 @@ export class LearningService {
       // Create quiz
       const quiz = await prisma.quiz.create({
         data: {
-          collectionId: data.collectionId,
+          programId: data.collectionId,
           moduleId: data.moduleId,
           title: data.title,
           description: data.description,
@@ -435,7 +508,11 @@ export class LearningService {
         },
       });
 
-      return quiz as QuizResponseDto;
+      const quizWithRelations = quiz as any;
+      return {
+        ...quizWithRelations,
+        collectionId: quizWithRelations.programId,
+      } as QuizResponseDto;
     } catch (error) {
       throw new Error(`Failed to create quiz: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
@@ -718,9 +795,16 @@ export class LearningService {
         throw new Error('Student not found');
       }
 
+      // Resolve programId from collectionId (legacy) or programId (new)
+      const programId = data.collectionId || data.programId;
+
+      if (!programId) {
+        throw new Error('Program ID is required');
+      }
+
       // Validate course exists
-      const course = await prisma.collection.findUnique({
-        where: { id: data.collectionId },
+      const course = await prisma.program.findUnique({
+        where: { id: programId },
       });
 
       if (!course) {
@@ -730,9 +814,9 @@ export class LearningService {
       // Upsert progress record
       const progress = await prisma.progress.upsert({
         where: {
-          studentId_collectionId_type_itemId: {
+          studentId_programId_type_itemId: {
             studentId: data.studentId,
-            collectionId: data.collectionId,
+            programId,
             type: data.type,
             itemId: data.itemId,
           },
@@ -747,8 +831,7 @@ export class LearningService {
         },
         create: {
           studentId: data.studentId,
-          collectionId: data.collectionId,
-          moduleId: data.moduleId,
+          programId,
           type: data.type,
           itemId: data.itemId,
           status: data.status,
@@ -766,13 +849,7 @@ export class LearningService {
               email: true,
             },
           },
-          collection: {
-            select: {
-              id: true,
-              title: true,
-            },
-          },
-          module: {
+          program: {
             select: {
               id: true,
               title: true,
@@ -787,14 +864,19 @@ export class LearningService {
         try {
           // Import certificate service dynamically to avoid circular dependency
           const { certificateService } = await import('./certificate.service');
-          await certificateService.autoIssueCertificate(data.studentId, data.collectionId);
+          await certificateService.autoIssueCertificate(data.studentId, data.collectionId || (data as any).programId);
         } catch (certError) {
           // Log but don't fail progress update if certificate issuance fails
           console.warn('Certificate auto-issuance failed:', certError);
         }
       }
 
-      return progress as ProgressResponseDto;
+      const progressWithRelations = progress as any;
+      return {
+        ...progressWithRelations,
+        collectionId: progressWithRelations.programId,
+        collection: progressWithRelations.program,
+      } as ProgressResponseDto;
     } catch (error) {
       throw new Error(`Failed to update progress: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
@@ -875,7 +957,7 @@ export class LearningService {
             select: { id: true, username: true, email: true }
           },
           quiz: {
-            select: { id: true, title: true, collectionId: true }
+            select: { id: true, title: true, programId: true }
           },
           grader: {
             select: { id: true, username: true, email: true }
@@ -978,11 +1060,11 @@ export class LearningService {
   async getLearningAnalytics(collectionId: string): Promise<LearningAnalyticsDto> {
     try {
       // Validate collection exists
-      const collection = await prisma.collection.findUnique({
+      const program = await prisma.program.findUnique({
         where: { id: collectionId },
       });
 
-      if (!collection) {
+      if (!program) {
         throw new Error('Collection not found');
       }
 
@@ -999,24 +1081,24 @@ export class LearningService {
       ] = await Promise.all([
         // Total students enrolled
         prisma.enrollment.count({
-          where: { collectionId },
+          where: { programId: collectionId },
         }),
         // Students who completed the course
         prisma.progress.count({
           where: {
-            collectionId,
+            programId: collectionId,
             status: 'completed',
             type: 'module',
           },
         }),
         // Average score across all activities
         prisma.progress.aggregate({
-          where: { collectionId },
+          where: { programId: collectionId },
           _avg: { score: true },
         }),
         // Average time spent
         prisma.progress.aggregate({
-          where: { collectionId },
+          where: { programId: collectionId },
           _avg: { timeSpent: true },
         }),
         // Module progress analytics
@@ -1052,18 +1134,24 @@ export class LearningService {
   // ===========================================
 
   private async getModuleProgressAnalytics(collectionId: string): Promise<ModuleProgressDto[]> {
-    const modules = await prisma.collectionModule.findMany({
-      where: { collectionId },
+    const programModules = await prisma.programModule.findMany({
+      where: { programId: collectionId },
       include: {
-        progress: true,
+        module: {
+          include: {
+            engagements: true,
+          },
+        },
       },
     });
 
-    return modules.map(module => {
-      const totalStudents = module.progress.length;
-      const completedStudents = module.progress.filter(p => p.status === 'completed').length;
+    return programModules.map((pm: any) => {
+      const module = pm.module;
+      const engagements = module.engagements || [];
+      const totalStudents = engagements.length;
+      const completedStudents = engagements.filter((e: any) => e.status === 'completed').length;
       const completionRate = totalStudents > 0 ? (completedStudents / totalStudents) * 100 : 0;
-      const averageTimeSpent = module.progress.reduce((sum, p) => sum + (p.timeSpent || 0), 0) / totalStudents || 0;
+      const averageTimeSpent = engagements.reduce((sum: number, e: any) => sum + (e.timeSpent || 0), 0) / totalStudents || 0;
 
       return {
         moduleId: module.id,
@@ -1077,7 +1165,7 @@ export class LearningService {
 
   private async getQuizPerformanceAnalytics(collectionId: string): Promise<QuizPerformanceDto[]> {
     const quizzes = await prisma.quiz.findMany({
-      where: { collectionId },
+      where: { programId: collectionId },
       include: {
         attempts: true,
       },
@@ -1103,7 +1191,7 @@ export class LearningService {
 
   private async getAssignmentPerformanceAnalytics(collectionId: string): Promise<AssignmentPerformanceDto[]> {
     const assignments = await prisma.assignment.findMany({
-      where: { collectionId },
+      where: { programId: collectionId },
       include: {
         submissions: true,
       },
@@ -1144,7 +1232,7 @@ export class LearningService {
 
 async function updateProgress(studentId: string, collectionId: string, type: string, itemId: string, status: string, score?: number, timeSpent?: number) {
     const existing = await prisma.progress.findUnique({
-        where: { studentId_collectionId_type_itemId: { studentId, collectionId, type, itemId } }
+        where: { studentId_programId_type_itemId: { studentId, programId: collectionId, type, itemId } }
     });
 
     if (existing) {
@@ -1163,7 +1251,7 @@ async function updateProgress(studentId: string, collectionId: string, type: str
         return prisma.progress.create({
             data: {
                 studentId,
-                collectionId,
+                programId: collectionId,
                 type,
                 itemId,
                 status,
@@ -1181,19 +1269,19 @@ async function updateProgress(studentId: string, collectionId: string, type: str
 async function getCourseProgress(studentId: string, collectionId: string) {
     // get all items for collection
     const progress = await prisma.progress.findMany({
-        where: { studentId, collectionId }
+        where: { studentId, programId: collectionId }
     });
 
-    // group by type or module
-    const moduleIds = [...new Set(progress.map(p => p.moduleId).filter(Boolean))] as string[];
+    // group by type or itemId
+    const itemIds = [...new Set(progress.map(p => p.itemId).filter(Boolean))] as string[];
 
     let totalProgress = 0;
     let modulesCounted = 0;
 
-    for (const moduleId of moduleIds) {
-        const moduleProgress = progress.filter(p => p.moduleId === moduleId);
-        if (moduleProgress.length) {
-            const avg = moduleProgress.reduce((sum, p) => sum + (p.progress ?? 0), 0) / moduleProgress.length;
+    for (const itemId of itemIds) {
+        const itemProgress = progress.filter(p => p.itemId === itemId);
+        if (itemProgress.length) {
+            const avg = itemProgress.reduce((sum, p) => sum + (p.progress ?? 0), 0) / itemProgress.length;
             totalProgress += avg;
             modulesCounted++;
         }

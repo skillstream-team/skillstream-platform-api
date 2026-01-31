@@ -61,7 +61,7 @@ export class DataExportService {
       prisma.enrollment.findMany({
         where: { studentId: userId },
         include: {
-          collection: {
+          program: {
             select: {
               id: true,
               title: true,
@@ -74,7 +74,7 @@ export class DataExportService {
       prisma.progress.findMany({
         where: { studentId: userId },
         include: {
-          collection: {
+          program: {
             select: {
               id: true,
               title: true,
@@ -107,7 +107,7 @@ export class DataExportService {
       prisma.certificate.findMany({
         where: { studentId: userId },
         include: {
-          collection: {
+          program: {
             select: {
               id: true,
               title: true,
@@ -118,7 +118,7 @@ export class DataExportService {
       prisma.payment.findMany({
         where: { studentId: userId },
         include: {
-          collection: {
+          program: {
             select: {
               id: true,
               title: true,

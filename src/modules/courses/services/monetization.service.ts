@@ -11,13 +11,10 @@ export class MonetizationService {
    */
   async getAccessRequirements(
     contentId: string,
-    contentType: 'PROGRAM' | 'MODULE' | 'COLLECTION' | 'LESSON'
+    contentType: 'PROGRAM' | 'MODULE'
   ): Promise<AccessRequirements> {
     // Support both new and old content types for backward compatibility
-    const isProgram = contentType === 'PROGRAM' || contentType === 'COLLECTION';
-    const isModule = contentType === 'MODULE' || contentType === 'LESSON';
-
-    if (isProgram) {
+    if (contentType === 'PROGRAM') {
       const program = await prisma.program.findUnique({
         where: { id: contentId },
         select: {
@@ -34,7 +31,7 @@ export class MonetizationService {
         type: program.monetizationType as 'FREE' | 'SUBSCRIPTION' | 'PREMIUM',
         price: program.monetizationType === 'PREMIUM' ? program.price : undefined,
       };
-    } else if (isModule) {
+    } else if (contentType === 'MODULE') {
       const module = await prisma.module.findUnique({
         where: { id: contentId },
         select: {
@@ -62,7 +59,7 @@ export class MonetizationService {
   async canAccess(
     studentId: string,
     contentId: string,
-    contentType: 'PROGRAM' | 'MODULE' | 'COLLECTION' | 'LESSON'
+    contentType: 'PROGRAM' | 'MODULE'
   ): Promise<boolean> {
     // Get access requirements
     const requirements = await this.getAccessRequirements(contentId, contentType);
@@ -83,10 +80,7 @@ export class MonetizationService {
 
     // PREMIUM content - check enrollment or payment
     if (requirements.type === 'PREMIUM') {
-      const isProgram = contentType === 'PROGRAM' || contentType === 'COLLECTION';
-      const isModule = contentType === 'MODULE' || contentType === 'LESSON';
-
-      if (isProgram) {
+      if (contentType === 'PROGRAM') {
         const enrollment = await prisma.enrollment.findUnique({
           where: {
             programId_studentId: {
@@ -96,7 +90,7 @@ export class MonetizationService {
           },
         });
         return !!enrollment;
-      } else if (isModule) {
+      } else if (contentType === 'MODULE') {
         // For standalone modules, check if there's a payment
         const payment = await prisma.payment.findFirst({
           where: {

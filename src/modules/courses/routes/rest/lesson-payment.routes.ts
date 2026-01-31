@@ -103,7 +103,7 @@ router.post('/bookings/:bookingId/payment',
   requireAuth,
   validate({
     params: z.object({ bookingId: z.string().min(1) }),
-    body: createLessonPaymentSchema,
+    body: createModulePaymentSchema,
   }),
   async (req, res) => {
     try {

@@ -60,11 +60,11 @@ async function checkIfPreviewContent(req: Request): Promise<boolean> {
   const { lessonId, videoId } = req.params;
 
   if (lessonId) {
-    const lesson = await prisma.lesson.findUnique({
+    const module = await prisma.module.findUnique({
       where: { id: lessonId },
       select: { isPreview: true },
     });
-    return lesson?.isPreview || false;
+    return module?.isPreview || false;
   }
 
   if (videoId) {
@@ -91,12 +91,12 @@ export async function getPreviewContent(
   try {
     const { collectionId } = req.params;
 
-    const [previewLessons, previewVideos] = await Promise.all([
-      prisma.lesson.findMany({
+    const [previewModules, previewVideos] = await Promise.all([
+      prisma.module.findMany({
         where: {
-          collectionLessons: {
+          programModules: {
             some: {
-              collectionId,
+              programId: collectionId,
             },
           },
           isPreview: true,
@@ -112,7 +112,7 @@ export async function getPreviewContent(
       }),
       prisma.video.findMany({
         where: {
-          collectionId,
+          programId: collectionId,
           isPreview: true,
         },
         select: {
@@ -129,7 +129,7 @@ export async function getPreviewContent(
     ]);
 
     (req as any).previewContent = {
-      lessons: previewLessons,
+      lessons: previewModules,
       videos: previewVideos,
     };
 

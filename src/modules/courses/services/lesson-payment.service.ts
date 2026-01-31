@@ -501,7 +501,7 @@ export class LessonPaymentService {
       });
 
       // Make slot available again
-      await prisma.lessonSlot.update({
+      await prisma.moduleSlot.update({
         where: { id: booking.slotId },
         data: {
           isBooked: false,

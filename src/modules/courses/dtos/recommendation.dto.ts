@@ -1,7 +1,7 @@
 export interface CreateRecommendationDto {
   userId: string;
-  courseId: string; // API compatibility - maps to collectionId
-  collectionId: string;
+  courseId: string; // API compatibility - maps to programId
+  programId?: string;
   score: number;
   reason: string;
   algorithm: string;

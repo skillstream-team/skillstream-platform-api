@@ -54,14 +54,14 @@ export class AdminService {
       prisma.payment.findMany({
         where: { status: 'COMPLETED', createdAt: { gte: startOfMonth } },
       }),
-      prisma.collectionReview.count({ where: { isPublished: false } }),
+      prisma.programReview.count({ where: { isPublished: false } }),
       prisma.contentFlag.count({ where: { status: 'PENDING' } }),
       prisma.user.count({ where: { createdAt: { gte: thirtyDaysAgo } } }),
       prisma.program.count({ where: { createdAt: { gte: startOfMonth } } }),
     ]);
 
-    const totalRevenue = allPayments.reduce((sum, p) => sum + (p.amount || 0), 0);
-    const monthlyRevenue = monthlyPayments.reduce((sum, p) => sum + (p.amount || 0), 0);
+    const totalRevenue = allPayments.reduce((sum: number, p: { amount?: number }) => sum + (p.amount || 0), 0);
+    const monthlyRevenue = monthlyPayments.reduce((sum: number, p: { amount?: number }) => sum + (p.amount || 0), 0);
 
     return {
       totalUsers,
@@ -277,7 +277,7 @@ export class AdminService {
     const skip = (page - 1) * limit;
 
     const [courses, total] = await Promise.all([
-      prisma.collection.findMany({
+      prisma.program.findMany({
         where: { isPublished: false },
         skip,
         take: limit,
@@ -423,7 +423,7 @@ export class AdminService {
               avatar: true,
             },
           },
-          collection: {
+          program: {
             select: {
               id: true,
               title: true,
@@ -486,7 +486,7 @@ export class AdminService {
       updateData.isPublished = false;
     }
 
-    const updatedReview = await prisma.collectionReview.update({
+    const updatedReview = await prisma.programReview.update({
       where: { id: reviewId },
       data: updateData,
       include: {
@@ -497,7 +497,7 @@ export class AdminService {
             email: true,
           },
         },
-        collection: {
+        program: {
           select: {
             id: true,
             title: true,
@@ -563,30 +563,30 @@ export class AdminService {
         skip,
         take: limit,
         orderBy: { issuedAt: 'desc' },
-        include: {
-          student: {
-            select: {
-              id: true,
-              username: true,
-              email: true,
-              firstName: true,
-              lastName: true,
-            },
+include: {
+        student: {
+          select: {
+            id: true,
+            username: true,
+            email: true,
+            firstName: true,
+            lastName: true,
           },
-          collection: {
-            select: {
-              id: true,
-              title: true,
-              instructor: {
-                select: {
-                  id: true,
-                  username: true,
-                },
+        },
+        program: {
+          select: {
+            id: true,
+            title: true,
+            instructor: {
+              select: {
+                id: true,
+                username: true,
               },
             },
           },
         },
-      }),
+      },
+    }),
       prisma.certificate.count({ where }),
     ]);
 
@@ -644,7 +644,7 @@ export class AdminService {
             email: true,
           },
         },
-        collection: {
+        program: {
           select: {
             id: true,
             title: true,

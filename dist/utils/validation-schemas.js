@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.updateCalendarEventSchema = exports.createCalendarEventSchema = exports.resendVerificationSchema = exports.verifyEmailSchema = exports.refreshTokenSchema = exports.resetPasswordSchema = exports.forgotPasswordSchema = exports.updateProgressSchema = exports.updateAssignmentSchema = exports.updateQuizSchema = exports.submitQuizAttemptSchema = exports.startQuizAttemptSchema = exports.createQuizQuestionSchema = exports.courseIdParamSchema = exports.idParamSchema = exports.createConversationSchema = exports.createMessageSchema = exports.createProgressSchema = exports.createAssignmentSchema = exports.activateSubscriptionSchema = exports.createSubscriptionSchema = exports.createQuizSchema = exports.createModuleSchema = exports.createEnrollmentSchema = exports.changePasswordSchema = exports.updateUserSchema = exports.loginSchema = exports.createUserSchema = exports.updateCourseSchema = exports.createCourseSchema = exports.paginationSchema = void 0;
+exports.updateCalendarEventSchema = exports.createCalendarEventSchema = exports.resendVerificationSchema = exports.verifyEmailSchema = exports.refreshTokenSchema = exports.resetPasswordSchema = exports.forgotPasswordSchema = exports.updateProgressSchema = exports.updateAssignmentSchema = exports.updateQuizSchema = exports.submitQuizAttemptSchema = exports.startQuizAttemptSchema = exports.createQuizQuestionSchema = exports.courseIdParamSchema = exports.idParamSchema = exports.createConversationSchema = exports.createMessageSchema = exports.createProgressSchema = exports.createAssignmentSchema = exports.activateSubscriptionSchema = exports.createSubscriptionSchema = exports.createQuizSchema = exports.createSectionSchema = exports.updateModuleSchema = exports.createModuleSchema = exports.createEnrollmentSchema = exports.changePasswordSchema = exports.updateUserSchema = exports.loginSchema = exports.createUserSchema = exports.updateCourseSchema = exports.createCourseSchema = exports.paginationSchema = void 0;
 const zod_1 = require("zod");
 /**
  * Common validation schemas
@@ -75,13 +75,27 @@ exports.createEnrollmentSchema = zod_1.z.object({
     provider: zod_1.z.string().min(1),
     transactionId: zod_1.z.string().optional(),
 });
-// Module schemas
+// Module schemas — price is required (teachers must set individual price per module)
 exports.createModuleSchema = zod_1.z.object({
     title: zod_1.z.string().min(1).max(200),
     description: zod_1.z.string().max(5000).optional(),
     order: zod_1.z.number().int().min(0),
+    price: zod_1.z.number().min(0),
     createdBy: zod_1.z.string().min(1),
     // courseId comes from URL params, not body
+});
+exports.updateModuleSchema = zod_1.z.object({
+    title: zod_1.z.string().min(1).max(200).optional(),
+    description: zod_1.z.string().max(5000).optional(),
+    order: zod_1.z.number().int().min(0).optional(),
+    price: zod_1.z.number().min(0).optional(),
+});
+// Section schema (no price — sections are containers; modules have price)
+exports.createSectionSchema = zod_1.z.object({
+    title: zod_1.z.string().min(1).max(200),
+    description: zod_1.z.string().max(5000).optional(),
+    order: zod_1.z.number().int().min(0),
+    createdBy: zod_1.z.string().min(1),
 });
 // Quiz schemas
 exports.createQuizSchema = zod_1.z.object({

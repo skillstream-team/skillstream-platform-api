@@ -176,7 +176,7 @@ class WishlistService {
                 isPublished: true,
             },
             select: {
-                collectionId: true,
+                programId: true,
                 rating: true,
             },
         });

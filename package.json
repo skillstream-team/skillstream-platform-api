@@ -5,7 +5,7 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "node dist/server.js",
-    "build": "tsc && npx prisma generate",
+    "build": "npx prisma generate && tsc",
     "dev": "ts-node-dev --respawn --transpile-only src/server.ts",
     "postinstall": "npx prisma generate",
     "db:push": "npx prisma db push && npx ts-node prisma/create-sparse-index.ts",

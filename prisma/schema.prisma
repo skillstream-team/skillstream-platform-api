@@ -132,8 +132,29 @@ model User {
   pushSubscription       PushSubscription?
   programImports          ProgramImport[]
   broadcasts            Broadcast[]
+  studyGoals             StudyGoal[]
 
   @@index([provider, providerId])
+}
+
+model StudyGoal {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId      String   @db.ObjectId
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title       String
+  type        String   // "hours" | "programs" | "modules"
+  target      Int      // target count (e.g. 5 programs, 10 modules, 20 hours)
+  current     Int      @default(0)
+  period      String   // "daily" | "weekly" | "monthly"
+  startDate   DateTime @default(now())
+  endDate     DateTime
+  completed   Boolean  @default(false)
+  categoryId  String?  @db.ObjectId // optional: align recommendations to this category
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([userId])
+  @@index([userId, completed])
 }
 
 model SecurityLog {

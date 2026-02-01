@@ -204,12 +204,6 @@ export class TeacherEarningsService {
             title: true,
           },
         },
-        collection: { // Backward compatibility
-          select: {
-            id: true,
-            title: true,
-          },
-        },
       },
     });
   }
@@ -226,12 +220,6 @@ export class TeacherEarningsService {
       take: limit,
       include: {
         program: {
-          select: {
-            id: true,
-            title: true,
-          },
-        },
-        collection: { // Backward compatibility
           select: {
             id: true,
             title: true,

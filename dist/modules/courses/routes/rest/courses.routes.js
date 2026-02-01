@@ -201,7 +201,7 @@ router.get('/:id/modules', auth_1.requireAuth, (0, validation_1.validate)({ para
         res.status(400).json({ error: err.message });
     }
 });
-router.post('/:id/sections', auth_1.requireAuth, (0, roles_1.requireRole)('TEACHER'), (0, validation_1.validate)({ params: validation_schemas_1.courseIdParamSchema, body: validation_schemas_1.createModuleSchema }), async (req, res) => {
+router.post('/:id/sections', auth_1.requireAuth, (0, roles_1.requireRole)('TEACHER'), (0, validation_1.validate)({ params: validation_schemas_1.courseIdParamSchema, body: validation_schemas_1.createSectionSchema }), async (req, res) => {
     try {
         const programSection = await service.addSectionToProgram(req.params.id, req.body);
         res.json(programSection);

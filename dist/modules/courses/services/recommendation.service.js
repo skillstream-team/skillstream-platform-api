@@ -31,6 +31,9 @@ class RecommendationService {
         // Algorithm 3: Popularity-Based
         const popularityRecs = await this.getPopularityBasedRecommendations(userId, userEnrollments);
         recommendations.push(...popularityRecs);
+        // Algorithm 4: Goal-based – boost programs/modules that align with user's study goals
+        const goalBasedRecs = await this.getGoalBasedRecommendations(userId, userEnrollments);
+        recommendations.push(...goalBasedRecs);
         // Sort by score and take top recommendations
         const topRecommendations = recommendations
             .sort((a, b) => b.score - a.score)
@@ -147,6 +150,39 @@ class RecommendationService {
             reason: `Popular course with ${course._count.enrollments} enrollments`,
             algorithm: 'popularity',
             metadata: { enrollmentCount: course._count.enrollments, rank: index + 1 }
+        }));
+    }
+    /**
+     * Goal-based: recommend programs/modules that align with user's study goals (for comms and discovery)
+     */
+    async getGoalBasedRecommendations(userId, userEnrollments) {
+        const enrolledIds = userEnrollments.map(e => e.programId);
+        const goals = await prisma_1.prisma.studyGoal.findMany({
+            where: { userId, completed: false, endDate: { gte: new Date() } },
+        });
+        if (goals.length === 0)
+            return [];
+        const categoryIds = goals.map((g) => g.categoryId).filter(Boolean);
+        const wantsPrograms = goals.some((g) => g.type === 'programs');
+        const wantsModules = goals.some((g) => g.type === 'modules');
+        const where = { id: { notIn: enrolledIds } };
+        if (categoryIds.length > 0)
+            where.categoryId = { in: categoryIds };
+        const programs = await prisma_1.prisma.program.findMany({
+            where,
+            include: { _count: { select: { programModules: true } } },
+            take: 5,
+        });
+        return programs.map((p) => ({
+            userId,
+            courseId: p.id,
+            programId: p.id,
+            score: 0.75,
+            reason: wantsPrograms || wantsModules
+                ? 'Matches your study goals'
+                : 'Recommended for your goals',
+            algorithm: 'goal_based',
+            metadata: { goalCount: goals.length },
         }));
     }
     /**

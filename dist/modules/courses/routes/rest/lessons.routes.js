@@ -40,6 +40,7 @@ const prisma_1 = require("../../../../utils/prisma");
 const logger_1 = require("../../../../utils/logger");
 const email_service_1 = require("../../../users/services/email.service");
 const service_1 = require("../../services/service");
+const monetization_service_1 = require("../../services/monetization.service");
 const router = (0, express_1.Router)();
 const service = new service_1.ProgramsService();
 /**
@@ -259,6 +260,7 @@ router.get('/modules/:id', auth_1.requireAuth, async (req, res) => {
             ...module,
             description,
             sectionId,
+            studentPrice: (0, monetization_service_1.getStudentPrice)(module.price ?? 0),
         });
     }
     catch (error) {
@@ -447,11 +449,19 @@ router.get('/modules', auth_1.requireAuth, async (req, res) => {
             return { ...module, teacher: null };
         }));
         logger_1.logger.info(`Found ${regularModules.length} regular modules`);
+        const regularModulesWithStudentPrice = regularModules.map((m) => ({
+            ...m,
+            studentPrice: (0, monetization_service_1.getStudentPrice)(m.price ?? 0),
+        }));
+        const quickModulesWithStudentPrice = quickModules.map((m) => ({
+            ...m,
+            studentPrice: (0, monetization_service_1.getStudentPrice)(m.price ?? 0),
+        }));
         res.json({
             success: true,
             data: {
-                quickModules,
-                regularModules
+                quickModules: quickModulesWithStudentPrice,
+                regularModules: regularModulesWithStudentPrice,
             }
         });
     }

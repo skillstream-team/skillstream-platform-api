@@ -38,7 +38,7 @@ class AdminService {
             prisma_1.prisma.payment.findMany({
                 where: { status: 'COMPLETED', createdAt: { gte: startOfMonth } },
             }),
-            prisma_1.prisma.collectionReview.count({ where: { isPublished: false } }),
+            prisma_1.prisma.programReview.count({ where: { isPublished: false } }),
             prisma_1.prisma.contentFlag.count({ where: { status: 'PENDING' } }),
             prisma_1.prisma.user.count({ where: { createdAt: { gte: thirtyDaysAgo } } }),
             prisma_1.prisma.program.count({ where: { createdAt: { gte: startOfMonth } } }),
@@ -228,7 +228,7 @@ class AdminService {
         const limit = Math.min(options.limit || 20, 100);
         const skip = (page - 1) * limit;
         const [courses, total] = await Promise.all([
-            prisma_1.prisma.collection.findMany({
+            prisma_1.prisma.program.findMany({
                 where: { isPublished: false },
                 skip,
                 take: limit,
@@ -353,7 +353,7 @@ class AdminService {
                             avatar: true,
                         },
                     },
-                    collection: {
+                    program: {
                         select: {
                             id: true,
                             title: true,
@@ -409,7 +409,7 @@ class AdminService {
             // Soft delete - unpublish
             updateData.isPublished = false;
         }
-        const updatedReview = await prisma_1.prisma.collectionReview.update({
+        const updatedReview = await prisma_1.prisma.programReview.update({
             where: { id: reviewId },
             data: updateData,
             include: {
@@ -420,7 +420,7 @@ class AdminService {
                         email: true,
                     },
                 },
-                collection: {
+                program: {
                     select: {
                         id: true,
                         title: true,
@@ -486,7 +486,7 @@ class AdminService {
                             lastName: true,
                         },
                     },
-                    collection: {
+                    program: {
                         select: {
                             id: true,
                             title: true,
@@ -547,7 +547,7 @@ class AdminService {
                         email: true,
                     },
                 },
-                collection: {
+                program: {
                     select: {
                         id: true,
                         title: true,

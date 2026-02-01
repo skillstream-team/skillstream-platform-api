@@ -183,12 +183,6 @@ class TeacherEarningsService {
                         title: true,
                     },
                 },
-                collection: {
-                    select: {
-                        id: true,
-                        title: true,
-                    },
-                },
             },
         });
     }
@@ -204,12 +198,6 @@ class TeacherEarningsService {
             take: limit,
             include: {
                 program: {
-                    select: {
-                        id: true,
-                        title: true,
-                    },
-                },
-                collection: {
                     select: {
                         id: true,
                         title: true,

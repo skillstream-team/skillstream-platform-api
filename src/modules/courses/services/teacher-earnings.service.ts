@@ -489,7 +489,7 @@ export class TeacherEarningsService {
                 include: {
                     earnings: {
                         include: {
-                            collection: {
+                            program: {
                                 select: {
                                     id: true,
                                     title: true,

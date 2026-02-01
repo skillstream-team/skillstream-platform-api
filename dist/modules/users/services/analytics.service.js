@@ -24,7 +24,7 @@ class AnalyticsService {
             }),
             prisma_1.prisma.payment.findMany({
                 where: { status: 'COMPLETED' },
-                include: { collection: { select: { id: true, title: true } } },
+                include: { program: { select: { id: true, title: true } } },
             }),
             prisma_1.prisma.user.groupBy({
                 by: ['role'],
@@ -47,8 +47,8 @@ class AnalyticsService {
                 count,
             });
         }
-        // Collection stats
-        const courses = await prisma_1.prisma.collection.findMany({
+        // Program stats
+        const courses = await prisma_1.prisma.program.findMany({
             include: {
                 enrollments: true,
                 payments: { where: { status: 'COMPLETED' } },
@@ -104,7 +104,7 @@ class AnalyticsService {
         const allProgress = await prisma_1.prisma.progress.findMany({
             where: { status: 'completed' },
             include: {
-                collection: { select: { id: true, title: true } },
+                program: { select: { id: true, title: true } },
             },
         });
         const allQuizAttempts = await prisma_1.prisma.quizAttempt.findMany({

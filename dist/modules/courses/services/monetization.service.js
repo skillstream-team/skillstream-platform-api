@@ -33,11 +33,17 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.MonetizationService = void 0;
+exports.MonetizationService = exports.PLATFORM_PRICE_MARKUP = void 0;
+exports.getStudentPrice = getStudentPrice;
 const prisma_1 = require("../../../utils/prisma");
+/** Platform markup: students see teacher price + 10% */
+exports.PLATFORM_PRICE_MARKUP = 0.10;
+function getStudentPrice(teacherPrice) {
+    return Math.round((teacherPrice * (1 + exports.PLATFORM_PRICE_MARKUP)) * 100) / 100;
+}
 class MonetizationService {
     /**
-     * Get content access requirements
+     * Get content access requirements (studentPrice = teacher price + 10% for students)
      */
     async getAccessRequirements(contentId, contentType) {
         // Support both new and old content types for backward compatibility
@@ -55,6 +61,7 @@ class MonetizationService {
             return {
                 type: program.monetizationType,
                 price: program.monetizationType === 'PREMIUM' ? program.price : undefined,
+                studentPrice: program.monetizationType === 'PREMIUM' ? getStudentPrice(program.price) : undefined,
             };
         }
         else if (contentType === 'MODULE') {
@@ -71,27 +78,39 @@ class MonetizationService {
             return {
                 type: module.monetizationType,
                 price: module.monetizationType === 'PREMIUM' ? module.price : undefined,
+                studentPrice: module.monetizationType === 'PREMIUM' ? getStudentPrice(module.price) : undefined,
             };
         }
         throw new Error('Invalid content type');
     }
     /**
-     * Check if student can access content
+     * Check if student can access content.
+     * Access is granted if:
+     * 1. User has an active subscription (access to everything), or
+     * 2. For programs: user is enrolled (bought the program), or
+     * 3. For modules: user is enrolled in a program that contains this module, or bought the module directly
      */
     async canAccess(studentId, contentId, contentType) {
+        // 1. Active subscription = access to everything on the platform
+        const subscription = await prisma_1.prisma.subscription.findUnique({
+            where: { userId: studentId },
+        });
+        if (subscription?.status === 'COMPLETED' && (!subscription.expiresAt || subscription.expiresAt > new Date())) {
+            return true;
+        }
         // Get access requirements
         const requirements = await this.getAccessRequirements(contentId, contentType);
         // FREE content is always accessible
         if (requirements.type === 'FREE') {
             return true;
         }
-        // SUBSCRIPTION content - check subscription access
+        // SUBSCRIPTION content - check subscription access (already checked above for "all access")
         if (requirements.type === 'SUBSCRIPTION') {
             const { SubscriptionAccessService } = await Promise.resolve().then(() => __importStar(require('../../subscriptions/services/subscription-access.service')));
             const accessService = new SubscriptionAccessService();
             return accessService.hasAccess(studentId, contentId, contentType);
         }
-        // PREMIUM content - check enrollment or payment
+        // PREMIUM content
         if (requirements.type === 'PREMIUM') {
             if (contentType === 'PROGRAM') {
                 const enrollment = await prisma_1.prisma.enrollment.findUnique({
@@ -104,8 +123,21 @@ class MonetizationService {
                 });
                 return !!enrollment;
             }
-            else if (contentType === 'MODULE') {
-                // For standalone modules, check if there's a payment
+            if (contentType === 'MODULE') {
+                // Module: access if (a) enrolled in a program that contains this module, or (b) direct module payment
+                const programLinks = await prisma_1.prisma.programModule.findMany({
+                    where: { moduleId: contentId },
+                    select: { programId: true },
+                });
+                for (const { programId } of programLinks) {
+                    const enrollment = await prisma_1.prisma.enrollment.findUnique({
+                        where: {
+                            programId_studentId: { programId, studentId },
+                        },
+                    });
+                    if (enrollment)
+                        return true;
+                }
                 const payment = await prisma_1.prisma.payment.findFirst({
                     where: {
                         studentId,

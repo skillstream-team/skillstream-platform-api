@@ -21,6 +21,7 @@ const gamification_routes_1 = __importDefault(require("./routes/rest/gamificatio
 const admin_management_routes_1 = __importDefault(require("./routes/rest/admin-management.routes"));
 const admin_platform_routes_1 = __importDefault(require("./routes/rest/admin-platform.routes"));
 const teachers_routes_1 = __importDefault(require("./routes/rest/teachers.routes"));
+const goals_routes_1 = __importDefault(require("./routes/rest/goals.routes"));
 const users_resolver_1 = require("./routes/graphql/users.resolver");
 const express_graphql_1 = require("express-graphql");
 function registerUserModule(app) {
@@ -41,6 +42,7 @@ function registerUserModule(app) {
     app.use('/api', admin_management_routes_1.default);
     app.use('/api', admin_platform_routes_1.default);
     app.use('/api', teachers_routes_1.default);
+    app.use('/api', goals_routes_1.default);
     // GraphQL
     app.use('/graphql/users', (0, express_graphql_1.graphqlHTTP)({
         schema: users_resolver_1.usersSchema,

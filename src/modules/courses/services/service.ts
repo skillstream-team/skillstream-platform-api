@@ -872,8 +872,8 @@ export class CollectionsService {
             const content = module.content as any;
             const sectionId = content?.sectionId;
             if (sectionId) {
-                if (!sectionMap.has(sectionId)) {
-                    sectionMap.set(sectionId, []);
+                if (!moduleMap.has(sectionId)) {
+                    moduleMap.set(sectionId, []);
                 }
                 // Extract description from content if it exists
                 const moduleWithDescription = {
@@ -882,13 +882,13 @@ export class CollectionsService {
                     sectionId: sectionId,
                     quizzes: [], // Empty array for builder view
                 };
-                sectionMap.get(sectionId)!.push(moduleWithDescription);
+                moduleMap.get(sectionId)!.push(moduleWithDescription);
             }
         });
 
         const result = sections.map(section => ({
             ...section,
-            modules: sectionMap.get(section.id) || []
+            modules: moduleMap.get(section.id) || []
         }));
 
         // Cache the result
@@ -1204,7 +1204,7 @@ export class CollectionsService {
         createdBy: string;
         programId: string;
     }) {
-        return prisma.assignment.create({ data: { ...data, moduleId } });
+        return prisma.assignment.create({ data: { ...data, sectionId: moduleId } });
     }
 
     // (Continue in same style for updateAssignment, deleteAssignment, materials, enrollments, progress, achievements, etc.)

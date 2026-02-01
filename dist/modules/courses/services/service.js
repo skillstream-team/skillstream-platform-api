@@ -3,6 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.ProgramsService = exports.CollectionsService = void 0;
 const prisma_1 = require("../../../utils/prisma");
 const cache_1 = require("../../../utils/cache");
+const monetization_service_1 = require("./monetization.service");
 class CollectionsService {
     // ============================================================
     // PROGRAM CRUD (formerly Collection)
@@ -379,6 +380,7 @@ class CollectionsService {
         const programsWithTags = programsWithRatings.map((program) => ({
             ...program,
             tags: tagsMap.get(program.id) || [],
+            studentPrice: (0, monetization_service_1.getStudentPrice)(program.price ?? 0),
         }));
         const result = {
             programs: programsWithTags,
@@ -510,6 +512,7 @@ class CollectionsService {
         const programWithRating = {
             ...program,
             averageRating,
+            studentPrice: (0, monetization_service_1.getStudentPrice)(program.price ?? 0),
             reviewCount: program._count.reviews,
             prerequisites: prerequisites.map((p) => ({
                 id: p.id,
@@ -775,8 +778,8 @@ class CollectionsService {
             const content = module.content;
             const sectionId = content?.sectionId;
             if (sectionId) {
-                if (!sectionMap.has(sectionId)) {
-                    sectionMap.set(sectionId, []);
+                if (!moduleMap.has(sectionId)) {
+                    moduleMap.set(sectionId, []);
                 }
                 // Extract description from content if it exists
                 const moduleWithDescription = {
@@ -785,12 +788,12 @@ class CollectionsService {
                     sectionId: sectionId,
                     quizzes: [], // Empty array for builder view
                 };
-                sectionMap.get(sectionId).push(moduleWithDescription);
+                moduleMap.get(sectionId).push(moduleWithDescription);
             }
         });
         const result = sections.map(section => ({
             ...section,
-            modules: sectionMap.get(section.id) || []
+            modules: moduleMap.get(section.id) || []
         }));
         // Cache the result
         await (0, cache_1.setCache)(cacheKey, result, cache_1.CACHE_TTL.SHORT);
@@ -1031,7 +1034,7 @@ class CollectionsService {
      *     tags: [Assignments]
      */
     async addAssignmentToModule(moduleId, data) {
-        return prisma_1.prisma.assignment.create({ data: { ...data, moduleId } });
+        return prisma_1.prisma.assignment.create({ data: { ...data, sectionId: moduleId } });
     }
     // (Continue in same style for updateAssignment, deleteAssignment, materials, enrollments, progress, achievements, etc.)
     // Backward compatibility aliases for GraphQL and other consumers

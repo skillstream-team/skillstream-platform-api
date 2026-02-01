@@ -6,6 +6,7 @@ import {
   RecommendationStatsDto
 } from '../dtos/recommendation.dto';
 import { prisma } from '../../../utils/prisma';
+import type { StudyGoal } from '@prisma/client';
 
 export class RecommendationService {
   
@@ -43,6 +44,10 @@ export class RecommendationService {
     // Algorithm 3: Popularity-Based
     const popularityRecs = await this.getPopularityBasedRecommendations(userId, userEnrollments);
     recommendations.push(...popularityRecs);
+
+    // Algorithm 4: Goal-based – boost programs/modules that align with user's study goals
+    const goalBasedRecs = await this.getGoalBasedRecommendations(userId, userEnrollments);
+    recommendations.push(...goalBasedRecs);
 
     // Sort by score and take top recommendations
     const topRecommendations = recommendations
@@ -186,6 +191,45 @@ export class RecommendationService {
       reason: `Popular course with ${course._count.enrollments} enrollments`,
       algorithm: 'popularity',
       metadata: { enrollmentCount: course._count.enrollments, rank: index + 1 }
+    }));
+  }
+
+  /**
+   * Goal-based: recommend programs/modules that align with user's study goals (for comms and discovery)
+   */
+  private async getGoalBasedRecommendations(
+    userId: string,
+    userEnrollments: any[]
+  ): Promise<CreateRecommendationDto[]> {
+    const enrolledIds = userEnrollments.map(e => e.programId);
+    const goals = await prisma.studyGoal.findMany({
+      where: { userId, completed: false, endDate: { gte: new Date() } },
+    });
+    if (goals.length === 0) return [];
+
+    const categoryIds = goals.map((g: StudyGoal) => g.categoryId).filter(Boolean) as string[];
+    const wantsPrograms = goals.some((g: StudyGoal) => g.type === 'programs');
+    const wantsModules = goals.some((g: StudyGoal) => g.type === 'modules');
+
+    const where: any = { id: { notIn: enrolledIds } };
+    if (categoryIds.length > 0) where.categoryId = { in: categoryIds };
+
+    const programs = await prisma.program.findMany({
+      where,
+      include: { _count: { select: { programModules: true } } },
+      take: 5,
+    });
+
+    return programs.map((p: any) => ({
+      userId,
+      courseId: p.id,
+      programId: p.id,
+      score: 0.75,
+      reason: wantsPrograms || wantsModules
+        ? 'Matches your study goals'
+        : 'Recommended for your goals',
+      algorithm: 'goal_based',
+      metadata: { goalCount: goals.length },
     }));
   }
 

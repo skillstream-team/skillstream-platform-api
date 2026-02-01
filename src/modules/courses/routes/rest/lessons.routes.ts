@@ -230,33 +230,79 @@ router.get('/modules/:id', requireAuth, async (req, res) => {
   try {
     const { id } = req.params;
     logger.info(`GET /api/modules/:id called with id: ${id}`);
-    
-    const module = await prisma.module.findUnique({
-      where: { id },
-      select: {
-        id: true,
-        title: true,
-        content: true,
-        order: true,
-        scheduledAt: true,
-        teacherId: true,
-        duration: true,
-        price: true,
-        joinLink: true,
-        meetingId: true,
-        status: true,
-        isPreview: true,
-        createdAt: true,
-        updatedAt: true,
-        quizzes: {
-          select: {
-            id: true,
-            title: true,
-            description: true,
-          },
+
+    const select = {
+      id: true,
+      title: true,
+      content: true,
+      order: true,
+      scheduledAt: true,
+      teacherId: true,
+      duration: true,
+      price: true,
+      joinLink: true,
+      meetingId: true,
+      status: true,
+      isPreview: true,
+      createdAt: true,
+      updatedAt: true,
+      quizzes: {
+        select: {
+          id: true,
+          title: true,
+          description: true,
         },
       },
+    };
+
+    let module = await prisma.module.findUnique({
+      where: { id },
+      select,
     });
+
+    // If id is a ProgramModule id (e.g. from program section list), resolve to the linked Module
+    if (!module) {
+      const programModule = await prisma.programModule.findUnique({
+        where: { id },
+        include: { module: { select } },
+      });
+      if (programModule?.module) {
+        module = programModule.module;
+      }
+    }
+
+    // If id is a QuickModule id (scheduled lesson), return a module-shaped response so links work
+    if (!module) {
+      const quickModule = await prisma.quickModule.findUnique({
+        where: { id },
+        include: { teacher: { select: { id: true, username: true, email: true, firstName: true, lastName: true } } },
+      });
+      if (quickModule) {
+        const description = quickModule.description ?? '';
+        res.json({
+          id: quickModule.id,
+          title: quickModule.title,
+          content: { description },
+          order: 0,
+          scheduledAt: quickModule.scheduledAt,
+          teacherId: quickModule.teacherId,
+          duration: quickModule.duration,
+          price: quickModule.price ?? 0,
+          joinLink: quickModule.joinLink,
+          meetingId: quickModule.meetingId,
+          status: quickModule.status,
+          isPreview: false,
+          createdAt: quickModule.createdAt,
+          updatedAt: quickModule.updatedAt,
+          quizzes: [],
+          description,
+          sectionId: '',
+          studentPrice: getStudentPrice(quickModule.price ?? 0),
+          teacher: quickModule.teacher,
+        });
+        return;
+      }
+    }
 
     if (!module) {
       return res.status(404).json({ error: 'Module not found' });

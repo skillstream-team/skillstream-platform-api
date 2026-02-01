@@ -86,8 +86,7 @@ router.post(
 router.get('/',
   validate({
     query: z.object({
-      courseId: z.string().optional(),
-      collectionId: z.string().optional(),
+      programId: z.string().optional(),
       page: z.string().optional().transform(val => val ? parseInt(val) : 1),
       limit: z.string().optional().transform(val => val ? parseInt(val) : 20),
       isActive: z.string().optional().transform(val => val === 'true'),
@@ -95,12 +94,11 @@ router.get('/',
   }),
   async (req, res) => {
     try {
-      const { courseId, collectionId, page = 1, limit = 20, isActive } = req.query as any;
-      const targetCollectionId = collectionId || courseId;
+      const { programId: targetProgramId, page = 1, limit = 20, isActive } = req.query as any;
 
       const where: any = {};
-      if (targetCollectionId) {
-        where.programId = targetCollectionId;
+      if (targetProgramId) {
+        where.programId = targetProgramId;
       }
       if (isActive !== undefined) {
         where.isActive = isActive;

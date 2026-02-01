@@ -61,17 +61,22 @@ export const requireAuth = async (req: AuthenticatedRequest, res: Response, next
     
     next();
   } catch (error: any) {
-    // Log authentication errors for debugging (but don't expose sensitive info)
+    // Token expiry is expected when users leave the tab open; log at debug to avoid noise
+    if (error.name === 'TokenExpiredError') {
+      logger.debug(`Token expired for ${req.path}`);
+      return res.status(401).json({
+        error: 'Token expired. Please login again.',
+        code: 'TOKEN_EXPIRED',
+      });
+    }
+
+    // Log other auth failures at warn for debugging
     logger.warn(`Authentication failed for ${req.path}`, {
       error: error.name,
       hasToken: !!req.header('Authorization'),
       path: req.path,
     });
-    
-    // More specific error messages
-    if (error.name === 'TokenExpiredError') {
-      return res.status(401).json({ error: 'Token expired. Please login again.' });
-    }
+
     if (error.name === 'JsonWebTokenError') {
       return res.status(401).json({ error: 'Invalid token.' });
     }

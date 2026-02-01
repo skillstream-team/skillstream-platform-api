@@ -22,34 +22,34 @@ const createPostSchema = z.object({
   content: z.string().min(10),
 });
 
-router.post('/courses/:courseId/forum/posts',
+const createForumPostHandler = async (req: any, res: any) => {
+  try {
+    const programId = req.params.programId;
+    const authorId = (req as any).user?.id;
+    const post = await forumsService.createPost({
+      programId,
+      authorId,
+      ...req.body,
+    });
+    res.status(201).json({
+      success: true,
+      data: post,
+      message: 'Post created successfully'
+    });
+  } catch (error) {
+    logger.error('Error creating post', error);
+    res.status(500).json({ error: (error as Error).message || 'Failed to create post' });
+  }
+};
+
+router.post('/programs/:programId/forum/posts',
   requireAuth,
   requireSubscription,
   validate({
-    params: z.object({ courseId: z.string().min(1) }),
+    params: z.object({ programId: z.string().min(1) }),
     body: createPostSchema,
   }),
-  async (req, res) => {
-    try {
-      const { courseId } = req.params;
-      const authorId = (req as any).user?.id;
-
-      const post = await forumsService.createPost({
-        courseId,
-        authorId,
-        ...req.body,
-      });
-
-      res.status(201).json({
-        success: true,
-        data: post,
-        message: 'Post created successfully'
-      });
-    } catch (error) {
-      logger.error('Error creating post', error);
-      res.status(500).json({ error: (error as Error).message || 'Failed to create post' });
-    }
-  }
+  createForumPostHandler
 );
 
 /**
@@ -59,33 +59,30 @@ router.post('/courses/:courseId/forum/posts',
  *     summary: Get forum posts for a course
  *     tags: [Forums]
  */
-router.get('/courses/:courseId/forum/posts',
+const getForumPostsHandler = async (req: any, res: any) => {
+  try {
+    const programId = req.params.programId;
+    const page = typeof req.query.page === 'number' ? req.query.page : 1;
+    const limit = typeof req.query.limit === 'number' ? req.query.limit : 20;
+    const search = req.query.search as string | undefined;
+    const result = await forumsService.getProgramPosts(programId, page, limit, search);
+    res.json({ success: true, ...result });
+  } catch (error) {
+    logger.error('Error fetching posts', error);
+    res.status(500).json({ error: 'Failed to fetch posts' });
+  }
+};
+
+router.get('/programs/:programId/forum/posts',
   validate({
-    params: z.object({ courseId: z.string().min(1) }),
+    params: z.object({ programId: z.string().min(1) }),
     query: z.object({
       page: z.string().optional().transform(val => val ? parseInt(val) : 1),
       limit: z.string().optional().transform(val => val ? parseInt(val) : 20),
       search: z.string().optional(),
     }),
   }),
-  async (req, res) => {
-    try {
-      const { courseId } = req.params;
-      const page = typeof req.query.page === 'number' ? req.query.page : 1;
-      const limit = typeof req.query.limit === 'number' ? req.query.limit : 20;
-      const search = req.query.search as string | undefined;
-
-      const result = await forumsService.getCoursePosts(courseId, page, limit, search);
-
-      res.json({
-        success: true,
-        ...result
-      });
-    } catch (error) {
-      logger.error('Error fetching posts', error);
-      res.status(500).json({ error: 'Failed to fetch posts' });
-    }
-  }
+  getForumPostsHandler
 );
 
 /**

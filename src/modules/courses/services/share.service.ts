@@ -1,19 +1,19 @@
 import { prisma } from '../../../utils/prisma';
 
-export interface ShareCourseDto {
-  courseId: string;
+export interface ShareProgramDto {
+  programId: string;
   userId: string;
   platform: string;
 }
 
 export class ShareService {
   /**
-   * Track course share
+   * Track program share
    */
-  async shareCourse(data: ShareCourseDto): Promise<void> {
+  async shareProgram(data: ShareProgramDto): Promise<void> {
     await prisma.programShare.create({
       data: {
-        programId: data.courseId,
+        programId: data.programId,
         userId: data.userId,
         platform: data.platform.toLowerCase(),
       },
@@ -21,14 +21,14 @@ export class ShareService {
   }
 
   /**
-   * Get share statistics for a course
+   * Get share statistics for a program
    */
-  async getCourseShareStats(courseId: string): Promise<{
+  async getProgramShareStats(programId: string): Promise<{
     totalShares: number;
     byPlatform: Record<string, number>;
   }> {
     const shares = await prisma.programShare.findMany({
-      where: { programId: courseId },
+      where: { programId },
       select: {
         platform: true,
       },
@@ -46,11 +46,11 @@ export class ShareService {
   }
 
   /**
-   * Get shareable link for course
+   * Get shareable link for program
    */
-  getShareableLink(courseId: string, platform: string): string {
+  getShareableLink(programId: string, platform: string): string {
     const baseUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
-    const courseUrl = `${baseUrl}/courses/${courseId}`;
+    const programUrl = `${baseUrl}/programs/${programId}`;
 
     const platforms: Record<string, (url: string, title: string) => string> = {
       facebook: (url, title) =>
@@ -63,6 +63,6 @@ export class ShareService {
         `https://wa.me/?text=${encodeURIComponent(`${title} ${url}`)}`,
     };
 
-    return platforms[platform.toLowerCase()]?.(courseUrl, 'Check out this course!') || courseUrl;
+    return platforms[platform.toLowerCase()]?.(programUrl, 'Check out this program!') || programUrl;
   }
 }

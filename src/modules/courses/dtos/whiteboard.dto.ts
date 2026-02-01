@@ -4,7 +4,7 @@
  */
 
 export interface CreateWhiteboardDto {
-  courseId?: string;
+  programId?: string;
   liveStreamId?: string;
   title: string;
   description?: string;
@@ -24,7 +24,7 @@ export interface UpdateWhiteboardDto {
 
 export interface WhiteboardResponseDto {
   id: string;
-  courseId?: string;
+  programId?: string;
   liveStreamId?: string;
   title: string;
   description?: string;

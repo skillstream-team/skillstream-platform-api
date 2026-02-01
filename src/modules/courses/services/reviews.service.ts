@@ -2,7 +2,7 @@ import { prisma } from '../../../utils/prisma';
 import { deleteCache } from '../../../utils/cache';
 
 export interface CreateReviewDto {
-  courseId: string;
+  programId: string;
   studentId: string;
   rating: number; // 1-5
   title?: string;
@@ -11,8 +11,8 @@ export interface CreateReviewDto {
 
 export interface ReviewResponseDto {
   id: string;
-  courseId: string;
-  course: {
+  programId: string;
+  program: {
     id: string;
     title: string;
   };
@@ -42,7 +42,7 @@ export class ReviewsService {
     // Check if student is enrolled
     const enrollment = await prisma.enrollment.findFirst({
       where: {
-        programId: data.courseId,
+        programId: data.programId,
         studentId: data.studentId,
       },
     });
@@ -54,7 +54,7 @@ export class ReviewsService {
     // Check if review already exists
     const existing = await prisma.programReview.findFirst({
       where: {
-        programId: data.courseId,
+        programId: data.programId,
         studentId: data.studentId,
       },
     });
@@ -70,7 +70,7 @@ export class ReviewsService {
 
     const review = await prisma.programReview.create({
       data: {
-        programId: data.courseId,
+        programId: data.programId,
         studentId: data.studentId,
         rating: data.rating,
         title: data.title,
@@ -96,16 +96,16 @@ export class ReviewsService {
     });
 
     // Invalidate course cache
-    await deleteCache(`program:${data.courseId}`);
+    await deleteCache(`program:${data.programId}`);
 
     return this.mapToDto(review);
   }
 
   /**
-   * Get course reviews
+   * Get program reviews
    */
-  async getCourseReviews(
-    courseId: string,
+  async getProgramReviews(
+    programId: string,
     page: number = 1,
     limit: number = 20,
     minRating?: number
@@ -135,7 +135,7 @@ export class ReviewsService {
       prisma.programReview.findMany({
         where: {
           ...where,
-          programId: courseId,
+          programId,
         },
         skip,
         take,
@@ -162,11 +162,11 @@ export class ReviewsService {
       prisma.programReview.count({ 
         where: { 
           ...where, 
-          programId: courseId,
+          programId,
         } 
       }),
       prisma.programReview.findMany({
-        where: { programId: courseId, isPublished: true },
+        where: { programId, isPublished: true },
         select: { rating: true },
       }),
     ]);
@@ -405,8 +405,8 @@ export class ReviewsService {
   private mapToDto(review: any): ReviewResponseDto {
     return {
       id: review.id,
-      courseId: review.programId,
-      course: review.program,
+      programId: review.programId,
+      program: review.program,
       studentId: review.studentId,
       student: review.student,
       rating: review.rating,

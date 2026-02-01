@@ -29,7 +29,7 @@ const router = Router();
  */
 router.get('/', requireAuth, async (req, res) => {
   try {
-    const { scope = 'global', collectionId } = req.query;
+    const { scope = 'global', programId: programIdQuery } = req.query;
     const userId = (req as any).user?.id;
 
     const where: any = {
@@ -46,11 +46,11 @@ router.get('/', requireAuth, async (req, res) => {
 
     if (scope === 'global') {
       where.scope = 'global';
-    } else if (scope === 'course' && collectionId) {
+    } else if (scope === 'course' && programIdQuery) {
       where.scope = 'course';
-      where.programId = collectionId;
+      where.programId = programIdQuery;
     } else if (scope === 'user' && userId) {
-      const programIds = await getUserCollectionIds(userId);
+      const programIds = await getUserProgramIds(userId);
       where.AND.push({
         OR: [
           { scope: 'global' },
@@ -112,7 +112,7 @@ router.get('/users/:userId/announcements', requireAuth, async (req, res) => {
     const { userId } = req.params;
 
     // Get user's enrolled collection IDs
-    const collectionIds = await getUserCollectionIds(userId);
+    const programIds = await getUserProgramIds(userId);
 
     const page = parseInt(req.query.page as string) || 1;
     const limit = Math.min(parseInt(req.query.limit as string) || 20, 100);
@@ -125,7 +125,7 @@ router.get('/users/:userId/announcements', requireAuth, async (req, res) => {
             OR: [
               { scope: 'global' },
               { scope: 'user', targetUserId: userId },
-              { scope: 'course', programId: { in: collectionIds } }
+              { scope: 'course', programId: { in: programIds } }
             ]
           },
           {
@@ -175,21 +175,21 @@ router.get('/users/:userId/announcements', requireAuth, async (req, res) => {
 
 /**
  * @swagger
- * /api/collections/{collectionId}/announcements:
+ * /api/programs/{programId}/announcements:
  *   get:
- *     summary: Get announcements for a specific collection
+ *     summary: Get announcements for a program
  *     tags: [Announcements]
  */
-router.get('/collections/:collectionId/announcements', requireAuth, async (req, res) => {
+router.get('/programs/:programId/announcements', requireAuth, async (req: any, res: any) => {
   try {
-    const { collectionId } = req.params;
+    const programId = req.params.programId;
 
     const page = parseInt(req.query.page as string) || 1;
     const limit = Math.min(parseInt(req.query.limit as string) || 20, 100);
     const skip = (page - 1) * limit;
 
     const where = {
-        programId: collectionId,
+        programId,
         isActive: true,
         OR: [
           { expiresAt: null },
@@ -228,12 +228,12 @@ router.get('/collections/:collectionId/announcements', requireAuth, async (req, 
       }
     });
   } catch (error) {
-    logger.error('Error fetching collection announcements', error);
-    res.status(500).json({ error: 'Failed to fetch collection announcements' });
+    logger.error('Error fetching program announcements', error);
+    res.status(500).json({ error: 'Failed to fetch program announcements' });
   }
 });
 
-async function getUserCollectionIds(userId: string): Promise<string[]> {
+async function getUserProgramIds(userId: string): Promise<string[]> {
   const enrollments = await prisma.enrollment.findMany({
     where: { studentId: userId },
     select: { programId: true }

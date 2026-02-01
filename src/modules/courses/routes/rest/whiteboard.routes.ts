@@ -82,15 +82,15 @@ router.get('/:whiteboardId',
  *     summary: Get whiteboards for a course
  *     tags: [Whiteboards]
  */
-router.get('/courses/:courseId',
+router.get('/programs/:programId',
   requireAuth,
-  validate({ params: z.object({ courseId: z.string().min(1) }) }),
+  validate({ params: z.object({ programId: z.string().min(1) }) }),
   async (req, res) => {
     try {
       const page = parseInt(req.query.page as string) || 1;
       const limit = parseInt(req.query.limit as string) || 20;
       
-      const result = await whiteboardService.getCollectionWhiteboards(req.params.courseId, page, limit);
+      const result = await whiteboardService.getProgramWhiteboards(req.params.programId, page, limit);
       res.json({
         success: true,
         ...result

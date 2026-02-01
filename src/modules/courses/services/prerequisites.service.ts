@@ -2,16 +2,15 @@ import { prisma } from '../../../utils/prisma';
 import { deleteCache } from '../../../utils/cache';
 
 export interface CreatePrerequisiteDto {
-  courseId: string; // API compatibility - maps to collectionId
-  collectionId: string;
+  programId: string;
   prerequisiteId: string;
   isRequired?: boolean;
 }
 
 export interface PrerequisiteResponseDto {
   id: string;
-  courseId: string;
-  course: {
+  programId: string;
+  program: {
     id: string;
     title: string;
   };
@@ -32,7 +31,7 @@ export class PrerequisitesService {
    */
   async addPrerequisite(data: CreatePrerequisiteDto): Promise<PrerequisiteResponseDto> {
     // Prevent self-reference
-    if (data.courseId === data.prerequisiteId) {
+    if (data.programId === data.prerequisiteId) {
       throw new Error('A course cannot be a prerequisite of itself');
     }
 
@@ -46,17 +45,16 @@ export class PrerequisitesService {
     }
 
     // Check if program exists
-    const course = await prisma.program.findUnique({
-      where: { id: data.collectionId || data.courseId },
+    const program = await prisma.program.findUnique({
+      where: { id: data.programId },
     });
 
-    if (!course) {
+    if (!program) {
       throw new Error('Program not found');
     }
 
-    // Check for circular dependencies
     const wouldCreateCycle = await this.wouldCreateCircularDependency(
-      data.courseId,
+      data.programId,
       data.prerequisiteId
     );
 
@@ -68,7 +66,7 @@ export class PrerequisitesService {
     const existing = await prisma.programPrerequisite.findUnique({
       where: {
         programId_prerequisiteId: {
-          programId: data.collectionId || data.courseId,
+          programId: data.programId,
           prerequisiteId: data.prerequisiteId,
         },
       },
@@ -80,7 +78,7 @@ export class PrerequisitesService {
 
     const prerequisite = await prisma.programPrerequisite.create({
       data: {
-        programId: data.collectionId || data.courseId,
+        programId: data.programId,
         prerequisiteId: data.prerequisiteId,
         isRequired: data.isRequired ?? true,
       },
@@ -102,7 +100,7 @@ export class PrerequisitesService {
     });
 
     // Invalidate cache
-    await deleteCache(`program:${data.collectionId || data.courseId}`);
+    await deleteCache(`program:${data.programId}`);
     await deleteCache(`program:${data.prerequisiteId}`);
 
     return this.mapToDto(prerequisite);
@@ -111,11 +109,11 @@ export class PrerequisitesService {
   /**
    * Remove a prerequisite from a course
    */
-  async removePrerequisite(courseId: string, prerequisiteId: string): Promise<void> {
+  async removePrerequisite(programId: string, prerequisiteId: string): Promise<void> {
     const prerequisite = await prisma.programPrerequisite.findUnique({
       where: {
         programId_prerequisiteId: {
-          programId: courseId,
+          programId,
           prerequisiteId,
         },
       },
@@ -132,15 +130,15 @@ export class PrerequisitesService {
     });
 
     // Invalidate cache
-    await deleteCache(`program:${courseId}`);
+    await deleteCache(`program:${programId}`);
   }
 
   /**
    * Get all prerequisites for a course
    */
-  async getCoursePrerequisites(courseId: string): Promise<PrerequisiteResponseDto[]> {
+  async getProgramPrerequisites(programId: string): Promise<PrerequisiteResponseDto[]> {
     const prerequisites = await prisma.programPrerequisite.findMany({
-      where: { programId: courseId },
+      where: { programId },
       include: {
         program: {
           select: {
@@ -165,9 +163,9 @@ export class PrerequisitesService {
   /**
    * Get all courses that require this course as a prerequisite
    */
-  async getDependentCourses(courseId: string): Promise<PrerequisiteResponseDto[]> {
+  async getDependentPrograms(programId: string): Promise<PrerequisiteResponseDto[]> {
     const dependents = await prisma.programPrerequisite.findMany({
-      where: { prerequisiteId: courseId },
+      where: { prerequisiteId: programId },
       include: {
         program: {
           select: {
@@ -192,7 +190,7 @@ export class PrerequisitesService {
   /**
    * Check if a student has completed all required prerequisites
    */
-  async checkPrerequisites(studentId: string, courseId: string): Promise<{
+  async checkPrerequisites(studentId: string, programId: string): Promise<{
     canEnroll: boolean;
     missingPrerequisites: Array<{
       id: string;
@@ -202,7 +200,7 @@ export class PrerequisitesService {
   }> {
     const prerequisites = await prisma.programPrerequisite.findMany({
       where: {
-        programId: courseId,
+        programId,
         isRequired: true,
       },
       include: {
@@ -253,7 +251,7 @@ export class PrerequisitesService {
    * Check if adding a prerequisite would create a circular dependency
    */
   private async wouldCreateCircularDependency(
-    courseId: string,
+    programId: string,
     prerequisiteId: string
   ): Promise<boolean> {
     // If the prerequisite course has the current course as a prerequisite (direct or indirect),
@@ -264,7 +262,7 @@ export class PrerequisitesService {
     while (queue.length > 0) {
       const currentId = queue.shift()!;
 
-      if (currentId === courseId) {
+      if (currentId === programId) {
         return true; // Cycle detected
       }
 
@@ -293,8 +291,8 @@ export class PrerequisitesService {
   private mapToDto(prerequisite: any): PrerequisiteResponseDto {
     return {
       id: prerequisite.id,
-      courseId: prerequisite.programId,
-      course: {
+      programId: prerequisite.programId,
+      program: {
         id: prerequisite.program.id,
         title: prerequisite.program.title,
       },

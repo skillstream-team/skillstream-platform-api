@@ -296,66 +296,6 @@ router.get('/programs/:programId/progress', requireAuth, requireSubscription, as
   }
 });
 
-// Backward compatibility route
-router.get('/collections/:collectionId/progress', requireAuth, requireSubscription, async (req, res) => {
-  try {
-    const { collectionId } = req.params;
-    const userId = (req as any).user?.id;
-
-    if (!userId) {
-      return res.status(401).json({ error: 'User not authenticated' });
-    }
-
-    const page = parseInt(req.query.page as string) || 1;
-    const limit = Math.min(parseInt(req.query.limit as string) || 20, 100);
-    const skip = (page - 1) * limit;
-
-    const [progress, total] = await Promise.all([
-      prisma.progress.findMany({
-      where: {
-        studentId: userId,
-        programId: collectionId
-      },
-        skip,
-        take: limit,
-        select: {
-          id: true,
-          status: true,
-          progress: true,
-          score: true,
-          timeSpent: true,
-          lastAccessed: true,
-          completedAt: true,
-          program: { select: { id: true, title: true } }
-        },
-        orderBy: { lastAccessed: 'desc' }
-      }),
-      prisma.progress.count({
-        where: {
-          studentId: userId,
-          programId: collectionId
-      }
-      })
-    ]);
-    
-    res.json({
-      success: true,
-      data: progress || [],
-      pagination: {
-        page,
-        limit,
-        total,
-        totalPages: Math.ceil(total / limit),
-        hasNext: page * limit < total,
-        hasPrev: page > 1,
-      }
-    });
-  } catch (error) {
-    console.error('Error fetching course progress:', error);
-    res.status(500).json({ error: 'Failed to fetch course progress' });
-  }
-});
-
 /**
  * @swagger
  * /api/progress/sync-milestone:
@@ -406,12 +346,10 @@ router.post('/sync-milestone', requireAuth, async (req, res) => {
       return res.status(401).json({ error: 'User not authenticated' });
     }
 
-    const { collectionId, programId, lessonId, moduleId, videoId, progressPercent, currentTime } = req.body;
-    const finalProgramId = programId || collectionId; // Support both for backward compatibility
-    const finalModuleId = moduleId || lessonId; // Support both for backward compatibility
+    const { programId, moduleId, videoId, progressPercent, currentTime } = req.body;
 
-    if (!finalProgramId || !finalModuleId || progressPercent === undefined) {
-      return res.status(400).json({ error: 'Missing required fields: programId (or collectionId), moduleId (or lessonId), progressPercent' });
+    if (!programId || !moduleId || progressPercent === undefined) {
+      return res.status(400).json({ error: 'Missing required fields: programId, moduleId, progressPercent' });
     }
 
     // Determine status based on progress
@@ -429,9 +367,9 @@ router.post('/sync-milestone', requireAuth, async (req, res) => {
       where: {
         studentId_programId_type_itemId: {
           studentId: userId,
-          programId: finalProgramId,
+          programId: programId,
           type: 'video',
-          itemId: finalModuleId,
+          itemId: moduleId,
         },
       },
       update: {
@@ -448,9 +386,9 @@ router.post('/sync-milestone', requireAuth, async (req, res) => {
       },
       create: {
         studentId: userId,
-        programId: finalProgramId,
+        programId: programId,
         type: 'video',
-        itemId: finalModuleId,
+        itemId: moduleId,
         progress: Math.min(progressPercent, 100),
         status,
         lastAccessed: new Date(),
@@ -466,7 +404,7 @@ router.post('/sync-milestone', requireAuth, async (req, res) => {
           where: {
             studentId_programId_type_itemId: {
               studentId: userId,
-              programId: finalProgramId,
+              programId: programId,
               type: 'video',
               itemId: videoId,
             },
@@ -479,7 +417,7 @@ router.post('/sync-milestone', requireAuth, async (req, res) => {
           },
           create: {
             studentId: userId,
-            programId: finalProgramId,
+            programId: programId,
             type: 'video',
             itemId: videoId,
             progress: Math.min(progressPercent, 100),

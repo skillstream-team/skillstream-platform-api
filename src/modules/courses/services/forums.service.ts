@@ -2,7 +2,7 @@ import { prisma } from '../../../utils/prisma';
 import { deleteCache } from '../../../utils/cache';
 
 export interface CreateForumPostDto {
-  collectionId: string;
+  programId: string;
   authorId: string;
   title: string;
   content: string;
@@ -17,8 +17,8 @@ export interface CreateForumReplyDto {
 
 export interface ForumPostResponseDto {
   id: string;
-  collectionId: string;
-  collection: {
+  programId: string;
+  program: {
     id: string;
     title: string;
   };
@@ -67,7 +67,7 @@ export class ForumsService {
   async createPost(data: CreateForumPostDto): Promise<ForumPostResponseDto> {
     const post = await prisma.forumPost.create({
       data: {
-        programId: data.collectionId,
+        programId: data.programId,
         authorId: data.authorId,
         title: data.title,
         content: data.content,
@@ -89,16 +89,16 @@ export class ForumsService {
       },
     });
 
-    await deleteCache(`collection:${data.collectionId}`);
+    await deleteCache(`program:${data.programId}`);
 
     return this.mapPostToDto(post);
   }
 
   /**
-   * Get forum posts for a course
+   * Get forum posts for a program
    */
-  async getCoursePosts(
-    collectionId: string,
+  async getProgramPosts(
+    programId: string,
     page: number = 1,
     limit: number = 20,
     search?: string
@@ -114,7 +114,7 @@ export class ForumsService {
     const skip = (page - 1) * limit;
     const take = Math.min(limit, 100);
 
-    const where: any = { collectionId };
+    const where: any = { programId };
     if (search) {
       where.OR = [
         { title: { contains: search, mode: 'insensitive' } },
@@ -478,8 +478,8 @@ export class ForumsService {
   private mapPostToDto(post: any): ForumPostResponseDto {
     return {
       id: post.id,
-      collectionId: post.programId, // Backward compatibility
-      collection: post.program, // Backward compatibility
+      programId: post.programId,
+      program: post.program,
       authorId: post.authorId,
       author: post.author,
       title: post.title,

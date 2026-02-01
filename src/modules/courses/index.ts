@@ -54,28 +54,13 @@ export function registerCoursesModule(app: express.Application) {
   app.use('/api/programs/wishlist', wishlistRoutes);
   
   // Register main programs router AFTER specific routes
-  // This ensures POST /api/programs matches before parameterized routes
   app.use('/api/programs', restCoursesRoutes);
-  
-  // Alias /api/courses to /api/programs for backward compatibility
-  app.use('/api/courses', restCoursesRoutes);
-  
-  // Register other specific program sub-routes AFTER the main router
-  // These have parameterized routes like /:programId/tags which won't conflict
   app.use('/api/programs', prerequisitesRoutes);
-  app.use('/api/programs', tagsRoutes); // Program-specific tag routes
+  app.use('/api/programs', tagsRoutes);
   app.use('/api/programs', instructorQARoutes);
   app.use('/api/programs', shareRoutes);
   app.use('/api/programs', comparisonRoutes);
   app.use('/api/programs', courseImportRoutes);
-  
-  // Alias /api/courses for all sub-routes too
-  app.use('/api/courses', prerequisitesRoutes);
-  app.use('/api/courses', tagsRoutes);
-  app.use('/api/courses', instructorQARoutes);
-  app.use('/api/courses', shareRoutes);
-  app.use('/api/courses', comparisonRoutes);
-  app.use('/api/courses', courseImportRoutes);
   
   app.use('/api', progressRoutes);
   app.use('/api/enrollments', enrollmentsRoutes);

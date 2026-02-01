@@ -2,7 +2,7 @@ import { prisma } from '../../../utils/prisma';
 import { deleteCache } from '../../../utils/cache';
 
 export interface CreateQuestionDto {
-  collectionId: string;
+  programId: string;
   studentId: string;
   question: string;
 }
@@ -15,8 +15,8 @@ export interface CreateAnswerDto {
 
 export interface QAResponseDto {
   id: string;
-  collectionId: string;
-  collection: {
+  programId: string;
+  program: {
     id: string;
     title: string;
   };
@@ -51,18 +51,18 @@ export class InstructorQAService {
     // Verify student is enrolled
     const enrollment = await prisma.enrollment.findFirst({
       where: {
-        programId: data.collectionId,
+        programId: data.programId,
         studentId: data.studentId,
       },
     });
 
     if (!enrollment) {
-      throw new Error('You must be enrolled in the collection to ask questions');
+      throw new Error('You must be enrolled in the program to ask questions');
     }
 
     const qa = await prisma.instructorQA.create({
       data: {
-        programId: data.collectionId,
+        programId: data.programId,
         studentId: data.studentId,
         question: data.question,
       },
@@ -191,8 +191,8 @@ export class InstructorQAService {
   /**
    * Get questions for a collection
    */
-  async getCourseQuestions(
-    collectionId: string,
+  async getProgramQuestions(
+    programId: string,
     page: number = 1,
     limit: number = 20,
     answeredOnly?: boolean
@@ -208,7 +208,7 @@ export class InstructorQAService {
     const skip = (page - 1) * limit;
     const take = Math.min(limit, 100);
 
-    const where: any = { programId: collectionId };
+    const where: any = { programId };
     if (answeredOnly !== undefined) {
       where.isAnswered = answeredOnly;
     }
@@ -331,8 +331,8 @@ export class InstructorQAService {
   private mapToDto(qa: any): QAResponseDto {
     return {
       id: qa.id,
-      collectionId: qa.programId, // Backward compatibility
-      collection: {
+      programId: qa.programId,
+      program: {
         id: qa.program.id,
         title: qa.program.title,
       },

@@ -518,7 +518,11 @@ router.get('/modules', requireAuth, async (req, res) => {
       })
     );
     
-    logger.info(`Found ${regularModules.length} regular modules`);
+    if (regularModules.length > 0) {
+      logger.info(`Found ${regularModules.length} regular modules`);
+    } else {
+      logger.debug('Found 0 regular modules');
+    }
 
     const regularModulesWithStudentPrice = regularModules.map((m: any) => ({
       ...m,

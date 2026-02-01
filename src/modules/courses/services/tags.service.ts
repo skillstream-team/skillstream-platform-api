@@ -5,8 +5,7 @@ export class TagsService {
   /**
    * Add tags to a course
    */
-  async addTagsToCourse(courseId: string, tags: string[]): Promise<void> {
-    // Remove duplicates and normalize
+  async addTagsToProgram(programId: string, tags: string[]): Promise<void> {
     const uniqueTags = [...new Set(tags.map((t) => t.toLowerCase().trim()))];
 
     await prisma.$transaction(
@@ -14,44 +13,42 @@ export class TagsService {
         prisma.programTag.upsert({
           where: {
             programId_name: {
-              programId: courseId,
+              programId,
               name: tag,
             },
           },
           update: {},
           create: {
-            programId: courseId,
+            programId,
             name: tag,
           },
         })
       )
     );
 
-    // Invalidate cache
-    await deleteCache(`course:${courseId}`);
+    await deleteCache(`program:${programId}`);
   }
 
   /**
-   * Remove tags from a course
+   * Remove tags from a program
    */
-  async removeTagsFromCourse(courseId: string, tags: string[]): Promise<void> {
+  async removeTagsFromProgram(programId: string, tags: string[]): Promise<void> {
     await prisma.programTag.deleteMany({
       where: {
-        programId: courseId,
+        programId,
         name: { in: tags.map((t) => t.toLowerCase().trim()) },
       },
     });
 
-    // Invalidate cache
-    await deleteCache(`course:${courseId}`);
+    await deleteCache(`program:${programId}`);
   }
 
   /**
-   * Get all tags for a course
+   * Get all tags for a program
    */
-  async getCourseTags(courseId: string): Promise<string[]> {
+  async getProgramTags(programId: string): Promise<string[]> {
     const tags = await prisma.programTag.findMany({
-      where: { programId: courseId },
+      where: { programId },
       select: { name: true },
       orderBy: { name: 'asc' },
     });

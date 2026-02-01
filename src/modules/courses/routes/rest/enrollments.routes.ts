@@ -63,19 +63,17 @@ router.get('/', requireAuth, async (req, res) => {
     const user = (req as any).user;
     const page = parseInt(req.query.page as string) || 1;
     const limit = Math.min(parseInt(req.query.limit as string) || 20, 100);
-    const collectionId = req.query.collectionId as string | undefined;
+    const programIdFilter = (req.query.programId ?? req.query.collectionId) as string | undefined;
     const studentIdParam = req.query.studentId as string | undefined;
 
-    // Students can only see their own enrollments unless they're admin/teacher
     let studentId = user.id;
     if (studentIdParam && (user.role === 'ADMIN' || user.role === 'TEACHER')) {
       studentId = studentIdParam;
     }
 
-    // Build where clause
     const where: any = { studentId };
-    if (collectionId) {
-      where.programId = collectionId;
+    if (programIdFilter) {
+      where.programId = programIdFilter;
     }
 
     const skip = (page - 1) * limit;
@@ -128,14 +126,13 @@ router.get('/', requireAuth, async (req, res) => {
       prisma.enrollment.count({ where }),
     ]);
 
-    // Transform to match frontend expected format
     const formattedEnrollments = enrollments.map((enrollment) => ({
       id: enrollment.id,
-      collectionId: enrollment.programId, // Backward compatibility
+      programId: enrollment.programId,
       studentId: enrollment.studentId,
       paymentId: enrollment.paymentId,
       createdAt: enrollment.createdAt.toISOString(),
-      collection: enrollment.program, // Backward compatibility
+      program: enrollment.program,
       student: enrollment.student,
       payment: enrollment.payment,
     }));
@@ -244,11 +241,11 @@ router.get('/:id', requireAuth, async (req, res) => {
 
     const formattedEnrollment = {
       id: enrollment.id,
-      collectionId: enrollment.programId, // Backward compatibility
+      programId: enrollment.programId,
       studentId: enrollment.studentId,
       paymentId: enrollment.paymentId,
       createdAt: enrollment.createdAt.toISOString(),
-      collection: enrollment.program, // Backward compatibility
+      program: enrollment.program,
       student: enrollment.student,
       payment: enrollment.payment,
     };
@@ -297,15 +294,15 @@ router.get('/:id', requireAuth, async (req, res) => {
 router.post('/', requireAuth, requireSubscription, async (req, res) => {
   try {
     const user = (req as any).user;
-    const { collectionId, paymentId } = req.body;
+    const programId = req.body.programId ?? req.body.collectionId;
+    const paymentId = req.body.paymentId;
 
-    if (!collectionId) {
-      return res.status(400).json({ error: 'collectionId is required' });
+    if (!programId) {
+      return res.status(400).json({ error: 'programId or collectionId is required' });
     }
 
-    // Get collection to get price
     const program = await prisma.program.findUnique({
-      where: { id: collectionId },
+      where: { id: programId },
       select: { id: true, title: true, price: true },
     });
 
@@ -316,18 +313,17 @@ router.post('/', requireAuth, requireSubscription, async (req, res) => {
     // Check if already enrolled
     const existingEnrollment = await prisma.enrollment.findFirst({
       where: {
-        programId: collectionId,
+        programId,
         studentId: user.id,
       },
     });
 
     if (existingEnrollment) {
-      return res.status(400).json({ error: 'You are already enrolled in this collection' });
+      return res.status(400).json({ error: 'You are already enrolled in this program' });
     }
 
-    // Create enrollment using the service
     const enrollmentData = {
-      programId: collectionId,
+      programId,
       studentId: user.id,
       amount: program.price || 0,
       currency: 'USD',
@@ -340,11 +336,11 @@ router.post('/', requireAuth, requireSubscription, async (req, res) => {
     // Format response
     const formattedEnrollment = {
       id: enrollment.id,
-      collectionId: enrollment.programId, // Backward compatibility
+      programId: enrollment.programId,
       studentId: enrollment.studentId,
       paymentId: enrollment.paymentId,
       createdAt: enrollment.createdAt.toISOString(),
-      collection: enrollment.program, // Backward compatibility
+      program: enrollment.program,
       student: enrollment.student,
       payment: enrollment.payment,
     };

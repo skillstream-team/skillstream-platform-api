@@ -5,7 +5,7 @@ import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import { generateToken, JWTPayload } from '../../../utils/jwt';
 import { emailService } from './email.service';
-import { getCache, setCache, deleteCachePattern, cacheKeys, CACHE_TTL } from '../../../utils/cache';
+import { getCache, setCache, deleteCache, deleteCachePattern, cacheKeys, CACHE_TTL } from '../../../utils/cache';
 import { ReferralService } from '../../courses/services/referral.service';
 import { getAuth } from '../../../utils/firebase';
 
@@ -775,6 +775,24 @@ export class UsersService {
     }
 
     return user;
+  }
+
+  /**
+   * Update the current user's profile (firstName, lastName, avatar). Invalidates profile cache.
+   */
+  async updateMyProfile(userId: string, data: { firstName?: string; lastName?: string; avatar?: string }) {
+    const updateData: { firstName?: string; lastName?: string; avatar?: string } = {};
+    if (data.firstName !== undefined) updateData.firstName = data.firstName || null;
+    if (data.lastName !== undefined) updateData.lastName = data.lastName || null;
+    if (data.avatar !== undefined) updateData.avatar = data.avatar || null;
+    if (Object.keys(updateData).length === 0) return this.getUserProfile(userId);
+    const updated = await prisma.user.update({
+      where: { id: userId },
+      data: updateData,
+      select: { id: true, username: true, email: true, role: true, firstName: true, lastName: true, avatar: true, createdAt: true, updatedAt: true },
+    });
+    await deleteCache(cacheKeys.userProfile(userId));
+    return updated;
   }
 
   /**

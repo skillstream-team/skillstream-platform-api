@@ -112,6 +112,7 @@ router.get('/admin/users/:id',
     }
 
     try {
+      res.set('Cache-Control', 'private, no-store');
       const user = await adminService.getUserById(req.params.id);
       res.json({
         success: true,

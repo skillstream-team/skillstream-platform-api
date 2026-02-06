@@ -102,6 +102,7 @@ router.put('/users/:userId/settings/billing',
  */
 router.get('/users/:userId/settings', requireAuth, async (req, res) => {
   try {
+    res.set('Cache-Control', 'private, no-store');
     const { userId } = req.params;
     const currentUserId = (req as any).user?.id;
 

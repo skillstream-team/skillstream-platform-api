@@ -11,7 +11,7 @@ class ReviewsService {
         // Check if student is enrolled
         const enrollment = await prisma_1.prisma.enrollment.findFirst({
             where: {
-                programId: data.courseId,
+                programId: data.programId,
                 studentId: data.studentId,
             },
         });
@@ -21,7 +21,7 @@ class ReviewsService {
         // Check if review already exists
         const existing = await prisma_1.prisma.programReview.findFirst({
             where: {
-                programId: data.courseId,
+                programId: data.programId,
                 studentId: data.studentId,
             },
         });
@@ -34,7 +34,7 @@ class ReviewsService {
         }
         const review = await prisma_1.prisma.programReview.create({
             data: {
-                programId: data.courseId,
+                programId: data.programId,
                 studentId: data.studentId,
                 rating: data.rating,
                 title: data.title,
@@ -59,13 +59,13 @@ class ReviewsService {
             },
         });
         // Invalidate course cache
-        await (0, cache_1.deleteCache)(`program:${data.courseId}`);
+        await (0, cache_1.deleteCache)(`program:${data.programId}`);
         return this.mapToDto(review);
     }
     /**
-     * Get course reviews
+     * Get program reviews
      */
-    async getCourseReviews(courseId, page = 1, limit = 20, minRating) {
+    async getProgramReviews(programId, page = 1, limit = 20, minRating) {
         const skip = (page - 1) * limit;
         const take = Math.min(limit, 100);
         const where = {
@@ -78,7 +78,7 @@ class ReviewsService {
             prisma_1.prisma.programReview.findMany({
                 where: {
                     ...where,
-                    programId: courseId,
+                    programId,
                 },
                 skip,
                 take,
@@ -105,11 +105,11 @@ class ReviewsService {
             prisma_1.prisma.programReview.count({
                 where: {
                     ...where,
-                    programId: courseId,
+                    programId,
                 }
             }),
             prisma_1.prisma.programReview.findMany({
-                where: { programId: courseId, isPublished: true },
+                where: { programId, isPublished: true },
                 select: { rating: true },
             }),
         ]);
@@ -313,8 +313,8 @@ class ReviewsService {
     mapToDto(review) {
         return {
             id: review.id,
-            courseId: review.programId,
-            course: review.program,
+            programId: review.programId,
+            program: review.program,
             studentId: review.studentId,
             student: review.student,
             rating: review.rating,

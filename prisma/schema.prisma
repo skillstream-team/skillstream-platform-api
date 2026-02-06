@@ -2064,8 +2064,9 @@ model PushSubscription {
   id        String   @id @default(auto()) @map("_id") @db.ObjectId
   userId    String   @unique @db.ObjectId
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  endpoint  String
-  keys      Json     // { p256dh: string, auth: string }
+  endpoint  String?  // VAPID endpoint (null when using FCM only)
+  keys      Json?    // { p256dh: string, auth: string } for VAPID
+  fcmToken  String?  // Firebase Cloud Messaging token (web or mobile)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }

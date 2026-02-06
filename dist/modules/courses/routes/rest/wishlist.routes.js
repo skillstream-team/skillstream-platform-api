@@ -69,7 +69,7 @@ router.get('/', auth_1.requireAuth, async (req, res) => {
  *       401:
  *         description: Unauthorized
  */
-router.post('/:courseId', auth_1.requireAuth, async (req, res) => {
+router.post('/:programId', auth_1.requireAuth, async (req, res) => {
     try {
         const userId = req.user.id;
         const { courseId } = req.params;
@@ -112,7 +112,7 @@ router.post('/:courseId', auth_1.requireAuth, async (req, res) => {
  *       401:
  *         description: Unauthorized
  */
-router.delete('/:courseId', auth_1.requireAuth, async (req, res) => {
+router.delete('/:programId', auth_1.requireAuth, async (req, res) => {
     try {
         const userId = req.user.id;
         const { courseId } = req.params;
@@ -157,7 +157,7 @@ router.delete('/:courseId', auth_1.requireAuth, async (req, res) => {
  *       401:
  *         description: Unauthorized
  */
-router.get('/:courseId/check', auth_1.requireAuth, async (req, res) => {
+router.get('/:programId/check', auth_1.requireAuth, async (req, res) => {
     try {
         const userId = req.user.id;
         const { courseId } = req.params;

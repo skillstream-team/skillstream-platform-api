@@ -221,6 +221,74 @@ router.post('/modules', requireAuth, requireRole('TEACHER'), async (req, res) =>
 
 /**
  * @swagger
+ * /api/modules/me:
+ *   get:
+ *     summary: Get modules owned by the current teacher (for dashboard)
+ *     tags: [Modules]
+ */
+router.get('/modules/me', requireAuth, requireRole('TEACHER'), async (req, res) => {
+  try {
+    res.set('Cache-Control', 'private, no-store');
+    const teacherId = (req as any).user?.id;
+    if (!teacherId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const [regularModulesRaw, quickModules] = await Promise.all([
+      prisma.module.findMany({
+        where: { teacherId },
+        orderBy: { createdAt: 'desc' },
+      }),
+      prisma.quickModule.findMany({
+        where: { teacherId },
+        include: {
+          teacher: { select: { id: true, username: true, email: true } },
+        },
+        orderBy: { scheduledAt: 'asc' },
+      }),
+    ]);
+
+    const regularModules = await Promise.all(
+      regularModulesRaw.map(async (module) => {
+        if (module.teacherId) {
+          try {
+            const teacher = await prisma.user.findUnique({
+              where: { id: module.teacherId },
+              select: { id: true, username: true, email: true, firstName: true, lastName: true },
+            });
+            return { ...module, teacher: teacher || null };
+          } catch {
+            return { ...module, teacher: null };
+          }
+        }
+        return { ...module, teacher: null };
+      })
+    );
+
+    const regularModulesWithStudentPrice = regularModules.map((m: any) => ({
+      ...m,
+      studentPrice: getStudentPrice(m.price ?? 0),
+    }));
+    const quickModulesWithStudentPrice = quickModules.map((m: any) => ({
+      ...m,
+      studentPrice: getStudentPrice(m.price ?? 0),
+    }));
+
+    res.json({
+      success: true,
+      data: {
+        quickModules: quickModulesWithStudentPrice,
+        regularModules: regularModulesWithStudentPrice,
+      },
+    });
+  } catch (error) {
+    logger.error('Error fetching teacher modules', error);
+    res.status(500).json({ error: 'Failed to fetch modules' });
+  }
+});
+
+/**
+ * @swagger
  * /api/modules/{id}:
  *   get:
  *     summary: Get a single module by ID
@@ -334,6 +402,9 @@ router.get('/modules/:id', requireAuth, async (req, res) => {
  */
 router.get('/modules', requireAuth, async (req, res) => {
   try {
+    // Prevent caching so different teachers never see each other's data (e.g. after login)
+    res.set('Cache-Control', 'private, no-store');
+
     const userId = (req as any).user?.id;
     const userRole = (req as any).user?.role;
     const { role, status } = req.query;
@@ -458,9 +529,9 @@ router.get('/modules', requireAuth, async (req, res) => {
         delete (whereRegular as any).enrolledModuleIds;
         // For enrolled modules, filter by ID only (regular Module doesn't have status/scheduledAt)
         whereRegular.id = { in: enrolledModuleIds };
-      } else {
-        // No enrolled modules or not a student - show all modules for browsing
-        // Clear whereRegular to return all modules
+      } else if (effectiveRole !== 'TEACHER') {
+        // No enrolled modules and not a teacher - show all modules for browsing
+        // For TEACHER we keep whereRegular.teacherId so they only see their own modules
         Object.keys(whereRegular).forEach(key => delete whereRegular[key]);
       }
     }

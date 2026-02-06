@@ -76,11 +76,11 @@ router.get('/:whiteboardId', auth_1.requireAuth, (0, validation_1.validate)({ pa
  *     summary: Get whiteboards for a course
  *     tags: [Whiteboards]
  */
-router.get('/courses/:courseId', auth_1.requireAuth, (0, validation_1.validate)({ params: zod_1.z.object({ courseId: zod_1.z.string().min(1) }) }), async (req, res) => {
+router.get('/programs/:programId', auth_1.requireAuth, (0, validation_1.validate)({ params: zod_1.z.object({ programId: zod_1.z.string().min(1) }) }), async (req, res) => {
     try {
         const page = parseInt(req.query.page) || 1;
         const limit = parseInt(req.query.limit) || 20;
-        const result = await whiteboardService.getCollectionWhiteboards(req.params.courseId, page, limit);
+        const result = await whiteboardService.getProgramWhiteboards(req.params.programId, page, limit);
         res.json({
             success: true,
             ...result

@@ -40,7 +40,17 @@ export const verifyFirebaseToken = async (
     try {
       const auth = getAuth();
       const decodedToken = await auth.verifyIdToken(token);
-      
+
+      // Require email verification when enabled (default: true). Skip in dev if explicitly disabled.
+      const requireEmailVerification = process.env.REQUIRE_EMAIL_VERIFICATION !== 'false';
+      const emailVerified = !!(decodedToken as any).email_verified;
+      if (requireEmailVerification && !emailVerified) {
+        return res.status(403).json({
+          error: 'Please verify your email before signing in.',
+          code: 'EMAIL_NOT_VERIFIED',
+        });
+      }
+
       // Find user by firebaseUid (using findFirst since firebaseUid is not @unique in schema)
       const user = await prisma.user.findFirst({
         where: { firebaseUid: decodedToken.uid },

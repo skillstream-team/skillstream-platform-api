@@ -77,25 +77,13 @@ function registerCoursesModule(app) {
     // This prevents /api/programs/:id from matching routes like /api/programs/wishlist
     app.use('/api/programs/wishlist', wishlist_routes_1.default);
     // Register main programs router AFTER specific routes
-    // This ensures POST /api/programs matches before parameterized routes
     app.use('/api/programs', courses_routes_1.default);
-    // Alias /api/courses to /api/programs for backward compatibility
-    app.use('/api/courses', courses_routes_1.default);
-    // Register other specific program sub-routes AFTER the main router
-    // These have parameterized routes like /:programId/tags which won't conflict
     app.use('/api/programs', prerequisites_routes_1.default);
-    app.use('/api/programs', tags_routes_1.default); // Program-specific tag routes
+    app.use('/api/programs', tags_routes_1.default);
     app.use('/api/programs', instructor_qa_routes_1.default);
     app.use('/api/programs', share_routes_1.default);
     app.use('/api/programs', comparison_routes_1.default);
     app.use('/api/programs', course_import_routes_1.default);
-    // Alias /api/courses for all sub-routes too
-    app.use('/api/courses', prerequisites_routes_1.default);
-    app.use('/api/courses', tags_routes_1.default);
-    app.use('/api/courses', instructor_qa_routes_1.default);
-    app.use('/api/courses', share_routes_1.default);
-    app.use('/api/courses', comparison_routes_1.default);
-    app.use('/api/courses', course_import_routes_1.default);
     app.use('/api', progress_routes_1.default);
     app.use('/api/enrollments', enrollments_routes_1.default);
     app.use('/api', announcements_routes_1.default);

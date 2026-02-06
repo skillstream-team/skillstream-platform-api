@@ -75,19 +75,17 @@ router.post('/', auth_1.requireAuth, (0, roles_1.requireRole)('TEACHER'), (0, va
  */
 router.get('/', (0, validation_1.validate)({
     query: zod_1.z.object({
-        courseId: zod_1.z.string().optional(),
-        collectionId: zod_1.z.string().optional(),
+        programId: zod_1.z.string().optional(),
         page: zod_1.z.string().optional().transform(val => val ? parseInt(val) : 1),
         limit: zod_1.z.string().optional().transform(val => val ? parseInt(val) : 20),
         isActive: zod_1.z.string().optional().transform(val => val === 'true'),
     }),
 }), async (req, res) => {
     try {
-        const { courseId, collectionId, page = 1, limit = 20, isActive } = req.query;
-        const targetCollectionId = collectionId || courseId;
+        const { programId: targetProgramId, page = 1, limit = 20, isActive } = req.query;
         const where = {};
-        if (targetCollectionId) {
-            where.programId = targetCollectionId;
+        if (targetProgramId) {
+            where.programId = targetProgramId;
         }
         if (isActive !== undefined) {
             where.isActive = isActive;

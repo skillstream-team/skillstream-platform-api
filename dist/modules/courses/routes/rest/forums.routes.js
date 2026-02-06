@@ -21,15 +21,12 @@ const createPostSchema = zod_1.z.object({
     title: zod_1.z.string().min(1),
     content: zod_1.z.string().min(10),
 });
-router.post('/courses/:courseId/forum/posts', auth_1.requireAuth, subscription_1.requireSubscription, (0, validation_1.validate)({
-    params: zod_1.z.object({ courseId: zod_1.z.string().min(1) }),
-    body: createPostSchema,
-}), async (req, res) => {
+const createForumPostHandler = async (req, res) => {
     try {
-        const { courseId } = req.params;
+        const programId = req.params.programId;
         const authorId = req.user?.id;
         const post = await forumsService.createPost({
-            courseId,
+            programId,
             authorId,
             ...req.body,
         });
@@ -43,7 +40,11 @@ router.post('/courses/:courseId/forum/posts', auth_1.requireAuth, subscription_1
         logger_1.logger.error('Error creating post', error);
         res.status(500).json({ error: error.message || 'Failed to create post' });
     }
-});
+};
+router.post('/programs/:programId/forum/posts', auth_1.requireAuth, subscription_1.requireSubscription, (0, validation_1.validate)({
+    params: zod_1.z.object({ programId: zod_1.z.string().min(1) }),
+    body: createPostSchema,
+}), createForumPostHandler);
 /**
  * @swagger
  * /api/courses/{courseId}/forum/posts:
@@ -51,30 +52,28 @@ router.post('/courses/:courseId/forum/posts', auth_1.requireAuth, subscription_1
  *     summary: Get forum posts for a course
  *     tags: [Forums]
  */
-router.get('/courses/:courseId/forum/posts', (0, validation_1.validate)({
-    params: zod_1.z.object({ courseId: zod_1.z.string().min(1) }),
-    query: zod_1.z.object({
-        page: zod_1.z.string().optional().transform(val => val ? parseInt(val) : 1),
-        limit: zod_1.z.string().optional().transform(val => val ? parseInt(val) : 20),
-        search: zod_1.z.string().optional(),
-    }),
-}), async (req, res) => {
+const getForumPostsHandler = async (req, res) => {
     try {
-        const { courseId } = req.params;
+        const programId = req.params.programId;
         const page = typeof req.query.page === 'number' ? req.query.page : 1;
         const limit = typeof req.query.limit === 'number' ? req.query.limit : 20;
         const search = req.query.search;
-        const result = await forumsService.getCoursePosts(courseId, page, limit, search);
-        res.json({
-            success: true,
-            ...result
-        });
+        const result = await forumsService.getProgramPosts(programId, page, limit, search);
+        res.json({ success: true, ...result });
     }
     catch (error) {
         logger_1.logger.error('Error fetching posts', error);
         res.status(500).json({ error: 'Failed to fetch posts' });
     }
-});
+};
+router.get('/programs/:programId/forum/posts', (0, validation_1.validate)({
+    params: zod_1.z.object({ programId: zod_1.z.string().min(1) }),
+    query: zod_1.z.object({
+        page: zod_1.z.string().optional().transform(val => val ? parseInt(val) : 1),
+        limit: zod_1.z.string().optional().transform(val => val ? parseInt(val) : 20),
+        search: zod_1.z.string().optional(),
+    }),
+}), getForumPostsHandler);
 /**
  * @swagger
  * /api/forum/posts/{postId}:

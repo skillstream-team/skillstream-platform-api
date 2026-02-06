@@ -62,6 +62,10 @@ const subscribeSchema = z.object({
   }),
 });
 
+const fcmTokenSchema = z.object({
+  token: z.string().min(1, 'FCM token is required'),
+});
+
 router.post('/push/subscribe',
   requireAuth,
   validate({ body: subscribeSchema }),
@@ -156,6 +160,51 @@ router.get('/push/subscription',
       console.error('Error getting push subscription status:', error);
       res.status(500).json({
         error: 'Failed to get push subscription status',
+      });
+    }
+  }
+);
+
+/**
+ * @swagger
+ * /api/users/push/fcm-token:
+ *   post:
+ *     summary: Register FCM token for push notifications
+ *     description: Store Firebase Cloud Messaging token for the authenticated user
+ *     tags: [Push Notifications]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [token]
+ *             properties:
+ *               token:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: FCM token registered
+ *       400:
+ *         description: Invalid token
+ *       401:
+ *         description: Unauthorized
+ */
+router.post('/push/fcm-token',
+  requireAuth,
+  validate({ body: fcmTokenSchema }),
+  async (req, res) => {
+    try {
+      const userId = (req as any).user.id;
+      const { token } = req.body;
+      await pushService.registerFcmToken(userId, token);
+      res.json({ success: true, message: 'FCM token registered' });
+    } catch (error) {
+      console.error('Error registering FCM token:', error);
+      res.status(400).json({
+        error: (error as Error).message || 'Failed to register FCM token',
       });
     }
   }

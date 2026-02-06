@@ -536,10 +536,12 @@ router.post('/auth/firebase-sync',
         success: true,
         ...result,
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Firebase sync error:', error);
-      res.status(400).json({
-        error: (error as Error).message || 'Failed to sync Firebase user',
+      const isEmailNotVerified = error?.code === 'EMAIL_NOT_VERIFIED';
+      res.status(isEmailNotVerified ? 403 : 400).json({
+        error: error?.message || 'Failed to sync Firebase user',
+        ...(isEmailNotVerified && { code: 'EMAIL_NOT_VERIFIED' }),
       });
     }
   }

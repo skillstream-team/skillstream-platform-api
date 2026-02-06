@@ -16,6 +16,11 @@ interface AuthenticatedRequest extends Request {
 
 export const requireAuth = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
+    // If Firebase middleware already set req.user, we're done
+    if (req.user) {
+      return next();
+    }
+
     const authHeader = req.header('Authorization');
     const token = authHeader?.replace('Bearer ', '');
     
@@ -86,6 +91,11 @@ export const requireAuth = async (req: AuthenticatedRequest, res: Response, next
 
 export const optionalAuth = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
+    // If Firebase middleware already set req.user, we're done
+    if (req.user) {
+      return next();
+    }
+
     const token = req.header('Authorization')?.replace('Bearer ', '');
     
     if (!token) {

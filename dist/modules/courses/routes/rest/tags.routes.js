@@ -22,10 +22,10 @@ const tagsService = new tags_service_1.TagsService();
  *       200:
  *         description: Tags retrieved successfully
  */
-router.get('/:courseId/tags', async (req, res) => {
+router.get('/:programId/tags', async (req, res) => {
     try {
-        const { courseId } = req.params;
-        const tags = await tagsService.getCourseTags(courseId);
+        const { programId } = req.params;
+        const tags = await tagsService.getProgramTags(programId);
         res.json({ data: tags });
     }
     catch (err) {
@@ -63,11 +63,11 @@ router.get('/:courseId/tags', async (req, res) => {
  *       200:
  *         description: Tags added successfully
  */
-router.post('/:courseId/tags', (0, roles_1.requireRole)('TEACHER'), async (req, res) => {
+router.post('/:programId/tags', (0, roles_1.requireRole)('TEACHER'), async (req, res) => {
     try {
-        const { courseId } = req.params;
+        const { programId } = req.params;
         const { tags } = req.body;
-        await tagsService.addTagsToCourse(courseId, tags);
+        await tagsService.addTagsToProgram(programId, tags);
         res.json({ message: 'Tags added successfully' });
     }
     catch (err) {
@@ -105,11 +105,11 @@ router.post('/:courseId/tags', (0, roles_1.requireRole)('TEACHER'), async (req, 
  *       200:
  *         description: Tags removed successfully
  */
-router.delete('/:courseId/tags', (0, roles_1.requireRole)('TEACHER'), async (req, res) => {
+router.delete('/:programId/tags', (0, roles_1.requireRole)('TEACHER'), async (req, res) => {
     try {
-        const { courseId } = req.params;
+        const { programId } = req.params;
         const { tags } = req.body;
-        await tagsService.removeTagsFromCourse(courseId, tags);
+        await tagsService.removeTagsFromProgram(programId, tags);
         res.json({ message: 'Tags removed successfully' });
     }
     catch (err) {

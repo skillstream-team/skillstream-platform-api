@@ -4,23 +4,23 @@ exports.ShareService = void 0;
 const prisma_1 = require("../../../utils/prisma");
 class ShareService {
     /**
-     * Track course share
+     * Track program share
      */
-    async shareCourse(data) {
+    async shareProgram(data) {
         await prisma_1.prisma.programShare.create({
             data: {
-                programId: data.courseId,
+                programId: data.programId,
                 userId: data.userId,
                 platform: data.platform.toLowerCase(),
             },
         });
     }
     /**
-     * Get share statistics for a course
+     * Get share statistics for a program
      */
-    async getCourseShareStats(courseId) {
+    async getProgramShareStats(programId) {
         const shares = await prisma_1.prisma.programShare.findMany({
-            where: { programId: courseId },
+            where: { programId },
             select: {
                 platform: true,
             },
@@ -35,18 +35,18 @@ class ShareService {
         };
     }
     /**
-     * Get shareable link for course
+     * Get shareable link for program
      */
-    getShareableLink(courseId, platform) {
+    getShareableLink(programId, platform) {
         const baseUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
-        const courseUrl = `${baseUrl}/courses/${courseId}`;
+        const programUrl = `${baseUrl}/programs/${programId}`;
         const platforms = {
             facebook: (url, title) => `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`,
             twitter: (url, title) => `https://twitter.com/intent/tweet?url=${encodeURIComponent(url)}&text=${encodeURIComponent(title)}`,
             linkedin: (url, title) => `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(url)}`,
             whatsapp: (url, title) => `https://wa.me/?text=${encodeURIComponent(`${title} ${url}`)}`,
         };
-        return platforms[platform.toLowerCase()]?.(courseUrl, 'Check out this course!') || courseUrl;
+        return platforms[platform.toLowerCase()]?.(programUrl, 'Check out this program!') || programUrl;
     }
 }
 exports.ShareService = ShareService;

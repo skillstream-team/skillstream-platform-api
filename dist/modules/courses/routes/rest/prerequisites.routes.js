@@ -23,10 +23,10 @@ const prerequisitesService = new prerequisites_service_1.PrerequisitesService();
  *       200:
  *         description: Prerequisites retrieved successfully
  */
-router.get('/:courseId/prerequisites', async (req, res) => {
+router.get('/:programId/prerequisites', async (req, res) => {
     try {
-        const { courseId } = req.params;
-        const prerequisites = await prerequisitesService.getCoursePrerequisites(courseId);
+        const { programId } = req.params;
+        const prerequisites = await prerequisitesService.getProgramPrerequisites(programId);
         res.json({ data: prerequisites });
     }
     catch (err) {
@@ -52,11 +52,11 @@ router.get('/:courseId/prerequisites', async (req, res) => {
  *       200:
  *         description: Prerequisite check result
  */
-router.get('/:courseId/prerequisites/check', auth_1.requireAuth, async (req, res) => {
+router.get('/:programId/prerequisites/check', auth_1.requireAuth, async (req, res) => {
     try {
-        const { courseId } = req.params;
+        const { programId } = req.params;
         const userId = req.user.id;
-        const result = await prerequisitesService.checkPrerequisites(userId, courseId);
+        const result = await prerequisitesService.checkPrerequisites(userId, programId);
         res.json(result);
     }
     catch (err) {
@@ -97,13 +97,12 @@ router.get('/:courseId/prerequisites/check', auth_1.requireAuth, async (req, res
  *       400:
  *         description: Invalid request or circular dependency
  */
-router.post('/:courseId/prerequisites', (0, roles_1.requireRole)('TEACHER'), async (req, res) => {
+router.post('/:programId/prerequisites', (0, roles_1.requireRole)('TEACHER'), async (req, res) => {
     try {
-        const { courseId } = req.params;
+        const { programId } = req.params;
         const { prerequisiteId, isRequired } = req.body;
         const result = await prerequisitesService.addPrerequisite({
-            courseId,
-            collectionId: courseId,
+            programId,
             prerequisiteId,
             isRequired,
         });
@@ -150,10 +149,10 @@ router.post('/:courseId/prerequisites', (0, roles_1.requireRole)('TEACHER'), asy
  *       404:
  *         description: Prerequisite not found
  */
-router.delete('/:courseId/prerequisites/:prerequisiteId', (0, roles_1.requireRole)('TEACHER'), async (req, res) => {
+router.delete('/:programId/prerequisites/:prerequisiteId', (0, roles_1.requireRole)('TEACHER'), async (req, res) => {
     try {
-        const { courseId, prerequisiteId } = req.params;
-        await prerequisitesService.removePrerequisite(courseId, prerequisiteId);
+        const { programId, prerequisiteId } = req.params;
+        await prerequisitesService.removePrerequisite(programId, prerequisiteId);
         res.json({ message: 'Prerequisite removed successfully' });
     }
     catch (err) {
@@ -183,10 +182,10 @@ router.delete('/:courseId/prerequisites/:prerequisiteId', (0, roles_1.requireRol
  *       200:
  *         description: Dependent courses retrieved successfully
  */
-router.get('/:courseId/dependents', async (req, res) => {
+router.get('/:programId/dependents', async (req, res) => {
     try {
-        const { courseId } = req.params;
-        const dependents = await prerequisitesService.getDependentCourses(courseId);
+        const { programId } = req.params;
+        const dependents = await prerequisitesService.getDependentPrograms(programId);
         res.json({ data: dependents });
     }
     catch (err) {

@@ -491,7 +491,12 @@ router.get('/modules', auth_1.requireAuth, async (req, res) => {
             }
             return { ...module, teacher: null };
         }));
-        logger_1.logger.info(`Found ${regularModules.length} regular modules`);
+        if (regularModules.length > 0) {
+            logger_1.logger.info(`Found ${regularModules.length} regular modules`);
+        }
+        else {
+            logger_1.logger.debug('Found 0 regular modules');
+        }
         const regularModulesWithStudentPrice = regularModules.map((m) => ({
             ...m,
             studentPrice: (0, monetization_service_1.getStudentPrice)(m.price ?? 0),

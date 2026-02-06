@@ -18,18 +18,26 @@ export const securityHeaders = (req: Request, res: Response, next: NextFunction)
   next();
 };
 
+/** Normalize origin for comparison (trim, no trailing slash) */
+function normalizeOrigin(url: string): string {
+  return url.trim().replace(/\/+$/, '') || url;
+}
+
 /**
  * CORS configuration
+ * On Render: set FRONTEND_URL to your frontend origin(s), e.g. https://your-app.onrender.com
+ * Multiple origins: comma-separated, e.g. https://app.com,https://admin.app.com
  */
 export const corsOptions = {
   origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
-    // Allow requests with no origin (mobile apps, Postman, etc.)
+    // Allow requests with no origin (mobile apps, Postman, server-to-server, etc.)
     if (!origin) {
       return callback(null, true);
     }
 
+    const normalizedOrigin = normalizeOrigin(origin);
     const allowedOrigins = env.FRONTEND_URL
-      ? env.FRONTEND_URL.split(',').map(url => url.trim())
+      ? env.FRONTEND_URL.split(',').map(url => normalizeOrigin(url.trim()))
       : [];
 
     // Always allow localhost origins (for local development even when backend is in production)
@@ -47,9 +55,9 @@ export const corsOptions = {
     ];
 
     // Check if origin is localhost
-    const isLocalhost = localhostOrigins.includes(origin) || 
-                       origin.startsWith('http://localhost:') || 
-                       origin.startsWith('http://127.0.0.1:');
+    const isLocalhost = localhostOrigins.includes(normalizedOrigin) ||
+                       normalizedOrigin.startsWith('http://localhost:') ||
+                       normalizedOrigin.startsWith('http://127.0.0.1:');
 
     // In development, always allow localhost
     if (env.NODE_ENV === 'development') {
@@ -65,14 +73,15 @@ export const corsOptions = {
       }
       // For non-localhost origins in production, require FRONTEND_URL
       if (allowedOrigins.length === 0) {
-        return callback(new Error('CORS: FRONTEND_URL must be set in production for non-localhost origins'));
+        return callback(new Error('CORS: Set FRONTEND_URL in Render to your frontend origin (e.g. https://your-app.onrender.com)'));
       }
     }
 
-    if (allowedOrigins.length === 0 || allowedOrigins.includes(origin) || isLocalhost) {
+    const allowed = allowedOrigins.length === 0 || allowedOrigins.includes(normalizedOrigin) || isLocalhost;
+    if (allowed) {
       callback(null, true);
     } else {
-      callback(new Error('Not allowed by CORS'));
+      callback(new Error(`CORS: Origin "${origin}" not allowed. Add it to FRONTEND_URL on Render (comma-separated for multiple).`));
     }
   },
   credentials: true,

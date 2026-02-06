@@ -31,9 +31,9 @@ services:
         sync: false  # Set a strong secret in Render dashboard
       - key: RESET_TOKEN_SECRET
         sync: false  # Set a strong secret in Render dashboard
-      # Frontend URL for CORS
+      # Frontend URL for CORS (required for browser requests; OPTIONS/login will fail without it)
       - key: FRONTEND_URL
-        sync: false  # Set your frontend URL
+        sync: false  # e.g. https://your-app.onrender.com or https://app.com,https://admin.app.com
       # Server URL for Swagger
       - key: SERVER_URL
         sync: false  # Set your production server URL

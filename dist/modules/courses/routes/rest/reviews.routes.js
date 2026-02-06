@@ -21,15 +21,12 @@ const createReviewSchema = zod_1.z.object({
     title: zod_1.z.string().optional(),
     content: zod_1.z.string().min(10),
 });
-router.post('/courses/:courseId/reviews', auth_1.requireAuth, subscription_1.requireSubscription, (0, validation_1.validate)({
-    params: zod_1.z.object({ courseId: zod_1.z.string().min(1) }),
-    body: createReviewSchema,
-}), async (req, res) => {
+const createReviewHandler = async (req, res) => {
     try {
-        const { courseId } = req.params;
+        const programId = req.params.programId;
         const studentId = req.user?.id;
         const review = await reviewsService.createReview({
-            courseId,
+            programId,
             studentId,
             ...req.body,
         });
@@ -43,7 +40,11 @@ router.post('/courses/:courseId/reviews', auth_1.requireAuth, subscription_1.req
         console.error('Error creating review:', error);
         res.status(500).json({ error: error.message || 'Failed to create review' });
     }
-});
+};
+router.post('/programs/:programId/reviews', auth_1.requireAuth, subscription_1.requireSubscription, (0, validation_1.validate)({
+    params: zod_1.z.object({ programId: zod_1.z.string().min(1) }),
+    body: createReviewSchema,
+}), createReviewHandler);
 /**
  * @swagger
  * /api/courses/{courseId}/reviews:
@@ -51,8 +52,8 @@ router.post('/courses/:courseId/reviews', auth_1.requireAuth, subscription_1.req
  *     summary: Get course reviews
  *     tags: [Reviews]
  */
-router.get('/courses/:courseId/reviews', (0, validation_1.validate)({
-    params: zod_1.z.object({ courseId: zod_1.z.string().min(1) }),
+router.get('/programs/:programId/reviews', (0, validation_1.validate)({
+    params: zod_1.z.object({ programId: zod_1.z.string().min(1) }),
     query: zod_1.z.object({
         page: zod_1.z.string().optional().transform(val => val ? parseInt(val) : 1),
         limit: zod_1.z.string().optional().transform(val => val ? parseInt(val) : 20),
@@ -60,18 +61,15 @@ router.get('/courses/:courseId/reviews', (0, validation_1.validate)({
     }),
 }), async (req, res) => {
     try {
-        const { courseId } = req.params;
+        const programId = req.params.programId;
         const page = typeof req.query.page === 'number' ? req.query.page : 1;
         const limit = typeof req.query.limit === 'number' ? req.query.limit : 20;
         const minRating = typeof req.query.minRating === 'number' ? req.query.minRating : undefined;
-        const result = await reviewsService.getCourseReviews(courseId, page, limit, minRating);
-        res.json({
-            success: true,
-            ...result
-        });
+        const result = await reviewsService.getProgramReviews(programId, page, limit, minRating);
+        res.json({ success: true, ...result });
     }
     catch (error) {
-        console.error('Error fetching reviews:', error);
+        console.error('Error fetching reviews', error);
         res.status(500).json({ error: 'Failed to fetch reviews' });
     }
 });

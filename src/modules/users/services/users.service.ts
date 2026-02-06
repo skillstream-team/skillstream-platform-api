@@ -901,6 +901,15 @@ export class UsersService {
       const auth = getAuth();
       const decodedToken = await auth.verifyIdToken(data.firebaseToken);
 
+      // Require email verification before syncing (and issuing JWT) when enabled
+      const requireEmailVerification = process.env.REQUIRE_EMAIL_VERIFICATION !== 'false';
+      const emailVerified = !!(decodedToken as any).email_verified;
+      if (requireEmailVerification && !emailVerified) {
+        const err = new Error('Please verify your email before signing in.') as Error & { code?: string };
+        err.code = 'EMAIL_NOT_VERIFIED';
+        throw err;
+      }
+
       // Check if user exists by firebaseUid (using findFirst since firebaseUid is not @unique in schema)
       let user = await prisma.user.findFirst({
         where: { firebaseUid: data.firebaseUid },

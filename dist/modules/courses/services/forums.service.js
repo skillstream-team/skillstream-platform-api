@@ -10,7 +10,7 @@ class ForumsService {
     async createPost(data) {
         const post = await prisma_1.prisma.forumPost.create({
             data: {
-                programId: data.collectionId,
+                programId: data.programId,
                 authorId: data.authorId,
                 title: data.title,
                 content: data.content,
@@ -31,16 +31,16 @@ class ForumsService {
                 },
             },
         });
-        await (0, cache_1.deleteCache)(`collection:${data.collectionId}`);
+        await (0, cache_1.deleteCache)(`program:${data.programId}`);
         return this.mapPostToDto(post);
     }
     /**
-     * Get forum posts for a course
+     * Get forum posts for a program
      */
-    async getCoursePosts(collectionId, page = 1, limit = 20, search) {
+    async getProgramPosts(programId, page = 1, limit = 20, search) {
         const skip = (page - 1) * limit;
         const take = Math.min(limit, 100);
-        const where = { collectionId };
+        const where = { programId };
         if (search) {
             where.OR = [
                 { title: { contains: search, mode: 'insensitive' } },
@@ -363,8 +363,8 @@ class ForumsService {
     mapPostToDto(post) {
         return {
             id: post.id,
-            collectionId: post.programId, // Backward compatibility
-            collection: post.program, // Backward compatibility
+            programId: post.programId,
+            program: post.program,
             authorId: post.authorId,
             author: post.author,
             title: post.title,

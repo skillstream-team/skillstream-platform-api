@@ -8,11 +8,11 @@ class WhiteboardService {
      */
     async createWhiteboard(data, userId) {
         // Validate program or liveStream exists
-        if (data.courseId) {
-            const course = await prisma_1.prisma.program.findUnique({
-                where: { id: data.courseId },
+        if (data.programId) {
+            const program = await prisma_1.prisma.program.findUnique({
+                where: { id: data.programId },
             });
-            if (!course) {
+            if (!program) {
                 throw new Error('Program not found');
             }
         }
@@ -26,7 +26,7 @@ class WhiteboardService {
         }
         const whiteboard = await prisma_1.prisma.whiteboard.create({
             data: {
-                programId: data.courseId,
+                programId: data.programId,
                 liveStreamId: data.liveStreamId,
                 title: data.title,
                 description: data.description,
@@ -103,12 +103,12 @@ class WhiteboardService {
     /**
      * Get whiteboards for a course
      */
-    async getCollectionWhiteboards(courseId, page = 1, limit = 20) {
+    async getProgramWhiteboards(programId, page = 1, limit = 20) {
         const skip = (page - 1) * limit;
         const take = Math.min(limit, 100);
         const [whiteboards, total] = await Promise.all([
             prisma_1.prisma.whiteboard.findMany({
-                where: { programId: courseId },
+                where: { programId },
                 skip,
                 take,
                 include: {
@@ -127,7 +127,7 @@ class WhiteboardService {
                 },
                 orderBy: { createdAt: 'desc' },
             }),
-            prisma_1.prisma.whiteboard.count({ where: { programId: courseId } }),
+            prisma_1.prisma.whiteboard.count({ where: { programId } }),
         ]);
         return {
             data: whiteboards.map(this.mapToResponseDto),
@@ -293,7 +293,7 @@ class WhiteboardService {
     mapToResponseDto(whiteboard) {
         return {
             id: whiteboard.id,
-            courseId: whiteboard.programId,
+            programId: whiteboard.programId,
             liveStreamId: whiteboard.liveStreamId,
             title: whiteboard.title,
             description: whiteboard.description,

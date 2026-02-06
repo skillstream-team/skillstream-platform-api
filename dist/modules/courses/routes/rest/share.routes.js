@@ -35,17 +35,17 @@ const shareService = new share_service_1.ShareService();
  *       200:
  *         description: Share tracked successfully
  */
-router.post('/:courseId/share', auth_1.requireAuth, async (req, res) => {
+router.post('/:programId/share', auth_1.requireAuth, async (req, res) => {
     try {
-        const { courseId } = req.params;
+        const { programId } = req.params;
         const userId = req.user.id;
         const { platform } = req.body;
-        await shareService.shareCourse({
-            courseId,
+        await shareService.shareProgram({
+            programId,
             userId,
             platform,
         });
-        const shareableLink = shareService.getShareableLink(courseId, platform);
+        const shareableLink = shareService.getShareableLink(programId, platform);
         res.json({ shareableLink });
     }
     catch (err) {
@@ -75,14 +75,14 @@ router.post('/:courseId/share', auth_1.requireAuth, async (req, res) => {
  *       200:
  *         description: Shareable link generated
  */
-router.get('/:courseId/share/link', async (req, res) => {
+router.get('/:programId/share/link', async (req, res) => {
     try {
-        const { courseId } = req.params;
+        const { programId } = req.params;
         const { platform } = req.query;
         if (!platform || typeof platform !== 'string') {
             return res.status(400).json({ error: 'Platform is required' });
         }
-        const shareableLink = shareService.getShareableLink(courseId, platform);
+        const shareableLink = shareService.getShareableLink(programId, platform);
         res.json({ shareableLink });
     }
     catch (err) {
@@ -106,10 +106,10 @@ router.get('/:courseId/share/link', async (req, res) => {
  *       200:
  *         description: Statistics retrieved successfully
  */
-router.get('/:courseId/share/stats', async (req, res) => {
+router.get('/:programId/share/stats', async (req, res) => {
     try {
-        const { courseId } = req.params;
-        const stats = await shareService.getCourseShareStats(courseId);
+        const { programId } = req.params;
+        const stats = await shareService.getProgramShareStats(programId);
         res.json(stats);
     }
     catch (err) {

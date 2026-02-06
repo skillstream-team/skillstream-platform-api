@@ -11,16 +11,16 @@ class InstructorQAService {
         // Verify student is enrolled
         const enrollment = await prisma_1.prisma.enrollment.findFirst({
             where: {
-                programId: data.collectionId,
+                programId: data.programId,
                 studentId: data.studentId,
             },
         });
         if (!enrollment) {
-            throw new Error('You must be enrolled in the collection to ask questions');
+            throw new Error('You must be enrolled in the program to ask questions');
         }
         const qa = await prisma_1.prisma.instructorQA.create({
             data: {
-                programId: data.collectionId,
+                programId: data.programId,
                 studentId: data.studentId,
                 question: data.question,
             },
@@ -137,10 +137,10 @@ class InstructorQAService {
     /**
      * Get questions for a collection
      */
-    async getCourseQuestions(collectionId, page = 1, limit = 20, answeredOnly) {
+    async getProgramQuestions(programId, page = 1, limit = 20, answeredOnly) {
         const skip = (page - 1) * limit;
         const take = Math.min(limit, 100);
-        const where = { programId: collectionId };
+        const where = { programId };
         if (answeredOnly !== undefined) {
             where.isAnswered = answeredOnly;
         }
@@ -245,8 +245,8 @@ class InstructorQAService {
     mapToDto(qa) {
         return {
             id: qa.id,
-            collectionId: qa.programId, // Backward compatibility
-            collection: {
+            programId: qa.programId,
+            program: {
                 id: qa.program.id,
                 title: qa.program.title,
             },

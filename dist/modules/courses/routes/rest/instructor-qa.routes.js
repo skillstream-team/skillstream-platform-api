@@ -36,13 +36,13 @@ const qaService = new instructor_qa_service_1.InstructorQAService();
  *       200:
  *         description: Questions retrieved successfully
  */
-router.get('/:courseId/qa', async (req, res) => {
+router.get('/:programId/qa', async (req, res) => {
     try {
-        const { courseId } = req.params;
+        const { programId } = req.params;
         const page = parseInt(req.query.page) || 1;
         const limit = parseInt(req.query.limit) || 20;
         const answeredOnly = req.query.answeredOnly === 'true';
-        const result = await qaService.getCourseQuestions(courseId, page, limit, answeredOnly);
+        const result = await qaService.getProgramQuestions(programId, page, limit, answeredOnly);
         res.json(result);
     }
     catch (err) {
@@ -78,13 +78,13 @@ router.get('/:courseId/qa', async (req, res) => {
  *       201:
  *         description: Question posted successfully
  */
-router.post('/:courseId/qa', auth_1.requireAuth, async (req, res) => {
+router.post('/:programId/qa', auth_1.requireAuth, async (req, res) => {
     try {
-        const { courseId } = req.params;
+        const { programId } = req.params;
         const userId = req.user.id;
         const { question } = req.body;
         const qa = await qaService.askQuestion({
-            collectionId: courseId,
+            programId,
             studentId: userId,
             question,
         });

@@ -7,44 +7,41 @@ class TagsService {
     /**
      * Add tags to a course
      */
-    async addTagsToCourse(courseId, tags) {
-        // Remove duplicates and normalize
+    async addTagsToProgram(programId, tags) {
         const uniqueTags = [...new Set(tags.map((t) => t.toLowerCase().trim()))];
         await prisma_1.prisma.$transaction(uniqueTags.map((tag) => prisma_1.prisma.programTag.upsert({
             where: {
                 programId_name: {
-                    programId: courseId,
+                    programId,
                     name: tag,
                 },
             },
             update: {},
             create: {
-                programId: courseId,
+                programId,
                 name: tag,
             },
         })));
-        // Invalidate cache
-        await (0, cache_1.deleteCache)(`course:${courseId}`);
+        await (0, cache_1.deleteCache)(`program:${programId}`);
     }
     /**
-     * Remove tags from a course
+     * Remove tags from a program
      */
-    async removeTagsFromCourse(courseId, tags) {
+    async removeTagsFromProgram(programId, tags) {
         await prisma_1.prisma.programTag.deleteMany({
             where: {
-                programId: courseId,
+                programId,
                 name: { in: tags.map((t) => t.toLowerCase().trim()) },
             },
         });
-        // Invalidate cache
-        await (0, cache_1.deleteCache)(`course:${courseId}`);
+        await (0, cache_1.deleteCache)(`program:${programId}`);
     }
     /**
-     * Get all tags for a course
+     * Get all tags for a program
      */
-    async getCourseTags(courseId) {
+    async getProgramTags(programId) {
         const tags = await prisma_1.prisma.programTag.findMany({
-            where: { programId: courseId },
+            where: { programId },
             select: { name: true },
             orderBy: { name: 'asc' },
         });

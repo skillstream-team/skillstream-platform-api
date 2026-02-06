@@ -11,11 +11,11 @@ const router = (0, express_1.Router)();
  *     summary: Get collection details with marketing context
  *     tags: [Marketing]
  */
-router.get('/collections/:collectionId/marketing', auth_1.requireAuth, async (req, res) => {
+router.get('/programs/:programId/marketing', auth_1.requireAuth, async (req, res) => {
     try {
-        const { collectionId } = req.params;
+        const { programId } = req.params;
         const program = await prisma_1.prisma.program.findUnique({
-            where: { id: collectionId },
+            where: { id: programId },
             include: {
                 instructor: {
                     select: { id: true, username: true, email: true }
@@ -43,7 +43,7 @@ router.get('/collections/:collectionId/marketing', auth_1.requireAuth, async (re
         const completionRate = totalEnrollments > 0 ? (completedCount / totalEnrollments) * 100 : 0;
         // Get recent enrollments (for trend analysis)
         const recentEnrollments = await prisma_1.prisma.enrollment.findMany({
-            where: { programId: collectionId },
+            where: { programId },
             orderBy: { createdAt: 'desc' },
             take: 10
         });
@@ -52,7 +52,7 @@ router.get('/collections/:collectionId/marketing', auth_1.requireAuth, async (re
         thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
         const recentEnrollmentsCount = await prisma_1.prisma.enrollment.count({
             where: {
-                programId: collectionId,
+                programId,
                 createdAt: { gte: thirtyDaysAgo }
             }
         });

@@ -781,7 +781,7 @@ export class UsersService {
    * Update the current user's profile (firstName, lastName, avatar). Invalidates profile cache.
    */
   async updateMyProfile(userId: string, data: { firstName?: string; lastName?: string; avatar?: string }) {
-    const updateData: { firstName?: string; lastName?: string; avatar?: string } = {};
+    const updateData: { firstName?: string | null; lastName?: string | null; avatar?: string | null } = {};
     if (data.firstName !== undefined) updateData.firstName = data.firstName || null;
     if (data.lastName !== undefined) updateData.lastName = data.lastName || null;
     if (data.avatar !== undefined) updateData.avatar = data.avatar || null;

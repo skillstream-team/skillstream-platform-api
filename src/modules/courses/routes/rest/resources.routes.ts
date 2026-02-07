@@ -443,6 +443,129 @@ router.post('/modules/:moduleId/videos/prepare', requireAuth, async (req, res) =
 });
 
 /**
+ * TUS proxy for Cloudflare Stream: forward initial TUS POST to Stream, create Video/Resource, return Location + stream-media-id.
+ * Client (tus-js-client) sends first request here; subsequent PATCH goes to Cloudflare's Location URL.
+ * @swagger
+ * /api/modules/{moduleId}/videos/tus:
+ *   post:
+ *     summary: TUS upload creation (proxy to Cloudflare Stream). Use with tus-js-client.
+ *     tags: [Resources]
+ */
+router.post('/modules/:moduleId/videos/tus', requireAuth, async (req, res) => {
+  try {
+    const { moduleId } = req.params;
+    const userId = (req as any).user?.id;
+    if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
+    const [regularModule, quickModule] = await Promise.all([
+      prisma.module.findUnique({ where: { id: moduleId } }),
+      prisma.quickModule.findUnique({ where: { id: moduleId } })
+    ]);
+    if (!regularModule && !quickModule) {
+      return res.status(404).json({ error: 'Module not found' });
+    }
+
+    const accountId = process.env.CLOUDFLARE_ACCOUNT_ID;
+    const apiToken = process.env.CLOUDFLARE_API_TOKEN;
+    if (!accountId || !apiToken) {
+      return res.status(503).json({
+        error: 'Video upload is not configured. Set CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN.',
+      });
+    }
+
+    const tusResumable = req.headers['tus-resumable'] as string | undefined;
+    const uploadLength = req.headers['upload-length'] as string | undefined;
+    const uploadMetadata = req.headers['upload-metadata'] as string | undefined;
+    if (!uploadLength) {
+      return res.status(400).json({ error: 'TUS Upload-Length required' });
+    }
+
+    const streamUrl = `https://api.cloudflare.com/client/v4/accounts/${accountId}/stream`;
+    const forwardHeaders: Record<string, string> = {
+      'Authorization': `Bearer ${apiToken}`,
+      'Upload-Length': uploadLength,
+    };
+    if (tusResumable) forwardHeaders['Tus-Resumable'] = tusResumable;
+    if (uploadMetadata) forwardHeaders['Upload-Metadata'] = uploadMetadata;
+
+    const cfRes = await fetch(streamUrl, {
+      method: 'POST',
+      headers: forwardHeaders,
+    });
+
+    const location = cfRes.headers.get('location');
+    const streamMediaId = cfRes.headers.get('stream-media-id');
+
+    if (!cfRes.ok) {
+      const text = await cfRes.text();
+      logger.error('Cloudflare TUS create failed', { status: cfRes.status, body: text });
+      return res.status(cfRes.status >= 400 ? cfRes.status : 502).json({
+        error: 'Stream TUS create failed',
+        details: text || undefined,
+      });
+    }
+
+    if (!location || !streamMediaId) {
+      logger.error('Cloudflare TUS response missing Location or stream-media-id');
+      return res.status(502).json({ error: 'Stream did not return Location or stream-media-id' });
+    }
+
+    let programId = moduleId;
+    if (regularModule) {
+      const programModule = await prisma.programModule.findFirst({
+        where: { moduleId },
+        select: { programId: true }
+      });
+      if (programModule) programId = programModule.programId;
+    }
+
+    const resourceTitle = 'Video';
+    let resourceId: string;
+
+    if (quickModule) {
+      const resource = await prisma.moduleResource.create({
+        data: {
+          moduleId,
+          title: resourceTitle,
+          type: 'video',
+          fileUrl: null,
+          url: streamMediaId,
+          filename: null,
+          size: null,
+          mimeType: 'video/mp4',
+          sharedBy: userId,
+        },
+      });
+      resourceId = resource.id;
+    } else {
+      const video = await prisma.video.create({
+        data: {
+          programId,
+          moduleId: regularModule ? moduleId : undefined,
+          streamId: streamMediaId,
+          title: resourceTitle,
+          type: 'on-demand',
+          status: 'pending',
+          uploadedBy: userId,
+        },
+      });
+      resourceId = video.id;
+    }
+
+    res.status(201);
+    res.setHeader('Location', location);
+    res.setHeader('Stream-Media-Id', streamMediaId);
+    res.setHeader('X-Resource-Id', resourceId);
+    res.setHeader('Access-Control-Expose-Headers', 'Location, Stream-Media-Id, X-Resource-Id');
+    res.end();
+  } catch (error: any) {
+    logger.error('Error in TUS proxy', error);
+    const msg = (error as Error).message || 'Unknown error';
+    return res.status(500).json({ error: 'TUS proxy failed: ' + msg });
+  }
+});
+
+/**
  * @swagger
  * /api/modules/{moduleId}/videos/{resourceId}/status:
  *   get:

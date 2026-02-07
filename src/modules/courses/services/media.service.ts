@@ -1,5 +1,6 @@
 import { CloudflareR2Service } from './cloudflare-r2.service';
 import { CloudflareStreamService } from './cloudflare-stream.service';
+import { isCloudflareImagesConfigured, uploadImageToCloudflareImages, deleteCloudflareImage } from '../../../utils/cloudflare-images';
 import {
     CreateMaterialDto,
     MaterialResponseDto,
@@ -42,23 +43,35 @@ export class MediaService {
      *               $ref: '#/components/schemas/MaterialResponseDto'
      */
     async uploadMaterial(data: CreateMaterialDto): Promise<MaterialResponseDto> {
-        const uploadResult = await r2Service.uploadFile({
-            file: data.file,
-            filename: data.filename,
-            contentType: data.mimeType,
-            programId: (data as any).collectionId || (data as any).programId,
-            type: data.type,
-        });
+        const programId = (data as any).collectionId || (data as any).programId;
+        let key: string;
+        let url: string;
+
+        if (data.type === 'image' && isCloudflareImagesConfigured()) {
+            const result = await uploadImageToCloudflareImages(data.file, data.filename, data.mimeType);
+            key = `images:${result.id}`;
+            url = result.url;
+        } else {
+            const uploadResult = await r2Service.uploadFile({
+                file: data.file,
+                filename: data.filename,
+                contentType: data.mimeType,
+                programId,
+                type: data.type,
+            });
+            key = uploadResult.key;
+            url = uploadResult.url;
+        }
 
         const material = await prisma.material.create({
             data: {
-                programId: (data as any).collectionId || (data as any).programId,
+                programId,
                 type: data.type,
-                key: uploadResult.key,
+                key,
                 filename: data.filename,
                 size: data.size,
                 mimeType: data.mimeType,
-                url: uploadResult.url,
+                url,
                 uploadedBy: data.uploadedBy,
             },
             include: {
@@ -103,7 +116,11 @@ export class MediaService {
     async deleteMaterial(materialId: string): Promise<void> {
         const material = await prisma.material.findUnique({ where: { id: materialId } });
         if (!material) throw new Error('Material not found');
-        await r2Service.deleteFile(material.key);
+        if (material.key.startsWith('images:')) {
+            await deleteCloudflareImage(material.key.slice(7));
+        } else {
+            await r2Service.deleteFile(material.key);
+        }
         await prisma.material.delete({ where: { id: materialId } });
     }
 
@@ -117,6 +134,7 @@ export class MediaService {
     async getSignedUrl(materialId: string, expiresIn = 3600): Promise<string> {
         const material = await prisma.material.findUnique({ where: { id: materialId } });
         if (!material) throw new Error('Material not found');
+        if (material.key.startsWith('images:')) return material.url;
         return await r2Service.getSignedUrl(material.key, expiresIn);
     }
 

@@ -3,6 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.MediaService = void 0;
 const cloudflare_r2_service_1 = require("./cloudflare-r2.service");
 const cloudflare_stream_service_1 = require("./cloudflare-stream.service");
+const cloudflare_images_1 = require("../../../utils/cloudflare-images");
 const prisma_1 = require("../../../utils/prisma");
 const r2Service = new cloudflare_r2_service_1.CloudflareR2Service();
 const streamService = new cloudflare_stream_service_1.CloudflareStreamService();
@@ -28,22 +29,34 @@ class MediaService {
      *               $ref: '#/components/schemas/MaterialResponseDto'
      */
     async uploadMaterial(data) {
-        const uploadResult = await r2Service.uploadFile({
-            file: data.file,
-            filename: data.filename,
-            contentType: data.mimeType,
-            programId: data.collectionId || data.programId,
-            type: data.type,
-        });
+        const programId = data.collectionId || data.programId;
+        let key;
+        let url;
+        if (data.type === 'image' && (0, cloudflare_images_1.isCloudflareImagesConfigured)()) {
+            const result = await (0, cloudflare_images_1.uploadImageToCloudflareImages)(data.file, data.filename, data.mimeType);
+            key = `images:${result.id}`;
+            url = result.url;
+        }
+        else {
+            const uploadResult = await r2Service.uploadFile({
+                file: data.file,
+                filename: data.filename,
+                contentType: data.mimeType,
+                programId,
+                type: data.type,
+            });
+            key = uploadResult.key;
+            url = uploadResult.url;
+        }
         const material = await prisma_1.prisma.material.create({
             data: {
-                programId: data.collectionId || data.programId,
+                programId,
                 type: data.type,
-                key: uploadResult.key,
+                key,
                 filename: data.filename,
                 size: data.size,
                 mimeType: data.mimeType,
-                url: uploadResult.url,
+                url,
                 uploadedBy: data.uploadedBy,
             },
             include: {
@@ -85,7 +98,12 @@ class MediaService {
         const material = await prisma_1.prisma.material.findUnique({ where: { id: materialId } });
         if (!material)
             throw new Error('Material not found');
-        await r2Service.deleteFile(material.key);
+        if (material.key.startsWith('images:')) {
+            await (0, cloudflare_images_1.deleteCloudflareImage)(material.key.slice(7));
+        }
+        else {
+            await r2Service.deleteFile(material.key);
+        }
         await prisma_1.prisma.material.delete({ where: { id: materialId } });
     }
     /**
@@ -99,6 +117,8 @@ class MediaService {
         const material = await prisma_1.prisma.material.findUnique({ where: { id: materialId } });
         if (!material)
             throw new Error('Material not found');
+        if (material.key.startsWith('images:'))
+            return material.url;
         return await r2Service.getSignedUrl(material.key, expiresIn);
     }
     /**

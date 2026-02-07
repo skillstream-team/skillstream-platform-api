@@ -6,6 +6,8 @@ const client_s3_1 = require("@aws-sdk/client-s3");
 class MessagingFileUploadService {
     constructor() {
         this.bucketName = process.env.CLOUDFLARE_R2_BUCKET_NAME || 'skillstream-media';
+        const base = process.env.CLOUDFLARE_R2_PUBLIC_BASE_URL;
+        this.publicBaseUrl = base && base.replace(/\/+$/, '') ? base.replace(/\/+$/, '') : null;
         this.s3Client = new client_s3_1.S3Client({
             region: 'auto',
             endpoint: `https://${process.env.CLOUDFLARE_ACCOUNT_ID}.r2.cloudflarestorage.com`,
@@ -28,9 +30,12 @@ class MessagingFileUploadService {
             },
         });
         await this.s3Client.send(command);
+        const url = this.publicBaseUrl
+            ? `${this.publicBaseUrl}/${key}`
+            : `https://${this.bucketName}.${process.env.CLOUDFLARE_ACCOUNT_ID}.r2.cloudflarestorage.com/${key}`;
         return {
             key,
-            url: `https://${this.bucketName}.${process.env.CLOUDFLARE_ACCOUNT_ID}.r2.cloudflarestorage.com/${key}`,
+            url,
             filename: data.filename,
             size: data.file.length,
             contentType: data.contentType,

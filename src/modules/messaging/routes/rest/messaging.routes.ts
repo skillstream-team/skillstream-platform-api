@@ -7,6 +7,7 @@ import { validate } from '../../../../middleware/validation';
 import { createMessageSchema, createConversationSchema } from '../../../../utils/validation-schemas';
 import { messagingRateLimiter } from '../../../../middleware/rate-limit';
 import { logger } from '../../../../utils/logger';
+import { isCloudflareImagesConfigured, uploadImageToCloudflareImages } from '../../../../utils/cloudflare-images';
 
 const router = Router();
 const messagingService = new MessagingService();
@@ -889,8 +890,22 @@ router.post('/upload', requireAuth, async (req, res) => {
       });
     }
 
-    // Decode base64 file
     const fileBuffer = Buffer.from(file, 'base64');
+
+    if (contentType.startsWith('image/') && isCloudflareImagesConfigured()) {
+      const result = await uploadImageToCloudflareImages(fileBuffer, filename, contentType);
+      return res.json({
+        success: true,
+        data: {
+          key: result.id,
+          url: result.url,
+          filename,
+          size: fileBuffer.length,
+          contentType,
+          uploadedAt: new Date(),
+        },
+      });
+    }
 
     const uploadResult = await fileUploadService.uploadFile({
       file: fileBuffer,

@@ -9,6 +9,7 @@ const validation_1 = require("../../../../middleware/validation");
 const validation_schemas_1 = require("../../../../utils/validation-schemas");
 const rate_limit_1 = require("../../../../middleware/rate-limit");
 const logger_1 = require("../../../../utils/logger");
+const cloudflare_images_1 = require("../../../../utils/cloudflare-images");
 const router = (0, express_1.Router)();
 const messagingService = new messaging_service_1.MessagingService();
 const fileUploadService = new file_upload_service_1.MessagingFileUploadService();
@@ -847,8 +848,21 @@ router.post('/upload', auth_1.requireAuth, async (req, res) => {
                 error: 'file (base64), filename, and contentType are required',
             });
         }
-        // Decode base64 file
         const fileBuffer = Buffer.from(file, 'base64');
+        if (contentType.startsWith('image/') && (0, cloudflare_images_1.isCloudflareImagesConfigured)()) {
+            const result = await (0, cloudflare_images_1.uploadImageToCloudflareImages)(fileBuffer, filename, contentType);
+            return res.json({
+                success: true,
+                data: {
+                    key: result.id,
+                    url: result.url,
+                    filename,
+                    size: fileBuffer.length,
+                    contentType,
+                    uploadedAt: new Date(),
+                },
+            });
+        }
         const uploadResult = await fileUploadService.uploadFile({
             file: fileBuffer,
             filename,

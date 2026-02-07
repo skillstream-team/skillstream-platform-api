@@ -3,6 +3,7 @@ import { requireAuth } from '../../../../middleware/auth';
 import { prisma } from '../../../../utils/prisma';
 import { logger } from '../../../../utils/logger';
 import { CloudflareR2Service } from '../../services/cloudflare-r2.service';
+import { isCloudflareImagesConfigured, uploadImageToCloudflareImages } from '../../../../utils/cloudflare-images';
 
 const router = Router();
 const r2Service = new CloudflareR2Service();
@@ -182,37 +183,43 @@ router.post('/modules/:moduleId/resources/upload', requireAuth, async (req, res)
       }
     }
 
-    // Decode base64 file
     const fileBuffer = Buffer.from(file, 'base64');
+    let fileUrl: string;
+    let size: number;
+    let mimeType: string;
 
-    // Determine file type from content type
-    let fileType: 'pdf' | 'image' | 'document' | 'zip' | 'other' = 'other';
-    if (contentType.includes('pdf')) fileType = 'pdf';
-    else if (contentType.startsWith('image/')) fileType = 'image';
-    else if (contentType.includes('zip') || contentType.includes('archive')) fileType = 'zip';
-    else if (contentType.includes('document') || contentType.includes('word') || contentType.includes('text')) fileType = 'document';
+    if (contentType.startsWith('image/') && isCloudflareImagesConfigured()) {
+      const result = await uploadImageToCloudflareImages(fileBuffer, filename, contentType);
+      fileUrl = result.url;
+      size = fileBuffer.length;
+      mimeType = contentType;
+    } else {
+      let fileType: 'pdf' | 'image' | 'document' | 'zip' | 'other' = 'other';
+      if (contentType.includes('pdf')) fileType = 'pdf';
+      else if (contentType.startsWith('image/')) fileType = 'image';
+      else if (contentType.includes('zip') || contentType.includes('archive')) fileType = 'zip';
+      else if (contentType.includes('document') || contentType.includes('word') || contentType.includes('text')) fileType = 'document';
+      const uploadResult = await r2Service.uploadFile({
+        file: fileBuffer,
+        filename,
+        contentType,
+        programId: courseId.toString(),
+        type: fileType,
+      });
+      fileUrl = uploadResult.url;
+      size = uploadResult.size;
+      mimeType = uploadResult.contentType;
+    }
 
-    // courseId is determined above based on lesson type
-
-    // Upload to Cloudflare R2
-    const uploadResult = await r2Service.uploadFile({
-      file: fileBuffer,
-      filename,
-      contentType,
-      programId: courseId.toString(),
-      type: fileType,
-    });
-
-    // Create resource record
     const resource = await prisma.moduleResource.create({
       data: {
         moduleId,
         title: title || filename,
         type: 'file',
-        fileUrl: uploadResult.url,
-        filename: uploadResult.filename,
-        size: uploadResult.size,
-        mimeType: uploadResult.contentType,
+        fileUrl,
+        filename,
+        size,
+        mimeType,
         sharedBy: userId
       },
       include: {
@@ -341,30 +348,42 @@ router.post('/lessons/:lessonId/resources/upload', requireAuth, async (req, res)
     }
 
     const fileBuffer = Buffer.from(file, 'base64');
+    let fileUrl: string;
+    let size: number;
+    let mimeType: string;
 
-    let fileType: 'pdf' | 'image' | 'document' | 'zip' | 'other' = 'other';
-    if (contentType.includes('pdf')) fileType = 'pdf';
-    else if (contentType.startsWith('image/')) fileType = 'image';
-    else if (contentType.includes('zip') || contentType.includes('archive')) fileType = 'zip';
-    else if (contentType.includes('document') || contentType.includes('word') || contentType.includes('text')) fileType = 'document';
-
-    const uploadResult = await r2Service.uploadFile({
-      file: fileBuffer,
-      filename,
-      contentType,
-      programId: courseId.toString(),
-      type: fileType,
-    });
+    if (contentType.startsWith('image/') && isCloudflareImagesConfigured()) {
+      const result = await uploadImageToCloudflareImages(fileBuffer, filename, contentType);
+      fileUrl = result.url;
+      size = fileBuffer.length;
+      mimeType = contentType;
+    } else {
+      let fileType: 'pdf' | 'image' | 'document' | 'zip' | 'other' = 'other';
+      if (contentType.includes('pdf')) fileType = 'pdf';
+      else if (contentType.startsWith('image/')) fileType = 'image';
+      else if (contentType.includes('zip') || contentType.includes('archive')) fileType = 'zip';
+      else if (contentType.includes('document') || contentType.includes('word') || contentType.includes('text')) fileType = 'document';
+      const uploadResult = await r2Service.uploadFile({
+        file: fileBuffer,
+        filename,
+        contentType,
+        programId: courseId.toString(),
+        type: fileType,
+      });
+      fileUrl = uploadResult.url;
+      size = uploadResult.size;
+      mimeType = uploadResult.contentType;
+    }
 
     const resource = await prisma.moduleResource.create({
       data: {
         moduleId,
         title: title || filename,
         type: 'file',
-        fileUrl: uploadResult.url,
-        filename: uploadResult.filename,
-        size: uploadResult.size,
-        mimeType: uploadResult.contentType,
+        fileUrl,
+        filename,
+        size,
+        mimeType,
         sharedBy: userId
       },
       include: {

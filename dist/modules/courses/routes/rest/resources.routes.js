@@ -5,6 +5,7 @@ const auth_1 = require("../../../../middleware/auth");
 const prisma_1 = require("../../../../utils/prisma");
 const logger_1 = require("../../../../utils/logger");
 const cloudflare_r2_service_1 = require("../../services/cloudflare-r2.service");
+const cloudflare_images_1 = require("../../../../utils/cloudflare-images");
 const router = (0, express_1.Router)();
 const r2Service = new cloudflare_r2_service_1.CloudflareR2Service();
 /**
@@ -170,37 +171,46 @@ router.post('/modules/:moduleId/resources/upload', auth_1.requireAuth, async (re
                 courseId = programModule.programId;
             }
         }
-        // Decode base64 file
         const fileBuffer = Buffer.from(file, 'base64');
-        // Determine file type from content type
-        let fileType = 'other';
-        if (contentType.includes('pdf'))
-            fileType = 'pdf';
-        else if (contentType.startsWith('image/'))
-            fileType = 'image';
-        else if (contentType.includes('zip') || contentType.includes('archive'))
-            fileType = 'zip';
-        else if (contentType.includes('document') || contentType.includes('word') || contentType.includes('text'))
-            fileType = 'document';
-        // courseId is determined above based on lesson type
-        // Upload to Cloudflare R2
-        const uploadResult = await r2Service.uploadFile({
-            file: fileBuffer,
-            filename,
-            contentType,
-            programId: courseId.toString(),
-            type: fileType,
-        });
-        // Create resource record
+        let fileUrl;
+        let size;
+        let mimeType;
+        if (contentType.startsWith('image/') && (0, cloudflare_images_1.isCloudflareImagesConfigured)()) {
+            const result = await (0, cloudflare_images_1.uploadImageToCloudflareImages)(fileBuffer, filename, contentType);
+            fileUrl = result.url;
+            size = fileBuffer.length;
+            mimeType = contentType;
+        }
+        else {
+            let fileType = 'other';
+            if (contentType.includes('pdf'))
+                fileType = 'pdf';
+            else if (contentType.startsWith('image/'))
+                fileType = 'image';
+            else if (contentType.includes('zip') || contentType.includes('archive'))
+                fileType = 'zip';
+            else if (contentType.includes('document') || contentType.includes('word') || contentType.includes('text'))
+                fileType = 'document';
+            const uploadResult = await r2Service.uploadFile({
+                file: fileBuffer,
+                filename,
+                contentType,
+                programId: courseId.toString(),
+                type: fileType,
+            });
+            fileUrl = uploadResult.url;
+            size = uploadResult.size;
+            mimeType = uploadResult.contentType;
+        }
         const resource = await prisma_1.prisma.moduleResource.create({
             data: {
                 moduleId,
                 title: title || filename,
                 type: 'file',
-                fileUrl: uploadResult.url,
-                filename: uploadResult.filename,
-                size: uploadResult.size,
-                mimeType: uploadResult.contentType,
+                fileUrl,
+                filename,
+                size,
+                mimeType,
                 sharedBy: userId
             },
             include: {
@@ -316,31 +326,45 @@ router.post('/lessons/:lessonId/resources/upload', auth_1.requireAuth, async (re
             }
         }
         const fileBuffer = Buffer.from(file, 'base64');
-        let fileType = 'other';
-        if (contentType.includes('pdf'))
-            fileType = 'pdf';
-        else if (contentType.startsWith('image/'))
-            fileType = 'image';
-        else if (contentType.includes('zip') || contentType.includes('archive'))
-            fileType = 'zip';
-        else if (contentType.includes('document') || contentType.includes('word') || contentType.includes('text'))
-            fileType = 'document';
-        const uploadResult = await r2Service.uploadFile({
-            file: fileBuffer,
-            filename,
-            contentType,
-            programId: courseId.toString(),
-            type: fileType,
-        });
+        let fileUrl;
+        let size;
+        let mimeType;
+        if (contentType.startsWith('image/') && (0, cloudflare_images_1.isCloudflareImagesConfigured)()) {
+            const result = await (0, cloudflare_images_1.uploadImageToCloudflareImages)(fileBuffer, filename, contentType);
+            fileUrl = result.url;
+            size = fileBuffer.length;
+            mimeType = contentType;
+        }
+        else {
+            let fileType = 'other';
+            if (contentType.includes('pdf'))
+                fileType = 'pdf';
+            else if (contentType.startsWith('image/'))
+                fileType = 'image';
+            else if (contentType.includes('zip') || contentType.includes('archive'))
+                fileType = 'zip';
+            else if (contentType.includes('document') || contentType.includes('word') || contentType.includes('text'))
+                fileType = 'document';
+            const uploadResult = await r2Service.uploadFile({
+                file: fileBuffer,
+                filename,
+                contentType,
+                programId: courseId.toString(),
+                type: fileType,
+            });
+            fileUrl = uploadResult.url;
+            size = uploadResult.size;
+            mimeType = uploadResult.contentType;
+        }
         const resource = await prisma_1.prisma.moduleResource.create({
             data: {
                 moduleId,
                 title: title || filename,
                 type: 'file',
-                fileUrl: uploadResult.url,
-                filename: uploadResult.filename,
-                size: uploadResult.size,
-                mimeType: uploadResult.contentType,
+                fileUrl,
+                filename,
+                size,
+                mimeType,
                 sharedBy: userId
             },
             include: {

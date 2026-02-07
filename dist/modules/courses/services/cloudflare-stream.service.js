@@ -8,7 +8,7 @@ const axios_1 = __importDefault(require("axios"));
 class CloudflareStreamService {
     constructor() {
         this.accountId = process.env.CLOUDFLARE_ACCOUNT_ID;
-        this.apiToken = process.env.CLOUDFLARE_STREAM_API_TOKEN;
+        this.apiToken = process.env.CLOUDFLARE_API_TOKEN;
         this.apiClient = axios_1.default.create({
             baseURL: `https://api.cloudflare.com/client/v4/accounts/${this.accountId}/stream`,
             headers: {

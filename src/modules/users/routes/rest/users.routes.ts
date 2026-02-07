@@ -1,12 +1,15 @@
 // modules/users/routes/rest/users.routes.ts
-import { Router } from 'express';
+import { Router, Request, Response } from 'express';
 import { UsersService } from '../../services/users.service';
-// Import loginRateLimiter middleware
 import { loginRateLimiter, registrationRateLimiter, passwordResetRateLimiter, generalRateLimiter } from '../../../../middleware/rate-limit';
 import { validate } from '../../../../middleware/validation';
 import { loginSchema, createUserSchema, forgotPasswordSchema, resetPasswordSchema, refreshTokenSchema, verifyEmailSchema, resendVerificationSchema } from '../../../../utils/validation-schemas';
 import { requireAuth } from '../../../../middleware/auth';
 import { z } from 'zod';
+import { CloudflareR2Service } from '../../../courses/services/cloudflare-r2.service';
+import { isCloudflareImagesConfigured, uploadImageToCloudflareImages } from '../../../../utils/cloudflare-images';
+
+const r2Service = new CloudflareR2Service();
 
 const router = Router();
 const service = new UsersService();
@@ -585,6 +588,87 @@ router.patch('/me/profile',
     }
   }
 );
+
+/**
+ * @swagger
+ * /api/users/me/upload-image:
+ *   post:
+ *     summary: Upload profile image (avatar) to Cloudflare
+ *     description: Uploads to Cloudflare Images when configured (optimized delivery), otherwise to Cloudflare R2. Returns the public URL to use as profilePicture.
+ *     tags: [Users]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [file, filename, contentType]
+ *             properties:
+ *               file: { type: string, format: base64 }
+ *               filename: { type: string }
+ *               contentType: { type: string, example: image/png }
+ *     responses:
+ *       200:
+ *         description: { url: string }
+ *       400:
+ *         description: Invalid request
+ */
+const uploadImageSchema = z.object({
+  file: z.string().min(1),
+  filename: z.string().min(1),
+  contentType: z.string().min(1).refine((v) => v.startsWith('image/'), { message: 'Must be an image type' }),
+});
+
+const uploadProfilePhotoHandler = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    const userId = (req as any).user?.id;
+    if (!userId) {
+      res.status(401).json({ error: 'Unauthorized' });
+      return;
+    }
+    const { file, filename, contentType } = req.body as { file: string; filename: string; contentType: string };
+    const buffer = Buffer.from(file, 'base64');
+
+    if (isCloudflareImagesConfigured()) {
+      const result = await uploadImageToCloudflareImages(buffer, filename, contentType);
+      res.json({ url: result.url });
+      return;
+    }
+
+    const result = await r2Service.uploadImageToFolder('avatars', userId, {
+      file: buffer,
+      filename,
+      contentType,
+    });
+    res.json({ url: result.url });
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message || 'Image upload failed' });
+  }
+};
+
+// Middleware stack for profile photo upload (shared by both paths)
+const uploadProfilePhotoMw = [
+  requireAuth,
+  generalRateLimiter,
+  validate({ body: uploadImageSchema }),
+  uploadProfilePhotoHandler,
+];
+
+// Explicit GET handlers so these paths always return JSON from our app (not host HTML 404)
+router.get('/me/upload-image', (req, res) => {
+  res.status(405).json({ error: 'Method Not Allowed', message: 'Use POST to upload an image' });
+});
+router.post('/me/upload-image', ...uploadProfilePhotoMw);
+
+// Alternate path for profile photo upload (in case /me/upload-image is blocked or missing on some deploys)
+router.get('/me/profile/photo', (req, res) => {
+  res.status(405).json({ error: 'Method Not Allowed', message: 'Use POST to upload an image' });
+});
+router.post('/me/profile/photo', ...uploadProfilePhotoMw);
 
 /**
  * @swagger

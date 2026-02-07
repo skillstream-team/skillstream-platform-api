@@ -377,8 +377,15 @@ process.on('uncaughtException', (error) => {
     }
 });
 
-// Sentry error handler (before global error handler)
-// Note: Error handling is done via our custom errorHandler middleware
+// 404 for any unmatched route (must be after all route registration)
+app.use((req, res, next) => {
+  res.status(404).json({
+    error: 'Not found',
+    message: `No route for ${req.method} ${req.path}`,
+    path: req.path,
+    method: req.method,
+  });
+});
 
 // Global error handler (must be last)
 app.use(errorHandler);

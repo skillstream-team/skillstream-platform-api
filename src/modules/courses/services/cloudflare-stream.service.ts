@@ -63,7 +63,7 @@ export class CloudflareStreamService {
 
   constructor() {
     this.accountId = process.env.CLOUDFLARE_ACCOUNT_ID!;
-    this.apiToken = process.env.CLOUDFLARE_STREAM_API_TOKEN!;
+    this.apiToken = process.env.CLOUDFLARE_API_TOKEN!;
     
     this.apiClient = axios.create({
       baseURL: `https://api.cloudflare.com/client/v4/accounts/${this.accountId}/stream`,

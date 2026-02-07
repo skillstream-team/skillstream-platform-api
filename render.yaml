@@ -46,10 +46,10 @@ services:
         sync: false
       - key: R2_BUCKET_NAME
         sync: false
-      # Cloudflare Stream (if using)
-      - key: CLOUDFLARE_STREAM_API_TOKEN
-        sync: false
+      # Cloudflare Images + Stream (same token)
       - key: CLOUDFLARE_ACCOUNT_ID
+        sync: false
+      - key: CLOUDFLARE_API_TOKEN
         sync: false
 
 # Note: You'll need to create separate services in Render for:

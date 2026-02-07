@@ -3,12 +3,14 @@ Object.defineProperty(exports, "__esModule", { value: true });
 // modules/users/routes/rest/users.routes.ts
 const express_1 = require("express");
 const users_service_1 = require("../../services/users.service");
-// Import loginRateLimiter middleware
 const rate_limit_1 = require("../../../../middleware/rate-limit");
 const validation_1 = require("../../../../middleware/validation");
 const validation_schemas_1 = require("../../../../utils/validation-schemas");
 const auth_1 = require("../../../../middleware/auth");
 const zod_1 = require("zod");
+const cloudflare_r2_service_1 = require("../../../courses/services/cloudflare-r2.service");
+const cloudflare_images_1 = require("../../../../utils/cloudflare-images");
+const r2Service = new cloudflare_r2_service_1.CloudflareR2Service();
 const router = (0, express_1.Router)();
 const service = new users_service_1.UsersService();
 /**
@@ -538,6 +540,58 @@ router.patch('/me/profile', auth_1.requireAuth, rate_limit_1.generalRateLimiter,
     }
     catch (error) {
         res.status(500).json({ error: error.message || 'Failed to update profile' });
+    }
+});
+/**
+ * @swagger
+ * /api/users/me/upload-image:
+ *   post:
+ *     summary: Upload profile image (avatar) to Cloudflare
+ *     description: Uploads to Cloudflare Images when configured (optimized delivery), otherwise to Cloudflare R2. Returns the public URL to use as profilePicture.
+ *     tags: [Users]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [file, filename, contentType]
+ *             properties:
+ *               file: { type: string, format: base64 }
+ *               filename: { type: string }
+ *               contentType: { type: string, example: image/png }
+ *     responses:
+ *       200:
+ *         description: { url: string }
+ *       400:
+ *         description: Invalid request
+ */
+const uploadImageSchema = zod_1.z.object({
+    file: zod_1.z.string().min(1),
+    filename: zod_1.z.string().min(1),
+    contentType: zod_1.z.string().min(1).refine((v) => v.startsWith('image/'), { message: 'Must be an image type' }),
+});
+router.post('/me/upload-image', auth_1.requireAuth, rate_limit_1.generalRateLimiter, (0, validation_1.validate)({ body: uploadImageSchema }), async (req, res) => {
+    try {
+        const userId = req.user?.id;
+        if (!userId)
+            return res.status(401).json({ error: 'Unauthorized' });
+        const { file, filename, contentType } = req.body;
+        const buffer = Buffer.from(file, 'base64');
+        if ((0, cloudflare_images_1.isCloudflareImagesConfigured)()) {
+            const result = await (0, cloudflare_images_1.uploadImageToCloudflareImages)(buffer, filename, contentType);
+            return res.json({ url: result.url });
+        }
+        const result = await r2Service.uploadImageToFolder('avatars', userId, {
+            file: buffer,
+            filename,
+            contentType,
+        });
+        res.json({ url: result.url });
+    }
+    catch (error) {
+        res.status(500).json({ error: error.message || 'Image upload failed' });
     }
 });
 /**

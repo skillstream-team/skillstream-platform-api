@@ -6,6 +6,8 @@ const s3_request_presigner_1 = require("@aws-sdk/s3-request-presigner");
 class CloudflareR2Service {
     constructor() {
         this.bucketName = process.env.CLOUDFLARE_R2_BUCKET_NAME || 'skillstream-media';
+        const base = process.env.CLOUDFLARE_R2_PUBLIC_BASE_URL;
+        this.publicBaseUrl = base && base.replace(/\/+$/, '') ? base.replace(/\/+$/, '') : null;
         this.s3Client = new client_s3_1.S3Client({
             region: 'auto',
             endpoint: `https://${process.env.CLOUDFLARE_ACCOUNT_ID}.r2.cloudflarestorage.com`,
@@ -30,9 +32,12 @@ class CloudflareR2Service {
             },
         });
         await this.s3Client.send(command);
+        const url = this.publicBaseUrl
+            ? `${this.publicBaseUrl}/${key}`
+            : `https://${this.bucketName}.${process.env.CLOUDFLARE_ACCOUNT_ID}.r2.cloudflarestorage.com/${key}`;
         return {
             key,
-            url: `https://${this.bucketName}.${process.env.CLOUDFLARE_ACCOUNT_ID}.r2.cloudflarestorage.com/${key}`,
+            url,
             filename: data.filename,
             size: data.file.length,
             contentType: data.contentType,
@@ -54,12 +59,45 @@ class CloudflareR2Service {
         return await (0, s3_request_presigner_1.getSignedUrl)(this.s3Client, command, { expiresIn });
     }
     async getFileUrl(key) {
+        if (this.publicBaseUrl)
+            return `${this.publicBaseUrl}/${key}`;
         return `https://${this.bucketName}.${process.env.CLOUDFLARE_ACCOUNT_ID}.r2.cloudflarestorage.com/${key}`;
     }
     generateKey(courseId, type, filename) {
         const timestamp = Date.now();
         const sanitizedFilename = filename.replace(/[^a-zA-Z0-9.-]/g, '_');
         return `courses/${courseId}/${type}/${timestamp}_${sanitizedFilename}`;
+    }
+    /**
+     * Upload an image to a named folder (e.g. avatars, thumbnails). Use for profile pictures and course/lesson thumbnails.
+     */
+    async uploadImageToFolder(folder, folderId, data) {
+        const timestamp = Date.now();
+        const sanitizedFilename = data.filename.replace(/[^a-zA-Z0-9.-]/g, '_');
+        const key = `${folder}/${folderId}/${timestamp}_${sanitizedFilename}`;
+        const command = new client_s3_1.PutObjectCommand({
+            Bucket: this.bucketName,
+            Key: key,
+            Body: data.file,
+            ContentType: data.contentType,
+            Metadata: {
+                folder,
+                folderId,
+                originalFilename: data.filename,
+            },
+        });
+        await this.s3Client.send(command);
+        const url = this.publicBaseUrl
+            ? `${this.publicBaseUrl}/${key}`
+            : `https://${this.bucketName}.${process.env.CLOUDFLARE_ACCOUNT_ID}.r2.cloudflarestorage.com/${key}`;
+        return {
+            key,
+            url,
+            filename: data.filename,
+            size: data.file.length,
+            contentType: data.contentType,
+            uploadedAt: new Date(),
+        };
     }
     // Get file metadata
     async getFileMetadata(key) {

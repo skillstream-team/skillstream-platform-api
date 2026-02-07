@@ -83,6 +83,8 @@ Create an R2 bucket and **R2 API token** (read/write) in the dashboard.
 3. **Upload file** – The **client** uploads the video file directly to the one-time URL. Per [Cloudflare Stream direct creator uploads](https://developers.cloudflare.com/stream/uploading-videos/direct-creator-uploads/): use **POST** with **multipart/form-data** and the form field named **`file`** (basic upload, max 200 MB). For larger or resumable uploads use the TUS protocol. Your API never receives the video bytes.
 4. **Playback** – After processing, Stream provides an HLS playback URL; your app uses that for the lesson player.
 
+**Allowed origins (CORS):** For the Stream player iframe to load the manifest and metadata, the video must allow your app’s origin(s). The backend adds `allowedorigins` to the TUS `Upload-Metadata` for every new upload, using localhost origins (5173–5175) plus `FRONTEND_URL` (comma‑separated). Set `FRONTEND_URL` in production (e.g. `https://skillstream.world`). Videos uploaded *before* this change may need their allowed origins set in the [Stream dashboard](https://dash.cloudflare.com/) (Stream → a video → Edit → Allowed origins) or be re-uploaded.
+
 So **videos do work for courses**, using the same Cloudflare account and token (Stream Edit). The flow is different from profile photos because Stream needs a direct upload for large files and then transcodes the video. The backend exposes this via the **GraphQL media API** (`/graphql/media`): `createVideo`, `getVideoUploadUrl`, `updateVideoStatus`, etc.
 
 ---

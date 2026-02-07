@@ -478,18 +478,32 @@ router.post('/modules/:moduleId/videos/tus', requireAuth, async (req, res) => {
 
     const tusResumable = req.headers['tus-resumable'] as string | undefined;
     const uploadLength = req.headers['upload-length'] as string | undefined;
-    const uploadMetadata = req.headers['upload-metadata'] as string | undefined;
+    let uploadMetadata = req.headers['upload-metadata'] as string | undefined;
     if (!uploadLength) {
       return res.status(400).json({ error: 'TUS Upload-Length required' });
     }
+
+    const allowedOrigins = [
+      'http://localhost:5173',
+      'http://localhost:5174',
+      'http://localhost:5175',
+      'http://127.0.0.1:5173',
+      'http://127.0.0.1:5174',
+      'http://127.0.0.1:5175',
+      ...(process.env.FRONTEND_URL ? process.env.FRONTEND_URL.split(',').map((u) => u.trim()).filter(Boolean) : []),
+    ];
+    const originsB64 = Buffer.from([...new Set(allowedOrigins)].join(','), 'utf8').toString('base64');
+    uploadMetadata = uploadMetadata
+      ? `${uploadMetadata},allowedorigins ${originsB64}`
+      : `allowedorigins ${originsB64}`;
 
     const streamUrl = `https://api.cloudflare.com/client/v4/accounts/${accountId}/stream`;
     const forwardHeaders: Record<string, string> = {
       'Authorization': `Bearer ${apiToken}`,
       'Upload-Length': uploadLength,
+      'Upload-Metadata': uploadMetadata,
     };
     if (tusResumable) forwardHeaders['Tus-Resumable'] = tusResumable;
-    if (uploadMetadata) forwardHeaders['Upload-Metadata'] = uploadMetadata;
 
     const cfRes = await fetch(streamUrl, {
       method: 'POST',

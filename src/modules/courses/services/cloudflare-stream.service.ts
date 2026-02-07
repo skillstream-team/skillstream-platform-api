@@ -74,19 +74,15 @@ export class CloudflareStreamService {
     });
   }
 
-  // Create a new video upload
+  // Create a new video upload (same valid body as createDirectUpload)
   async createVideo(data: CreateVideoDto): Promise<VideoResponseDto> {
     try {
-      const response = await this.apiClient.post('/direct_upload', {
-        maxDurationSeconds: data.duration || 3600,
-        expiry: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(), // 7 days
-        metadata: {
-          collectionId: data.collectionId,
-          title: data.title,
-          description: data.description,
-          type: data.type,
-        },
-      });
+      const body: Record<string, unknown> = {
+        maxDurationSeconds: data.duration ?? 3600,
+        expiry: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+      };
+      if (data.title) body.meta = { name: data.title };
+      const response = await this.apiClient.post('/direct_upload', body);
 
       return {
         id: response.data.result.uid,
@@ -108,16 +104,17 @@ export class CloudflareStreamService {
   /** Create a direct upload and return streamId + uploadURL for client upload (e.g. lesson videos). */
   async createDirectUpload(data: CreateVideoDto): Promise<{ streamId: string; uploadURL: string }> {
     try {
-      const response = await this.apiClient.post<{ result: { uid: string; uploadURL: string } }>('/direct_upload', {
-        maxDurationSeconds: data.duration || 3600,
-        expiry: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(), // 7 days
-        metadata: {
-          collectionId: data.collectionId,
-          title: data.title,
-          description: data.description,
-          type: data.type,
-        },
-      });
+      // Stream API expects only maxDurationSeconds (required); optional: expiry (ISO), meta.name (video name).
+      // Do not send "metadata" or unsupported fields — they cause 400 Bad Request.
+      const body: Record<string, unknown> = {
+        maxDurationSeconds: data.duration ?? 3600,
+      };
+      const expiry = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+      body.expiry = expiry;
+      if (data.title) {
+        body.meta = { name: data.title };
+      }
+      const response = await this.apiClient.post<{ result: { uid: string; uploadURL: string } }>('/direct_upload', body);
       const result = response.data.result;
       if (!result?.uid || !result?.uploadURL) {
         throw new Error('Stream did not return upload URL');

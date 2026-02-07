@@ -123,8 +123,12 @@ export class CloudflareStreamService {
         throw new Error('Stream did not return upload URL');
       }
       return { streamId: result.uid, uploadURL: result.uploadURL };
-    } catch (error) {
-      throw new Error(`Failed to create direct upload: ${error}`);
+    } catch (error: any) {
+      const msg = error?.response?.data?.errors?.[0]?.message
+        || error?.response?.data?.error
+        || error?.message
+        || String(error);
+      throw new Error(`Stream direct upload failed: ${msg}`);
     }
   }
 

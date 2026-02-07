@@ -75,22 +75,24 @@ router.get('/modules/:moduleId/resources', requireAuth, async (req, res) => {
   try {
     const { moduleId } = req.params;
 
-    // ModuleResource schema only relates to QuickModule, but moduleId is just a string
-    // So we can query by moduleId directly without the relation constraint
-    const resources = await prisma.moduleResource.findMany({
-      where: { moduleId },
-      include: {
-        sharer: {
-          select: { id: true, username: true, email: true }
-        }
-      },
-      orderBy: { createdAt: 'desc' }
-    });
+    const [moduleResources, lessonResources] = await Promise.all([
+      prisma.moduleResource.findMany({
+        where: { moduleId },
+        include: { sharer: { select: { id: true, username: true, email: true } } },
+        orderBy: { createdAt: 'desc' },
+      }),
+      prisma.lessonResource.findMany({
+        where: { moduleId },
+        include: { sharer: { select: { id: true, username: true, email: true } } },
+        orderBy: { createdAt: 'desc' },
+      }),
+    ]);
 
-    res.json({
-      success: true,
-      data: resources
-    });
+    const data = [...moduleResources, ...lessonResources].sort(
+      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    );
+
+    res.json({ success: true, data });
   } catch (error) {
     logger.error('Error fetching module resources', error);
     res.status(500).json({ error: 'Failed to fetch module resources' });
@@ -110,29 +112,27 @@ router.post('/modules/:moduleId/resources', requireAuth, async (req, res) => {
     const userId = (req as any).user?.id;
     const { title, type, url, fileUrl, filename, size, mimeType } = req.body;
 
-    const resource = await prisma.moduleResource.create({
-      data: {
-        moduleId,
-        title,
-        type,
-        url,
-        fileUrl,
-        filename,
-        size,
-        mimeType,
-        sharedBy: userId
-      },
-      include: {
-        sharer: {
-          select: { id: true, username: true, email: true }
-        }
-      }
-    });
+    const [regularModule, quickModule] = await Promise.all([
+      prisma.module.findUnique({ where: { id: moduleId } }),
+      prisma.quickModule.findUnique({ where: { id: moduleId } }),
+    ]);
+    if (!regularModule && !quickModule) {
+      return res.status(404).json({ error: 'Module not found' });
+    }
 
-    res.status(201).json({
-      success: true,
-      data: resource
+    if (quickModule) {
+      const resource = await prisma.moduleResource.create({
+        data: { moduleId, title, type, url, fileUrl, filename, size, mimeType, sharedBy: userId },
+        include: { sharer: { select: { id: true, username: true, email: true } } },
+      });
+      return res.status(201).json({ success: true, data: resource });
+    }
+
+    const resource = await prisma.lessonResource.create({
+      data: { moduleId, title, type, url, fileUrl, filename, size, mimeType, sharedBy: userId },
+      include: { sharer: { select: { id: true, username: true, email: true } } },
     });
+    return res.status(201).json({ success: true, data: resource });
   } catch (error) {
     logger.error('Error sharing resource', error);
     res.status(500).json({ error: 'Failed to share resource' });
@@ -166,9 +166,6 @@ router.post('/modules/:moduleId/resources/upload', requireAuth, async (req, res)
       });
     }
 
-    // Verify module exists - check both Module and QuickModule types
-    // Even though schema shows ModuleResource relates to QuickModule, 
-    // moduleId is just a string field, so we can support both types
     const [regularModule, quickModule] = await Promise.all([
       prisma.module.findUnique({ where: { id: moduleId } }),
       prisma.quickModule.findUnique({ where: { id: moduleId } })
@@ -178,19 +175,13 @@ router.post('/modules/:moduleId/resources/upload', requireAuth, async (req, res)
       return res.status(404).json({ error: 'Module not found' });
     }
 
-    // Determine courseId based on module type
-    // For regular Module, try to get programId from ProgramModule relation
-    // For QuickModule, use moduleId as courseId
     let courseId = moduleId;
     if (regularModule) {
-      // Try to find the program this module belongs to
       const programModule = await prisma.programModule.findFirst({
         where: { moduleId },
         select: { programId: true }
       });
-      if (programModule) {
-        courseId = programModule.programId;
-      }
+      if (programModule) courseId = programModule.programId;
     }
 
     const fileBuffer = Buffer.from(file, 'base64');
@@ -221,7 +212,27 @@ router.post('/modules/:moduleId/resources/upload', requireAuth, async (req, res)
       mimeType = uploadResult.contentType;
     }
 
-    const resource = await prisma.moduleResource.create({
+    if (quickModule) {
+      const resource = await prisma.moduleResource.create({
+        data: {
+          moduleId,
+          title: title || filename,
+          type: 'file',
+          fileUrl,
+          filename,
+          size,
+          mimeType,
+          sharedBy: userId,
+        },
+        include: {
+          sharer: { select: { id: true, username: true, email: true } },
+          module: { select: { id: true, title: true, scheduledAt: true } },
+        },
+      });
+      return res.status(201).json({ success: true, data: resource });
+    }
+
+    const resource = await prisma.lessonResource.create({
       data: {
         moduleId,
         title: title || filename,
@@ -230,22 +241,14 @@ router.post('/modules/:moduleId/resources/upload', requireAuth, async (req, res)
         filename,
         size,
         mimeType,
-        sharedBy: userId
+        sharedBy: userId,
       },
       include: {
-        sharer: {
-          select: { id: true, username: true, email: true }
-        },
-        module: {
-          select: { id: true, title: true, scheduledAt: true }
-        }
-      }
+        sharer: { select: { id: true, username: true, email: true } },
+        module: { select: { id: true, title: true, scheduledAt: true } },
+      },
     });
-
-    res.status(201).json({
-      success: true,
-      data: resource
-    });
+    return res.status(201).json({ success: true, data: resource });
   } catch (error) {
     logger.error('Error uploading resource', error);
     res.status(500).json({ error: 'Failed to upload resource: ' + (error as Error).message });
@@ -264,7 +267,6 @@ router.delete('/modules/:moduleId/resources/:resourceId', requireAuth, async (re
     const { moduleId, resourceId } = req.params;
     const userId = (req as any).user?.id;
 
-    // Check if resource exists and user has permission
     const resource = await prisma.moduleResource.findUnique({
       where: { id: resourceId },
       include: {
@@ -274,24 +276,33 @@ router.delete('/modules/:moduleId/resources/:resourceId', requireAuth, async (re
       }
     });
 
-    if (!resource) {
-      return res.status(404).json({ error: 'Resource not found' });
+    if (resource) {
+      if (resource.sharedBy !== userId && resource.module?.teacherId !== userId) {
+        return res.status(403).json({ error: 'You do not have permission to delete this resource' });
+      }
+      await prisma.moduleResource.delete({ where: { id: resourceId } });
+      return res.json({ success: true, message: 'Resource deleted successfully' });
     }
 
-    // Check if user is the sharer or the module teacher
-    if (resource.sharedBy !== userId && resource.module?.teacherId !== userId) {
-      return res.status(403).json({ error: 'You do not have permission to delete this resource' });
+    const video = await prisma.video.findUnique({
+      where: { id: resourceId },
+      select: { id: true, uploadedBy: true, programId: true },
+    });
+    if (video && video.uploadedBy === userId) {
+      await prisma.video.delete({ where: { id: resourceId } });
+      return res.json({ success: true, message: 'Resource deleted successfully' });
     }
 
-    // Delete the resource
-    await prisma.moduleResource.delete({
-      where: { id: resourceId }
+    const lessonResource = await prisma.lessonResource.findFirst({
+      where: { id: resourceId, moduleId },
+      select: { id: true, sharedBy: true },
     });
+    if (lessonResource && lessonResource.sharedBy === userId) {
+      await prisma.lessonResource.delete({ where: { id: resourceId } });
+      return res.json({ success: true, message: 'Resource deleted successfully' });
+    }
 
-    res.json({
-      success: true,
-      message: 'Resource deleted successfully'
-    });
+    return res.status(404).json({ error: 'Resource not found' });
   } catch (error) {
     logger.error('Error deleting resource', error);
     res.status(500).json({ error: 'Failed to delete resource' });
@@ -309,6 +320,7 @@ router.post('/modules/:moduleId/videos/prepare', requireAuth, async (req, res) =
   try {
     const { moduleId } = req.params;
     const userId = (req as any).user?.id;
+    if (!userId) return res.status(401).json({ error: 'Unauthorized' });
     const { title } = req.body;
 
     const [regularModule, quickModule] = await Promise.all([
@@ -328,6 +340,12 @@ router.post('/modules/:moduleId/videos/prepare', requireAuth, async (req, res) =
       if (programModule) programId = programModule.programId;
     }
 
+    if (!process.env.CLOUDFLARE_ACCOUNT_ID || !process.env.CLOUDFLARE_API_TOKEN) {
+      return res.status(503).json({
+        error: 'Video upload is not configured. Set CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN (with Stream Edit).',
+      });
+    }
+
     const { streamId, uploadURL } = await streamService.createDirectUpload({
       collectionId: programId,
       title: title || 'Lesson video',
@@ -335,38 +353,66 @@ router.post('/modules/:moduleId/videos/prepare', requireAuth, async (req, res) =
       duration: 3600,
     });
 
-    const resource = await prisma.moduleResource.create({
+    const resourceTitle = title || 'Video';
+    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+
+    if (quickModule) {
+      const resource = await prisma.moduleResource.create({
+        data: {
+          moduleId,
+          title: resourceTitle,
+          type: 'video',
+          fileUrl: null,
+          url: streamId,
+          filename: null,
+          size: null,
+          mimeType: 'video/mp4',
+          sharedBy: userId,
+        },
+        include: {
+          sharer: { select: { id: true, username: true, email: true } },
+          module: { select: { id: true, title: true, scheduledAt: true } },
+        },
+      });
+      return res.status(201).json({
+        success: true,
+        data: {
+          resourceId: resource.id,
+          uploadUrl: uploadURL,
+          streamId,
+          expiresAt,
+          title: resource.title,
+        },
+      });
+    }
+
+    const video = await prisma.video.create({
       data: {
-        moduleId,
-        title: title || 'Video',
-        type: 'video',
-        fileUrl: null,
-        url: streamId,
-        filename: null,
-        size: null,
-        mimeType: 'video/mp4',
-        sharedBy: userId,
-      },
-      include: {
-        sharer: { select: { id: true, username: true, email: true } },
-        module: { select: { id: true, title: true, scheduledAt: true } },
+        programId,
+        streamId,
+        title: resourceTitle,
+        type: 'on-demand',
+        status: 'pending',
+        uploadedBy: userId,
       },
     });
-
-    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
-    res.status(201).json({
+    return res.status(201).json({
       success: true,
       data: {
-        resourceId: resource.id,
+        resourceId: video.id,
         uploadUrl: uploadURL,
         streamId,
         expiresAt,
-        title: resource.title,
+        title: video.title,
       },
     });
   } catch (error) {
     logger.error('Error preparing video upload', error);
-    res.status(500).json({ error: 'Failed to prepare video upload: ' + (error as Error).message });
+    const msg = (error as Error).message || 'Unknown error';
+    if (msg.includes('Foreign key') || msg.includes('Record to create not found')) {
+      return res.status(400).json({ error: 'This lesson type does not support video upload.', code: 'UNSUPPORTED_MODULE' });
+    }
+    return res.status(500).json({ error: 'Failed to prepare video upload: ' + msg });
   }
 });
 
@@ -385,29 +431,57 @@ router.get('/modules/:moduleId/videos/:resourceId/status', requireAuth, async (r
       where: { id: resourceId, moduleId },
       include: { sharer: { select: { id: true, username: true, email: true } } },
     });
-    if (!resource || resource.type !== 'video' || !resource.url) {
-      return res.status(404).json({ error: 'Video resource not found' });
+
+    if (resource && resource.type === 'video' && resource.url) {
+      const streamId = resource.url;
+      const streamVideo = await streamService.getVideo(streamId);
+      const playbackUrl = streamVideo.playbackUrl || undefined;
+      const updated = await prisma.moduleResource.update({
+        where: { id: resourceId },
+        data: { fileUrl: playbackUrl || null },
+        include: { sharer: { select: { id: true, username: true, email: true } } },
+      });
+      return res.json({
+        success: true,
+        data: {
+          id: updated.id,
+          title: updated.title,
+          type: updated.type,
+          fileUrl: updated.fileUrl,
+          streamId,
+          status: streamVideo.status,
+        },
+      });
     }
 
-    const streamId = resource.url;
-    const streamVideo = await streamService.getVideo(streamId);
-    const playbackUrl = streamVideo.playbackUrl || undefined;
-
-    const updated = await prisma.moduleResource.update({
+    const video = await prisma.video.findUnique({
       where: { id: resourceId },
-      data: { fileUrl: playbackUrl || null },
-      include: { sharer: { select: { id: true, username: true, email: true } } },
+      select: { id: true, programId: true, streamId: true, title: true, playbackUrl: true, status: true },
+    });
+    if (!video) {
+      return res.status(404).json({ error: 'Video resource not found' });
+    }
+    const streamVideo = await streamService.getVideo(video.streamId);
+    const playbackUrl = streamVideo.playbackUrl || undefined;
+    const updatedVideo = await prisma.video.update({
+      where: { id: resourceId },
+      data: {
+        playbackUrl: playbackUrl || null,
+        status: streamVideo.status,
+        thumbnailUrl: streamVideo.thumbnailUrl || undefined,
+        duration: streamVideo.duration ?? undefined,
+      },
     });
 
-    res.json({
+    return res.json({
       success: true,
       data: {
-        id: updated.id,
-        title: updated.title,
-        type: updated.type,
-        fileUrl: updated.fileUrl,
-        streamId,
-        status: streamVideo.status,
+        id: updatedVideo.id,
+        title: updatedVideo.title,
+        type: 'video',
+        fileUrl: updatedVideo.playbackUrl,
+        streamId: updatedVideo.streamId,
+        status: updatedVideo.status,
       },
     });
   } catch (error) {
@@ -419,23 +493,23 @@ router.get('/modules/:moduleId/videos/:resourceId/status', requireAuth, async (r
 // Backward compatibility routes for /lessons endpoints
 router.get('/lessons/:lessonId/resources', requireAuth, async (req, res) => {
   try {
-    const { lessonId } = req.params;
-    const moduleId = lessonId;
-
-    const resources = await prisma.moduleResource.findMany({
-      where: { moduleId },
-      include: {
-        sharer: {
-          select: { id: true, username: true, email: true }
-        }
-      },
-      orderBy: { createdAt: 'desc' }
-    });
-
-    res.json({
-      success: true,
-      data: resources
-    });
+    const moduleId = req.params.lessonId;
+    const [moduleResources, lessonResources] = await Promise.all([
+      prisma.moduleResource.findMany({
+        where: { moduleId },
+        include: { sharer: { select: { id: true, username: true, email: true } } },
+        orderBy: { createdAt: 'desc' },
+      }),
+      prisma.lessonResource.findMany({
+        where: { moduleId },
+        include: { sharer: { select: { id: true, username: true, email: true } } },
+        orderBy: { createdAt: 'desc' },
+      }),
+    ]);
+    const data = [...moduleResources, ...lessonResources].sort(
+      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    );
+    res.json({ success: true, data });
   } catch (error) {
     logger.error('Error fetching module resources', error);
     res.status(500).json({ error: 'Failed to fetch module resources' });
@@ -510,7 +584,27 @@ router.post('/lessons/:lessonId/resources/upload', requireAuth, async (req, res)
       mimeType = uploadResult.contentType;
     }
 
-    const resource = await prisma.moduleResource.create({
+    if (quickModule) {
+      const resource = await prisma.moduleResource.create({
+        data: {
+          moduleId,
+          title: title || filename,
+          type: 'file',
+          fileUrl,
+          filename,
+          size,
+          mimeType,
+          sharedBy: userId,
+        },
+        include: {
+          sharer: { select: { id: true, username: true, email: true } },
+          module: { select: { id: true, title: true, scheduledAt: true } },
+        },
+      });
+      return res.status(201).json({ success: true, data: resource });
+    }
+
+    const resource = await prisma.lessonResource.create({
       data: {
         moduleId,
         title: title || filename,
@@ -519,22 +613,14 @@ router.post('/lessons/:lessonId/resources/upload', requireAuth, async (req, res)
         filename,
         size,
         mimeType,
-        sharedBy: userId
+        sharedBy: userId,
       },
       include: {
-        sharer: {
-          select: { id: true, username: true, email: true }
-        },
-        module: {
-          select: { id: true, title: true, scheduledAt: true }
-        }
-      }
+        sharer: { select: { id: true, username: true, email: true } },
+        module: { select: { id: true, title: true, scheduledAt: true } },
+      },
     });
-
-    res.status(201).json({
-      success: true,
-      data: resource
-    });
+    return res.status(201).json({ success: true, data: resource });
   } catch (error) {
     logger.error('Error uploading resource', error);
     res.status(500).json({ error: 'Failed to upload resource: ' + (error as Error).message });
@@ -544,33 +630,40 @@ router.post('/lessons/:lessonId/resources/upload', requireAuth, async (req, res)
 router.delete('/lessons/:lessonId/resources/:resourceId', requireAuth, async (req, res) => {
   try {
     const { lessonId, resourceId } = req.params;
+    const moduleId = lessonId;
     const userId = (req as any).user?.id;
 
     const resource = await prisma.moduleResource.findUnique({
       where: { id: resourceId },
-      include: {
-        module: {
-          select: { teacherId: true }
-        }
+      include: { module: { select: { teacherId: true } } },
+    });
+    if (resource) {
+      if (resource.sharedBy !== userId && resource.module?.teacherId !== userId) {
+        return res.status(403).json({ error: 'You do not have permission to delete this resource' });
       }
-    });
-
-    if (!resource) {
-      return res.status(404).json({ error: 'Resource not found' });
+      await prisma.moduleResource.delete({ where: { id: resourceId } });
+      return res.json({ success: true, message: 'Resource deleted successfully' });
     }
 
-    if (resource.sharedBy !== userId && resource.module?.teacherId !== userId) {
-      return res.status(403).json({ error: 'You do not have permission to delete this resource' });
+    const video = await prisma.video.findUnique({
+      where: { id: resourceId },
+      select: { id: true, uploadedBy: true },
+    });
+    if (video && video.uploadedBy === userId) {
+      await prisma.video.delete({ where: { id: resourceId } });
+      return res.json({ success: true, message: 'Resource deleted successfully' });
     }
 
-    await prisma.moduleResource.delete({
-      where: { id: resourceId }
+    const lessonResource = await prisma.lessonResource.findFirst({
+      where: { id: resourceId, moduleId },
+      select: { id: true, sharedBy: true },
     });
+    if (lessonResource && lessonResource.sharedBy === userId) {
+      await prisma.lessonResource.delete({ where: { id: resourceId } });
+      return res.json({ success: true, message: 'Resource deleted successfully' });
+    }
 
-    res.json({
-      success: true,
-      message: 'Resource deleted successfully'
-    });
+    return res.status(404).json({ error: 'Resource not found' });
   } catch (error) {
     logger.error('Error deleting resource', error);
     res.status(500).json({ error: 'Failed to delete resource' });

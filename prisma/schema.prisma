@@ -86,6 +86,7 @@ model User {
   moduleSlots            ModuleSlot[]              @relation("ModuleSlotTeacher")
   quickModules           QuickModule[]             @relation("QuickModuleTeacher")
   moduleResourcesCreated ModuleResource[]          @relation("ModuleResourceSharer")
+  lessonResourcesCreated LessonResource[]          @relation("LessonResourceSharer")
   videoConferencesHosted VideoConference[]         @relation("VideoConferenceHost")
   settings               UserSettings?
   apiKeys                ApiKey[]                  @relation("ApiKeyUser")
@@ -366,7 +367,8 @@ model Module {
   programModules ProgramModule[]
   subscriptionAccesses SubscriptionAccess[]
   engagements        StudentEngagement[]
-  
+  lessonResources    LessonResource[]
+
   @@index([isPreview])
   @@index([teacherId])
   @@index([monetizationType])
@@ -1563,6 +1565,26 @@ model ModuleResource {
   sharer    User        @relation("ModuleResourceSharer", fields: [sharedBy], references: [id])
   createdAt DateTime    @default(now())
   updatedAt DateTime    @updatedAt
+
+  @@index([moduleId, createdAt])
+}
+
+/// Resources (docs, links) for course lessons (Module). Video for lessons uses Video model or ModuleResource when QuickModule.
+model LessonResource {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  moduleId  String   @db.ObjectId
+  module    Module   @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  title     String
+  type      String   // "file", "link", "document", "video"
+  url       String?
+  fileUrl   String?
+  filename  String?
+  size      Int?
+  mimeType  String?
+  sharedBy  String   @db.ObjectId
+  sharer    User     @relation("LessonResourceSharer", fields: [sharedBy], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([moduleId, createdAt])
 }

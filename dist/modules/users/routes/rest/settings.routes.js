@@ -93,6 +93,7 @@ router.put('/users/:userId/settings/billing', auth_1.requireAuth, (0, validation
  */
 router.get('/users/:userId/settings', auth_1.requireAuth, async (req, res) => {
     try {
+        res.set('Cache-Control', 'private, no-store');
         const { userId } = req.params;
         const currentUserId = req.user?.id;
         // Users can only access their own settings

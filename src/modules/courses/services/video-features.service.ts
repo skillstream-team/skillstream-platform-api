@@ -146,6 +146,15 @@ export class VideoFeaturesService {
   }
 
   /**
+   * Delete a video note (only if owned by user)
+   */
+  async deleteNote(videoId: string, noteId: string, userId: string): Promise<void> {
+    await prisma.videoNote.deleteMany({
+      where: { id: noteId, videoId, userId },
+    });
+  }
+
+  /**
    * Create video bookmark
    */
   async createBookmark(data: CreateVideoBookmarkDto): Promise<VideoBookmarkDto> {
@@ -169,6 +178,15 @@ export class VideoFeaturesService {
     });
 
     return bookmarks.map(this.mapBookmarkToDto);
+  }
+
+  /**
+   * Delete a video bookmark (only if owned by user)
+   */
+  async deleteBookmark(videoId: string, bookmarkId: string, userId: string): Promise<void> {
+    await prisma.videoBookmark.deleteMany({
+      where: { id: bookmarkId, videoId, userId },
+    });
   }
 
   /**

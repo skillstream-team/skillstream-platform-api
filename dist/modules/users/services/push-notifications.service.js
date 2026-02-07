@@ -6,6 +6,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.PushNotificationsService = void 0;
 const prisma_1 = require("../../../utils/prisma");
 const web_push_1 = __importDefault(require("web-push"));
+const firebase_1 = require("../../../utils/firebase");
 class PushNotificationsService {
     constructor() {
         this.vapidPublicKey = process.env.VAPID_PUBLIC_KEY || '';
@@ -17,14 +18,12 @@ class PushNotificationsService {
         }
     }
     /**
-     * Subscribe a user to push notifications
+     * Subscribe a user to push notifications (VAPID)
      */
     async subscribe(userId, subscription) {
-        // Validate subscription
         if (!subscription.endpoint || !subscription.keys?.p256dh || !subscription.keys?.auth) {
             throw new Error('Invalid push subscription data');
         }
-        // Upsert subscription (update if exists, create if not)
         await prisma_1.prisma.pushSubscription.upsert({
             where: { userId },
             update: {
@@ -36,6 +35,27 @@ class PushNotificationsService {
                 userId,
                 endpoint: subscription.endpoint,
                 keys: subscription.keys,
+            },
+        });
+    }
+    /**
+     * Register FCM token for a user (Firebase Cloud Messaging)
+     */
+    async registerFcmToken(userId, fcmToken) {
+        if (!fcmToken || typeof fcmToken !== 'string') {
+            throw new Error('Invalid FCM token');
+        }
+        await prisma_1.prisma.pushSubscription.upsert({
+            where: { userId },
+            update: {
+                fcmToken,
+                updatedAt: new Date(),
+            },
+            create: {
+                userId,
+                endpoint: '',
+                keys: {},
+                fcmToken,
             },
         });
     }
@@ -61,27 +81,72 @@ class PushNotificationsService {
         };
     }
     /**
-     * Get user's push subscription
+     * Get user's push subscription (VAPID format for legacy; FCM is stored separately)
      */
     async getSubscription(userId) {
         const subscription = await prisma_1.prisma.pushSubscription.findUnique({
             where: { userId },
         });
-        if (!subscription) {
+        if (!subscription)
             return null;
-        }
-        return {
-            endpoint: subscription.endpoint,
-            keys: subscription.keys,
+        const result = {
+            endpoint: subscription.endpoint || '',
+            keys: subscription.keys || { p256dh: '', auth: '' },
         };
+        if (subscription.fcmToken)
+            result.fcmToken = subscription.fcmToken;
+        return result;
     }
     /**
-     * Send a push notification to a user
+     * Send a push notification to a user (tries FCM first if token exists, else VAPID)
      */
     async sendNotification(userId, payload) {
-        const subscription = await this.getSubscription(userId);
-        if (!subscription) {
+        const record = await prisma_1.prisma.pushSubscription.findUnique({
+            where: { userId },
+        });
+        if (!record) {
             throw new Error('User does not have a push subscription');
+        }
+        // Prefer FCM when available
+        if (record.fcmToken) {
+            try {
+                const messaging = (0, firebase_1.getMessaging)();
+                await messaging.send({
+                    token: record.fcmToken,
+                    notification: {
+                        title: payload.title,
+                        body: payload.body,
+                        imageUrl: payload.image,
+                    },
+                    webpush: {
+                        notification: {
+                            title: payload.title,
+                            body: payload.body,
+                            icon: payload.icon || '/vite.svg',
+                            badge: payload.badge || '/vite.svg',
+                            image: payload.image,
+                            tag: payload.tag,
+                            data: payload.data,
+                        },
+                        fcmOptions: payload.data?.url ? { link: payload.data.url } : undefined,
+                    },
+                    data: payload.data,
+                });
+                return;
+            }
+            catch (error) {
+                if (error?.code === 'messaging/registration-token-not-registered' || error?.code === 'messaging/invalid-registration-token') {
+                    await prisma_1.prisma.pushSubscription.update({
+                        where: { userId },
+                        data: { fcmToken: null },
+                    });
+                }
+                throw error;
+            }
+        }
+        // Fallback to VAPID web-push
+        if (!record.endpoint || !record.keys) {
+            throw new Error('User does not have a valid push subscription');
         }
         const notificationPayload = JSON.stringify({
             title: payload.title,
@@ -94,15 +159,11 @@ class PushNotificationsService {
         });
         try {
             await web_push_1.default.sendNotification({
-                endpoint: subscription.endpoint,
-                keys: {
-                    p256dh: subscription.keys.p256dh,
-                    auth: subscription.keys.auth,
-                },
+                endpoint: record.endpoint,
+                keys: record.keys,
             }, notificationPayload);
         }
         catch (error) {
-            // If subscription is invalid (410 Gone), remove it
             if (error.statusCode === 410 || error.statusCode === 404) {
                 await this.unsubscribe(userId);
                 throw new Error('Push subscription is invalid and has been removed');

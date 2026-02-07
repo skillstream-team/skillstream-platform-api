@@ -17,17 +17,24 @@ const securityHeaders = (req, res, next) => {
     next();
 };
 exports.securityHeaders = securityHeaders;
+/** Normalize origin for comparison (trim, no trailing slash) */
+function normalizeOrigin(url) {
+    return url.trim().replace(/\/+$/, '') || url;
+}
 /**
  * CORS configuration
+ * On Render: set FRONTEND_URL to your frontend origin(s).
+ * Production: https://skillstream.world (add https://www.skillstream.world if needed; comma-separated for multiple).
  */
 exports.corsOptions = {
     origin: (origin, callback) => {
-        // Allow requests with no origin (mobile apps, Postman, etc.)
+        // Allow requests with no origin (mobile apps, Postman, server-to-server, etc.)
         if (!origin) {
             return callback(null, true);
         }
+        const normalizedOrigin = normalizeOrigin(origin);
         const allowedOrigins = env_1.env.FRONTEND_URL
-            ? env_1.env.FRONTEND_URL.split(',').map(url => url.trim())
+            ? env_1.env.FRONTEND_URL.split(',').map(url => normalizeOrigin(url.trim()))
             : [];
         // Always allow localhost origins (for local development even when backend is in production)
         const localhostOrigins = [
@@ -43,9 +50,9 @@ exports.corsOptions = {
             'http://127.0.0.1:5175'
         ];
         // Check if origin is localhost
-        const isLocalhost = localhostOrigins.includes(origin) ||
-            origin.startsWith('http://localhost:') ||
-            origin.startsWith('http://127.0.0.1:');
+        const isLocalhost = localhostOrigins.includes(normalizedOrigin) ||
+            normalizedOrigin.startsWith('http://localhost:') ||
+            normalizedOrigin.startsWith('http://127.0.0.1:');
         // In development, always allow localhost
         if (env_1.env.NODE_ENV === 'development') {
             allowedOrigins.push(...localhostOrigins);
@@ -59,14 +66,15 @@ exports.corsOptions = {
             }
             // For non-localhost origins in production, require FRONTEND_URL
             if (allowedOrigins.length === 0) {
-                return callback(new Error('CORS: FRONTEND_URL must be set in production for non-localhost origins'));
+                return callback(new Error('CORS: Set FRONTEND_URL to your frontend origin (e.g. https://skillstream.world)'));
             }
         }
-        if (allowedOrigins.length === 0 || allowedOrigins.includes(origin) || isLocalhost) {
+        const allowed = allowedOrigins.length === 0 || allowedOrigins.includes(normalizedOrigin) || isLocalhost;
+        if (allowed) {
             callback(null, true);
         }
         else {
-            callback(new Error('Not allowed by CORS'));
+            callback(new Error(`CORS: Origin "${origin}" not allowed. Set FRONTEND_URL (e.g. https://skillstream.world, comma-separated for multiple).`));
         }
     },
     credentials: true,

@@ -7,6 +7,7 @@ exports.initializeFirebase = initializeFirebase;
 exports.getFirebaseApp = getFirebaseApp;
 exports.getFirestore = getFirestore;
 exports.getAuth = getAuth;
+exports.getMessaging = getMessaging;
 // src/utils/firebase.ts
 const firebase_admin_1 = __importDefault(require("firebase-admin"));
 let firebaseApp = null;
@@ -59,4 +60,7 @@ function getFirestore() {
 }
 function getAuth() {
     return getFirebaseApp().auth();
+}
+function getMessaging() {
+    return getFirebaseApp().messaging();
 }

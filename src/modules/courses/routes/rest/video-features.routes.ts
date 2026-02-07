@@ -148,6 +148,30 @@ router.get('/videos/:videoId/notes',
   }
 );
 
+router.delete('/videos/:videoId/notes/:noteId',
+  requireAuth,
+  requireSubscription,
+  validate({
+    params: z.object({ videoId: z.string().min(1), noteId: z.string().min(1) }),
+  }),
+  async (req, res) => {
+    try {
+      const { videoId, noteId } = req.params;
+      const userId = (req as any).user?.id;
+
+      await videoFeaturesService.deleteNote(videoId, noteId, userId);
+
+      res.json({
+        success: true,
+        message: 'Note deleted successfully'
+      });
+    } catch (error) {
+      console.error('Error deleting note:', error);
+      res.status(500).json({ error: (error as Error).message || 'Failed to delete note' });
+    }
+  }
+);
+
 /**
  * @swagger
  * /api/videos/{videoId}/bookmarks:
@@ -216,6 +240,30 @@ router.get('/videos/:videoId/bookmarks',
     } catch (error) {
       console.error('Error fetching bookmarks:', error);
       res.status(500).json({ error: 'Failed to fetch bookmarks' });
+    }
+  }
+);
+
+router.delete('/videos/:videoId/bookmarks/:bookmarkId',
+  requireAuth,
+  requireSubscription,
+  validate({
+    params: z.object({ videoId: z.string().min(1), bookmarkId: z.string().min(1) }),
+  }),
+  async (req, res) => {
+    try {
+      const { videoId, bookmarkId } = req.params;
+      const userId = (req as any).user?.id;
+
+      await videoFeaturesService.deleteBookmark(videoId, bookmarkId, userId);
+
+      res.json({
+        success: true,
+        message: 'Bookmark deleted successfully'
+      });
+    } catch (error) {
+      console.error('Error deleting bookmark:', error);
+      res.status(500).json({ error: (error as Error).message || 'Failed to delete bookmark' });
     }
   }
 );

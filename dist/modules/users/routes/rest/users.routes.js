@@ -444,6 +444,104 @@ router.get('/search', auth_1.requireAuth, rate_limit_1.generalRateLimiter, (0, v
 });
 /**
  * @swagger
+ * /api/users/me/profile:
+ *   get:
+ *     summary: Get current user's profile
+ *     description: Returns the authenticated user's profile from the database (source of truth for name, email, etc.).
+ *     tags: [Users]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: User profile
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 id: { type: string }
+ *                 username: { type: string }
+ *                 email: { type: string }
+ *                 role: { type: string }
+ *                 firstName: { type: string }
+ *                 lastName: { type: string }
+ *                 avatar: { type: string }
+ *                 profilePicture: { type: string }
+ *                 createdAt: { type: string, format: date-time }
+ *                 updatedAt: { type: string, format: date-time }
+ *       401:
+ *         description: Unauthorized
+ */
+router.get('/me/profile', auth_1.requireAuth, rate_limit_1.generalRateLimiter, async (req, res) => {
+    try {
+        const userId = req.user?.id;
+        if (!userId) {
+            return res.status(401).json({ error: 'Unauthorized' });
+        }
+        res.set('Cache-Control', 'private, no-store');
+        const profile = await service.getUserProfile(userId);
+        if (!profile) {
+            return res.status(404).json({ error: 'Profile not found' });
+        }
+        res.json({
+            ...profile,
+            profilePicture: profile.avatar,
+        });
+    }
+    catch (error) {
+        res.status(500).json({ error: error.message || 'Failed to get profile' });
+    }
+});
+/**
+ * @swagger
+ * /api/users/me/profile:
+ *   patch:
+ *     summary: Update current user's profile (name, avatar)
+ *     description: Updates firstName, lastName, and avatar in the database. These values are then returned by GET /users/me/profile.
+ *     tags: [Users]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               firstName: { type: string }
+ *               lastName: { type: string }
+ *               profilePicture: { type: string }
+ *     responses:
+ *       200:
+ *         description: Updated profile
+ *       401:
+ *         description: Unauthorized
+ */
+const updateMyProfileSchema = zod_1.z.object({
+    firstName: zod_1.z.string().optional(),
+    lastName: zod_1.z.string().optional(),
+    profilePicture: zod_1.z.string().optional(),
+});
+router.patch('/me/profile', auth_1.requireAuth, rate_limit_1.generalRateLimiter, (0, validation_1.validate)({ body: updateMyProfileSchema }), async (req, res) => {
+    try {
+        const userId = req.user?.id;
+        if (!userId) {
+            return res.status(401).json({ error: 'Unauthorized' });
+        }
+        const { firstName, lastName, profilePicture } = req.body;
+        const profile = await service.updateMyProfile(userId, {
+            firstName,
+            lastName,
+            avatar: profilePicture,
+        });
+        res.set('Cache-Control', 'private, no-store');
+        res.json({ ...profile, profilePicture: profile.avatar });
+    }
+    catch (error) {
+        res.status(500).json({ error: error.message || 'Failed to update profile' });
+    }
+});
+/**
+ * @swagger
  * /api/users/auth/firebase-sync:
  *   post:
  *     summary: Sync Firebase user with backend
@@ -500,8 +598,10 @@ router.post('/auth/firebase-sync', rate_limit_1.generalRateLimiter, async (req, 
     }
     catch (error) {
         console.error('Firebase sync error:', error);
-        res.status(400).json({
-            error: error.message || 'Failed to sync Firebase user',
+        const isEmailNotVerified = error?.code === 'EMAIL_NOT_VERIFIED';
+        res.status(isEmailNotVerified ? 403 : 400).json({
+            error: error?.message || 'Failed to sync Firebase user',
+            ...(isEmailNotVerified && { code: 'EMAIL_NOT_VERIFIED' }),
         });
     }
 });

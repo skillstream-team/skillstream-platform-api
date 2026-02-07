@@ -760,6 +760,27 @@ class UsersService {
         return user;
     }
     /**
+     * Update the current user's profile (firstName, lastName, avatar). Invalidates profile cache.
+     */
+    async updateMyProfile(userId, data) {
+        const updateData = {};
+        if (data.firstName !== undefined)
+            updateData.firstName = data.firstName || null;
+        if (data.lastName !== undefined)
+            updateData.lastName = data.lastName || null;
+        if (data.avatar !== undefined)
+            updateData.avatar = data.avatar || null;
+        if (Object.keys(updateData).length === 0)
+            return this.getUserProfile(userId);
+        const updated = await user_model_1.prisma.user.update({
+            where: { id: userId },
+            data: updateData,
+            select: { id: true, username: true, email: true, role: true, firstName: true, lastName: true, avatar: true, createdAt: true, updatedAt: true },
+        });
+        await (0, cache_1.deleteCache)(cache_1.cacheKeys.userProfile(userId));
+        return updated;
+    }
+    /**
      * @swagger
      * /roles:
      *   get:
@@ -867,6 +888,14 @@ class UsersService {
             // Verify Firebase token
             const auth = (0, firebase_1.getAuth)();
             const decodedToken = await auth.verifyIdToken(data.firebaseToken);
+            // Require email verification before syncing (and issuing JWT) when enabled
+            const requireEmailVerification = process.env.REQUIRE_EMAIL_VERIFICATION !== 'false';
+            const emailVerified = !!decodedToken.email_verified;
+            if (requireEmailVerification && !emailVerified) {
+                const err = new Error('Please verify your email before signing in.');
+                err.code = 'EMAIL_NOT_VERIFIED';
+                throw err;
+            }
             // Check if user exists by firebaseUid (using findFirst since firebaseUid is not @unique in schema)
             let user = await user_model_1.prisma.user.findFirst({
                 where: { firebaseUid: data.firebaseUid },

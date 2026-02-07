@@ -44,6 +44,14 @@ class VideoFeaturesService {
         return notes.map(this.mapNoteToDto);
     }
     /**
+     * Delete a video note (only if owned by user)
+     */
+    async deleteNote(videoId, noteId, userId) {
+        await prisma_1.prisma.videoNote.deleteMany({
+            where: { id: noteId, videoId, userId },
+        });
+    }
+    /**
      * Create video bookmark
      */
     async createBookmark(data) {
@@ -61,6 +69,14 @@ class VideoFeaturesService {
             orderBy: { timestamp: 'asc' },
         });
         return bookmarks.map(this.mapBookmarkToDto);
+    }
+    /**
+     * Delete a video bookmark (only if owned by user)
+     */
+    async deleteBookmark(videoId, bookmarkId, userId) {
+        await prisma_1.prisma.videoBookmark.deleteMany({
+            where: { id: bookmarkId, videoId, userId },
+        });
     }
     /**
      * Create or update video transcript

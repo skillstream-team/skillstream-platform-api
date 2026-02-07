@@ -100,6 +100,7 @@ router.get('/admin/users/:id', auth_1.requireAuth, async (req, res) => {
         return res.status(403).json({ error: 'Forbidden: Admin role required' });
     }
     try {
+        res.set('Cache-Control', 'private, no-store');
         const user = await adminService.getUserById(req.params.id);
         res.json({
             success: true,

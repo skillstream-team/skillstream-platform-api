@@ -33,10 +33,10 @@ services:
         sync: false  # Set a strong secret in Render dashboard
       # Frontend URL for CORS (required for browser requests; OPTIONS/login will fail without it)
       - key: FRONTEND_URL
-        sync: false  # e.g. https://your-app.onrender.com or https://app.com,https://admin.app.com
-      # Server URL for Swagger
+        sync: false  # Production: https://skillstream.world (or https://www.skillstream.world; comma-separated for multiple)
+      # Server URL for Swagger / docs
       - key: SERVER_URL
-        sync: false  # Set your production server URL
+        sync: false  # Production API URL, e.g. https://skillstream-api.onrender.com
       # Cloudflare R2 (if using)
       - key: R2_ACCOUNT_ID
         sync: false

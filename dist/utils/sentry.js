@@ -51,14 +51,14 @@ catch (error) {
     console.warn("⚠️  Sentry profiling module not available. Profiling disabled.");
 }
 /**
- * Initialize Sentry for error tracking and performance monitoring
- * Only initializes in production if SENTRY_DSN is provided
+ * Initialize Sentry for error tracking and performance monitoring.
+ * Initializes when SENTRY_DSN is set (works in both development and production).
  */
 function initSentry() {
     const dsn = process.env.SENTRY_DSN;
     const environment = process.env.NODE_ENV || 'development';
-    // Only initialize in production with a valid DSN
-    if (environment === 'production' && dsn) {
+    const isDevelopment = environment !== 'production';
+    if (dsn) {
         const integrations = [
             (0, node_1.expressIntegration)(),
         ];
@@ -66,24 +66,24 @@ function initSentry() {
         if (nodeProfilingIntegration) {
             integrations.push(nodeProfilingIntegration());
         }
+        // Higher sample rates in development so you see all events
+        const defaultTracesSampleRate = isDevelopment ? '1' : '0.1';
+        const defaultProfilesSampleRate = isDevelopment ? '1' : '0.1';
         Sentry.init({
             dsn: dsn,
             environment: environment,
             // Integrations
             integrations,
             // Performance Monitoring
-            // Sample 10% of transactions for performance monitoring
-            tracesSampleRate: parseFloat(process.env.SENTRY_TRACES_SAMPLE_RATE || '0.1'),
+            tracesSampleRate: parseFloat(process.env.SENTRY_TRACES_SAMPLE_RATE || defaultTracesSampleRate),
             // Profiling (only if module is available)
-            // Sample 10% of transactions for profiling
             profilesSampleRate: nodeProfilingIntegration
-                ? parseFloat(process.env.SENTRY_PROFILES_SAMPLE_RATE || '0.1')
+                ? parseFloat(process.env.SENTRY_PROFILES_SAMPLE_RATE || defaultProfilesSampleRate)
                 : undefined,
             // Release tracking (useful for versioning)
             release: process.env.SENTRY_RELEASE || process.env.npm_package_version || undefined,
             // Filter out health check endpoints from monitoring
-            beforeSend(event, hint) {
-                // Don't send events for health checks
+            beforeSend(event) {
                 if (event.request?.url?.includes('/health')) {
                     return null;
                 }
@@ -91,30 +91,26 @@ function initSentry() {
             },
             // Ignore certain errors
             ignoreErrors: [
-                // Browser extensions
                 'top.GLOBALS',
-                // Network errors
                 'NetworkError',
                 'Network request failed',
-                // Prisma client errors (we handle these separately)
             ],
         });
-        console.log("✅ Sentry initialized for error tracking");
+        console.log(`✅ Sentry initialized for error tracking (${environment})`);
     }
-    else if (environment === 'production' && !dsn) {
+    else if (environment === 'production') {
         console.warn("⚠️  Sentry DSN not provided. Error tracking disabled.");
     }
     else {
-        console.log("ℹ️  Sentry disabled in development mode");
+        console.log("ℹ️  Sentry disabled. Set SENTRY_DSN in .env to enable in development.");
     }
 }
 /**
  * Capture an exception and send it to Sentry
  */
 function captureException(error, context) {
-    if (process.env.NODE_ENV === 'production' && process.env.SENTRY_DSN) {
+    if (process.env.SENTRY_DSN) {
         Sentry.withScope((scope) => {
-            // Set user context
             if (context?.user) {
                 scope.setUser({
                     id: context.user.id,
@@ -122,13 +118,11 @@ function captureException(error, context) {
                     username: context.user.username,
                 });
             }
-            // Set tags
             if (context?.tags) {
                 Object.entries(context.tags).forEach(([key, value]) => {
                     scope.setTag(key, value);
                 });
             }
-            // Set extra context
             if (context?.extra) {
                 Object.entries(context.extra).forEach(([key, value]) => {
                     scope.setExtra(key, value);
@@ -142,7 +136,7 @@ function captureException(error, context) {
  * Capture a message (non-error event)
  */
 function captureMessage(message, level = 'info', context) {
-    if (process.env.NODE_ENV === 'production' && process.env.SENTRY_DSN) {
+    if (process.env.SENTRY_DSN) {
         Sentry.withScope((scope) => {
             if (context?.tags) {
                 Object.entries(context.tags).forEach(([key, value]) => {
@@ -162,7 +156,7 @@ function captureMessage(message, level = 'info', context) {
  * Set user context for all subsequent events
  */
 function setUser(user) {
-    if (process.env.NODE_ENV === 'production' && process.env.SENTRY_DSN) {
+    if (process.env.SENTRY_DSN) {
         Sentry.setUser({
             id: user.id,
             email: user.email,
@@ -174,7 +168,7 @@ function setUser(user) {
  * Add breadcrumb for debugging
  */
 function addBreadcrumb(breadcrumb) {
-    if (process.env.NODE_ENV === 'production' && process.env.SENTRY_DSN) {
+    if (process.env.SENTRY_DSN) {
         Sentry.addBreadcrumb(breadcrumb);
     }
 }

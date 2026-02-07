@@ -11,6 +11,10 @@ const env_1 = require("../utils/env");
 const logger_1 = require("../utils/logger");
 const requireAuth = async (req, res, next) => {
     try {
+        // If Firebase middleware already set req.user, we're done
+        if (req.user) {
+            return next();
+        }
         const authHeader = req.header('Authorization');
         const token = authHeader?.replace('Bearer ', '');
         if (!token) {
@@ -70,6 +74,10 @@ const requireAuth = async (req, res, next) => {
 exports.requireAuth = requireAuth;
 const optionalAuth = async (req, res, next) => {
     try {
+        // If Firebase middleware already set req.user, we're done
+        if (req.user) {
+            return next();
+        }
         const token = req.header('Authorization')?.replace('Bearer ', '');
         if (!token) {
             return next();

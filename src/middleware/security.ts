@@ -25,8 +25,8 @@ function normalizeOrigin(url: string): string {
 
 /**
  * CORS configuration
- * On Render: set FRONTEND_URL to your frontend origin(s), e.g. https://your-app.onrender.com
- * Multiple origins: comma-separated, e.g. https://app.com,https://admin.app.com
+ * On Render: set FRONTEND_URL to your frontend origin(s).
+ * Production: https://skillstream.world (add https://www.skillstream.world if needed; comma-separated for multiple).
  */
 export const corsOptions = {
   origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
@@ -73,7 +73,7 @@ export const corsOptions = {
       }
       // For non-localhost origins in production, require FRONTEND_URL
       if (allowedOrigins.length === 0) {
-        return callback(new Error('CORS: Set FRONTEND_URL in Render to your frontend origin (e.g. https://your-app.onrender.com)'));
+        return callback(new Error('CORS: Set FRONTEND_URL to your frontend origin (e.g. https://skillstream.world)'));
       }
     }
 
@@ -81,7 +81,7 @@ export const corsOptions = {
     if (allowed) {
       callback(null, true);
     } else {
-      callback(new Error(`CORS: Origin "${origin}" not allowed. Add it to FRONTEND_URL on Render (comma-separated for multiple).`));
+      callback(new Error(`CORS: Origin "${origin}" not allowed. Set FRONTEND_URL (e.g. https://skillstream.world, comma-separated for multiple).`));
     }
   },
   credentials: true,

@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { ProgramsService } from '../../services/service';
 import { EnrollmentService } from '../../services/enrollment.service';
+import { MediaService } from '../../services/media.service';
 import { requireRole } from '../../../../middleware/roles';
 import { requireAuth } from '../../../../middleware/auth';
 import { requireSubscription } from '../../../../middleware/subscription';
@@ -11,6 +12,7 @@ import { prisma } from '../../../../utils/prisma';
 const router = Router();
 const service = new ProgramsService();
 const enrollmentService = new EnrollmentService();
+const mediaService = new MediaService();
 
 /**
  * @swagger
@@ -1051,6 +1053,24 @@ router.get('/:id/enrollments',
       res.json(result);
     } catch (err) {
       res.status(500).json({ error: (err as Error).message || 'Failed to fetch enrollments' });
+    }
+  }
+);
+
+/**
+ * GET /api/programs/:id/materials
+ * Get all materials (docs, PDFs, etc.) for a program/course. Used by course player to show instructor-provided resources.
+ */
+router.get('/:id/materials',
+  requireAuth,
+  validate({ params: courseIdParamSchema }),
+  async (req, res) => {
+    try {
+      const programId = req.params.id;
+      const materials = await mediaService.getMaterialsByCourse(programId);
+      res.json({ success: true, data: materials });
+    } catch (err) {
+      res.status(500).json({ error: (err as Error).message || 'Failed to fetch materials' });
     }
   }
 );

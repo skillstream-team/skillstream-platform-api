@@ -56,6 +56,8 @@ const error_handler_1 = require("./middleware/error-handler");
 const security_1 = require("./middleware/security");
 const logger_1 = require("./middleware/logger");
 const request_id_1 = require("./middleware/request-id");
+const firebase_auth_1 = require("./middleware/firebase-auth");
+const app_check_1 = require("./middleware/app-check");
 const no_cache_1 = require("./middleware/no-cache");
 const prisma_1 = require("./utils/prisma");
 const redis_1 = __importDefault(require("./utils/redis"));
@@ -117,6 +119,10 @@ const PORT = parseInt(env_1.env.PORT, 10);
 // Sentry request handlers (must be before other middleware)
 // Note: In Sentry v8+, request handling is done via integrations
 // The expressIntegration handles this automatically
+// Firebase token verification (runs first so requireAuth can use req.user when set)
+app.use(firebase_auth_1.verifyFirebaseToken);
+// Optional App Check (when ENABLE_APP_CHECK=true, verifies X-Firebase-AppCheck if present)
+app.use(app_check_1.verifyAppCheck);
 // Request ID tracking (must be early)
 app.use(request_id_1.requestId);
 // Compression middleware
@@ -345,7 +351,7 @@ process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 process.on('unhandledRejection', (reason, promise) => {
     console.error('❌ Unhandled Rejection at:', promise, 'reason:', reason);
     // Send to Sentry in production
-    if (process.env.NODE_ENV === 'production' && process.env.SENTRY_DSN) {
+    if (process.env.SENTRY_DSN) {
         Sentry.captureException(reason, {
             tags: {
                 type: 'unhandledRejection',
@@ -356,7 +362,7 @@ process.on('unhandledRejection', (reason, promise) => {
 process.on('uncaughtException', (error) => {
     console.error('❌ Uncaught Exception:', error);
     // Send to Sentry in production before shutdown
-    if (process.env.NODE_ENV === 'production' && process.env.SENTRY_DSN) {
+    if (process.env.SENTRY_DSN) {
         Sentry.captureException(error, {
             tags: {
                 type: 'uncaughtException',

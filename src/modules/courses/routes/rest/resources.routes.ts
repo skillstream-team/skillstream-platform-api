@@ -483,7 +483,7 @@ router.post('/modules/:moduleId/videos/tus', requireAuth, async (req, res) => {
       return res.status(400).json({ error: 'TUS Upload-Length required' });
     }
 
-    const allowedOrigins = [
+    const withProtocol = [
       'http://localhost:5173',
       'http://localhost:5174',
       'http://localhost:5175',
@@ -492,6 +492,14 @@ router.post('/modules/:moduleId/videos/tus', requireAuth, async (req, res) => {
       'http://127.0.0.1:5175',
       ...(process.env.FRONTEND_URL ? process.env.FRONTEND_URL.split(',').map((u) => u.trim()).filter(Boolean) : []),
     ];
+    const allowedOrigins = withProtocol.map((url) => {
+      try {
+        const u = new URL(url);
+        return u.port ? `${u.hostname}:${u.port}` : u.hostname;
+      } catch {
+        return url.replace(/^https?:\/\//, '');
+      }
+    });
     const originsB64 = Buffer.from([...new Set(allowedOrigins)].join(','), 'utf8').toString('base64');
     uploadMetadata = uploadMetadata
       ? `${uploadMetadata},allowedorigins ${originsB64}`

@@ -427,8 +427,13 @@ router.post('/modules/:moduleId/videos/prepare', requireAuth, async (req, res) =
         title: video.title,
       },
     });
-  } catch (error) {
-    logger.error('Error preparing video upload', error);
+  } catch (error: any) {
+    const cfData = error?.response?.data;
+    if (cfData && (cfData.errors || cfData.messages)) {
+      logger.error('Error preparing video upload (Cloudflare response)', { error: cfData });
+    } else {
+      logger.error('Error preparing video upload', error);
+    }
     const msg = (error as Error).message || 'Unknown error';
     if (msg.includes('Foreign key') || msg.includes('Record to create not found')) {
       return res.status(400).json({ error: 'This lesson type does not support video upload.', code: 'UNSUPPORTED_MODULE' });

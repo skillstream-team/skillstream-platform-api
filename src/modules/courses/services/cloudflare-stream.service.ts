@@ -104,16 +104,12 @@ export class CloudflareStreamService {
   /** Create a direct upload and return streamId + uploadURL for client upload (e.g. lesson videos). */
   async createDirectUpload(data: CreateVideoDto): Promise<{ streamId: string; uploadURL: string }> {
     try {
-      // Stream API expects only maxDurationSeconds (required); optional: expiry (ISO), meta.name (video name).
-      // Do not send "metadata" or unsupported fields — they cause 400 Bad Request.
+      // Cloudflare docs: POST body only { "maxDurationSeconds": 3600 }. Optional: expiry (ISO), meta.name.
+      // Send minimal body to avoid 400; ensure integer for maxDurationSeconds.
+      const maxDurationSeconds = typeof data.duration === 'number' ? Math.round(data.duration) : 3600;
       const body: Record<string, unknown> = {
-        maxDurationSeconds: data.duration ?? 3600,
+        maxDurationSeconds: Math.min(Math.max(maxDurationSeconds, 1), 21600), // 1s–6h typical range
       };
-      const expiry = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
-      body.expiry = expiry;
-      if (data.title) {
-        body.meta = { name: data.title };
-      }
       const response = await this.apiClient.post<{ result: { uid: string; uploadURL: string } }>('/direct_upload', body);
       const result = response.data.result;
       if (!result?.uid || !result?.uploadURL) {
@@ -121,11 +117,18 @@ export class CloudflareStreamService {
       }
       return { streamId: result.uid, uploadURL: result.uploadURL };
     } catch (error: any) {
-      const msg = error?.response?.data?.errors?.[0]?.message
-        || error?.response?.data?.error
+      const data = error?.response?.data;
+      const errors = Array.isArray(data?.errors) ? data.errors : [];
+      const messages = Array.isArray(data?.messages) ? data.messages : [];
+      const firstError = errors[0];
+      const msg =
+        (firstError && (firstError.message || firstError.code))
+        || (messages[0] && (typeof messages[0] === 'object' ? (messages[0] as { message?: string }).message : messages[0]))
+        || data?.error
         || error?.message
         || String(error);
-      throw new Error(`Stream direct upload failed: ${msg}`);
+      const detail = firstError ? ` (code: ${firstError.code || 'unknown'})` : '';
+      throw new Error(`Stream direct upload failed: ${msg}${detail}`);
     }
   }
 

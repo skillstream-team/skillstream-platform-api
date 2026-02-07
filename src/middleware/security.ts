@@ -87,6 +87,13 @@ export const corsOptions = {
   credentials: true,
   optionsSuccessStatus: 200,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
+  allowedHeaders: [
+    'Content-Type',
+    'Authorization',
+    'Tus-Resumable',
+    'Upload-Length',
+    'Upload-Metadata',
+    'Upload-Offset',
+  ],
 };
 

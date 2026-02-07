@@ -368,6 +368,7 @@ model Module {
   subscriptionAccesses SubscriptionAccess[]
   engagements        StudentEngagement[]
   lessonResources    LessonResource[]
+  videos             Video[]
 
   @@index([isPreview])
   @@index([teacherId])
@@ -512,6 +513,8 @@ model Video {
   id           String    @id @default(auto()) @map("_id") @db.ObjectId
   programId     String    @db.ObjectId
   program       Program    @relation(fields: [programId], references: [id])
+  moduleId      String?   @db.ObjectId
+  module        Module?   @relation(fields: [moduleId], references: [id], onDelete: SetNull)
   streamId     String    @unique
   title        String
   description  String?
@@ -533,6 +536,8 @@ model Video {
   analytics  VideoAnalytics[]
   notes      VideoNote[]
   bookmarks  VideoBookmark[]
+
+  @@index([moduleId])
   
   @@index([programId, isPreview])
 }

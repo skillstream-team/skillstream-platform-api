@@ -75,7 +75,7 @@ router.get('/modules/:moduleId/resources', requireAuth, async (req, res) => {
   try {
     const { moduleId } = req.params;
 
-    const [moduleResources, lessonResources] = await Promise.all([
+    const [moduleResources, lessonResources, videoRecords] = await Promise.all([
       prisma.moduleResource.findMany({
         where: { moduleId },
         include: { sharer: { select: { id: true, username: true, email: true } } },
@@ -86,9 +86,29 @@ router.get('/modules/:moduleId/resources', requireAuth, async (req, res) => {
         include: { sharer: { select: { id: true, username: true, email: true } } },
         orderBy: { createdAt: 'desc' },
       }),
+      // Videos for this module: Video records with moduleId, or programId (standalone modules)
+      prisma.video.findMany({
+        where: { OR: [{ moduleId }, { programId: moduleId }] },
+        select: { id: true, streamId: true, title: true, playbackUrl: true, status: true, createdAt: true },
+        orderBy: { createdAt: 'desc' },
+      }),
     ]);
 
-    const data = [...moduleResources, ...lessonResources].sort(
+    // Map Video records to same shape as resources so UI can show them (id, title, type, fileUrl, url=streamId, mimeType)
+    const videoAsResources = videoRecords.map((v) => ({
+      id: v.id,
+      moduleId,
+      title: v.title,
+      type: 'video',
+      fileUrl: v.playbackUrl ?? null,
+      url: v.streamId,
+      filename: null,
+      size: null,
+      mimeType: 'video/mp4',
+      createdAt: v.createdAt,
+    }));
+
+    const data = [...moduleResources, ...lessonResources, ...videoAsResources].sort(
       (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
     );
 
@@ -389,6 +409,7 @@ router.post('/modules/:moduleId/videos/prepare', requireAuth, async (req, res) =
     const video = await prisma.video.create({
       data: {
         programId,
+        moduleId: regularModule ? moduleId : undefined,
         streamId,
         title: resourceTitle,
         type: 'on-demand',

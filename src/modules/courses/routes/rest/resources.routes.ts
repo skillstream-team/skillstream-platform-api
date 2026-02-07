@@ -10,6 +10,9 @@ const router = Router();
 const r2Service = new CloudflareR2Service();
 const streamService = new CloudflareStreamService();
 
+/** In-memory store for TUS upload URL proxy: streamMediaId -> Cloudflare Location URL. Enables HEAD/PATCH to go through our backend to avoid CORS. */
+const tusCloudflareUrlByMediaId = new Map<string, string>();
+
 /**
  * @swagger
  * /api/users/{userId}/resources/recent:
@@ -510,6 +513,11 @@ router.post('/modules/:moduleId/videos/tus', requireAuth, async (req, res) => {
       return res.status(502).json({ error: 'Stream did not return Location or stream-media-id' });
     }
 
+    tusCloudflareUrlByMediaId.set(streamMediaId, location);
+
+    const baseUrl = `${req.protocol}://${req.get('host')}`.replace(/\/$/, '');
+    const proxyLocation = `${baseUrl}/api/modules/${moduleId}/videos/tus/upload/${streamMediaId}?tusv2=true`;
+
     let programId = moduleId;
     if (regularModule) {
       const programModule = await prisma.programModule.findFirst({
@@ -553,7 +561,7 @@ router.post('/modules/:moduleId/videos/tus', requireAuth, async (req, res) => {
     }
 
     res.status(201);
-    res.setHeader('Location', location);
+    res.setHeader('Location', proxyLocation);
     res.setHeader('Stream-Media-Id', streamMediaId);
     res.setHeader('X-Resource-Id', resourceId);
     res.setHeader('Access-Control-Expose-Headers', 'Location, Stream-Media-Id, X-Resource-Id');
@@ -562,6 +570,77 @@ router.post('/modules/:moduleId/videos/tus', requireAuth, async (req, res) => {
     logger.error('Error in TUS proxy', error);
     const msg = (error as Error).message || 'Unknown error';
     return res.status(500).json({ error: 'TUS proxy failed: ' + msg });
+  }
+});
+
+const apiToken = () => process.env.CLOUDFLARE_API_TOKEN || '';
+
+/**
+ * Proxy TUS HEAD/PATCH to Cloudflare so the browser never hits Cloudflare directly (avoids CORS).
+ * POST to /videos/tus returns Location pointing here; tus-js-client then sends HEAD/PATCH to this URL.
+ */
+router.head('/modules/:moduleId/videos/tus/upload/:uploadId', requireAuth, async (req, res) => {
+  const cloudflareUrl = tusCloudflareUrlByMediaId.get(req.params.uploadId);
+  if (!cloudflareUrl) {
+    return res.status(404).json({ error: 'Upload session not found or expired' });
+  }
+  try {
+    const cfRes = await fetch(cloudflareUrl, {
+      method: 'HEAD',
+      headers: {
+        'Authorization': `Bearer ${apiToken()}`,
+        'Tus-Resumable': (req.headers['tus-resumable'] as string) || '1.0.0',
+      },
+    });
+    res.status(cfRes.status);
+    const expose = ['Upload-Offset', 'Upload-Length', 'Upload-Defer-Length', 'Upload-Incomplete', 'Upload-Metadata'];
+    cfRes.headers.forEach((value, key) => {
+      if (expose.includes(key) || key.toLowerCase().startsWith('upload-')) {
+        res.setHeader(key, value);
+      }
+    });
+    res.setHeader('Access-Control-Expose-Headers', expose.join(', '));
+    res.end();
+  } catch (e: any) {
+    logger.error('TUS HEAD proxy error', e);
+    res.status(502).json({ error: 'Proxy failed' });
+  }
+});
+
+router.patch('/modules/:moduleId/videos/tus/upload/:uploadId', requireAuth, async (req, res) => {
+  const cloudflareUrl = tusCloudflareUrlByMediaId.get(req.params.uploadId);
+  if (!cloudflareUrl) {
+    return res.status(404).json({ error: 'Upload session not found or expired' });
+  }
+  try {
+    const forwardHeaders: Record<string, string> = {
+      'Authorization': `Bearer ${apiToken()}`,
+      'Content-Type': (req.headers['content-type'] as string) || 'application/offset+octet-stream',
+    };
+    const uploadOffset = req.headers['upload-offset'];
+    const tusResumable = req.headers['tus-resumable'];
+    if (uploadOffset) forwardHeaders['Upload-Offset'] = uploadOffset as string;
+    if (tusResumable) forwardHeaders['Tus-Resumable'] = tusResumable as string;
+
+    const cfRes = await fetch(cloudflareUrl, {
+      method: 'PATCH',
+      headers: forwardHeaders,
+      body: req as any,
+      duplex: 'half',
+    } as RequestInit);
+    res.status(cfRes.status);
+    const expose = ['Upload-Offset', 'Upload-Length', 'Upload-Defer-Length', 'Upload-Incomplete', 'Upload-Metadata'];
+    cfRes.headers.forEach((value, key) => {
+      if (expose.includes(key) || key.toLowerCase().startsWith('upload-')) {
+        res.setHeader(key, value);
+      }
+    });
+    res.setHeader('Access-Control-Expose-Headers', expose.join(', '));
+    const text = await cfRes.text();
+    res.send(text);
+  } catch (e: any) {
+    logger.error('TUS PATCH proxy error', e);
+    res.status(502).json({ error: 'Proxy failed' });
   }
 });
 

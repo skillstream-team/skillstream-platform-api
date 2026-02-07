@@ -72,6 +72,21 @@ Create an R2 bucket and **R2 API token** (read/write) in the dashboard.
 
 ---
 
+## How course videos work (different from profile photos)
+
+**Profile photos** use a single step: the client sends the image (e.g. base64) to your API, and the API uploads it to Cloudflare Images or R2 and returns a URL.
+
+**Course videos** use **Cloudflare Stream** and a **direct-upload** flow (videos are not sent through your API):
+
+1. **Create video** – Your API creates a video record in the DB and a placeholder in Cloudflare Stream (GraphQL: `createVideo` mutation; courseId, title, description, etc.). Stream returns a `streamId`.
+2. **Get upload URL** – Your API calls Stream to get a one-time **upload URL** (GraphQL: `getVideoUploadUrl(videoId)`). The response includes `uploadUrl` and `expiresAt`.
+3. **Upload file** – The **client** (browser/app) uploads the **video file directly to that URL** (e.g. with `fetch(uploadUrl, { method: 'PUT', body: file })` or a TUS client). Your API never receives the video bytes.
+4. **Playback** – After processing, Stream provides an HLS playback URL; your app uses that for the lesson player.
+
+So **videos do work for courses**, using the same Cloudflare account and token (Stream Edit). The flow is different from profile photos because Stream needs a direct upload for large files and then transcodes the video. The backend exposes this via the **GraphQL media API** (`/graphql/media`): `createVideo`, `getVideoUploadUrl`, `updateVideoStatus`, etc.
+
+---
+
 ## Summary
 
 - **Images + Stream** → same credentials: set `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN` (token needs Images Write + Stream Edit).

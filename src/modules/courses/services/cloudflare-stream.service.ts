@@ -105,6 +105,29 @@ export class CloudflareStreamService {
     }
   }
 
+  /** Create a direct upload and return streamId + uploadURL for client upload (e.g. lesson videos). */
+  async createDirectUpload(data: CreateVideoDto): Promise<{ streamId: string; uploadURL: string }> {
+    try {
+      const response = await this.apiClient.post<{ result: { uid: string; uploadURL: string } }>('/direct_upload', {
+        maxDurationSeconds: data.duration || 3600,
+        expiry: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(), // 7 days
+        metadata: {
+          collectionId: data.collectionId,
+          title: data.title,
+          description: data.description,
+          type: data.type,
+        },
+      });
+      const result = response.data.result;
+      if (!result?.uid || !result?.uploadURL) {
+        throw new Error('Stream did not return upload URL');
+      }
+      return { streamId: result.uid, uploadURL: result.uploadURL };
+    } catch (error) {
+      throw new Error(`Failed to create direct upload: ${error}`);
+    }
+  }
+
   // Get video details
   async getVideo(videoId: string): Promise<VideoResponseDto> {
     try {

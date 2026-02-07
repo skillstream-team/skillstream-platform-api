@@ -627,7 +627,7 @@ router.get('/modules', requireAuth, async (req, res) => {
 router.put('/modules/:id', requireAuth, requireRole('TEACHER'), async (req, res) => {
   try {
     const { id } = req.params;
-    const { title, description, order, duration, price, isPreview, moduleId } = req.body;
+    const { title, description, order, duration, price, isPreview, moduleId, content: bodyContent } = req.body;
     
     // Get module to check if it exists
     const existingModule = await prisma.module.findUnique({
@@ -652,9 +652,18 @@ router.put('/modules/:id', requireAuth, requireRole('TEACHER'), async (req, res)
     }
     if (isPreview !== undefined) updateData.isPreview = isPreview;
 
-    // Handle content JSON (description and sectionId)
+    // Handle content JSON: merge existing + body content (thumbnailUrl, etc.) + legacy description/sectionId
     const existingContent = (existingModule.content as any) || {};
-    const contentUpdate: any = { ...existingContent };
+    const bodyContentObj = bodyContent && typeof bodyContent === 'object' && !Array.isArray(bodyContent) ? bodyContent as Record<string, unknown> : {};
+    // Only copy defined values from body so we persist thumbnailUrl and don't overwrite with undefined
+    const mergedFromBody: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(bodyContentObj)) {
+      if (v !== undefined) mergedFromBody[k] = v;
+    }
+    const contentUpdate: any = {
+      ...existingContent,
+      ...mergedFromBody,
+    };
     if (description !== undefined) contentUpdate.description = description;
     if (moduleId !== undefined) contentUpdate.sectionId = moduleId;
     updateData.content = contentUpdate;

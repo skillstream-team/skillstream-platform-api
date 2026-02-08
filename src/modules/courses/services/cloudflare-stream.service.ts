@@ -138,6 +138,12 @@ export class CloudflareStreamService {
       const response = await this.apiClient.get(`/${videoId}`);
       const video = response.data.result;
 
+      const rawDuration = video.duration;
+      const duration =
+        rawDuration != null && !Number.isNaN(Number(rawDuration))
+          ? Math.round(Number(rawDuration))
+          : undefined;
+
       return {
         id: video.uid,
         title: video.meta?.title || 'Untitled',
@@ -147,7 +153,7 @@ export class CloudflareStreamService {
         streamId: video.uid,
         playbackUrl: video.playback?.hls,
         thumbnailUrl: video.thumbnail,
-        duration: video.duration,
+        duration: duration !== undefined && duration > 0 ? duration : undefined,
         createdAt: new Date(video.created),
         courseId: video.meta?.collectionId,
         scheduledAt: video.meta?.scheduledAt ? new Date(video.meta.scheduledAt) : undefined,

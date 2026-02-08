@@ -2,17 +2,20 @@ import { Router } from 'express';
 import { ProgramsService } from '../../services/service';
 import { EnrollmentService } from '../../services/enrollment.service';
 import { MediaService } from '../../services/media.service';
+import { CloudflareR2Service } from '../../services/cloudflare-r2.service';
 import { requireRole } from '../../../../middleware/roles';
 import { requireAuth } from '../../../../middleware/auth';
 import { requireSubscription } from '../../../../middleware/subscription';
 import { validate } from '../../../../middleware/validation';
 import { createCourseSchema, updateCourseSchema, courseIdParamSchema, createModuleSchema, createSectionSchema } from '../../../../utils/validation-schemas';
 import { prisma } from '../../../../utils/prisma';
+import { isCloudflareImagesConfigured, uploadImageToCloudflareImages } from '../../../../utils/cloudflare-images';
 
 const router = Router();
 const service = new ProgramsService();
 const enrollmentService = new EnrollmentService();
 const mediaService = new MediaService();
+const r2Service = new CloudflareR2Service();
 
 /**
  * @swagger
@@ -1071,6 +1074,58 @@ router.get('/:id/materials',
       res.json({ success: true, data: materials });
     } catch (err) {
       res.status(500).json({ error: (err as Error).message || 'Failed to fetch materials' });
+    }
+  }
+);
+
+/**
+ * POST /api/programs/:id/thumbnail/upload
+ * Upload program thumbnail (image). Same flow as module thumbnail: image → R2 or Cloudflare Images, then set program.thumbnailUrl.
+ */
+router.post('/:id/thumbnail/upload',
+  requireAuth,
+  requireRole('TEACHER'),
+  validate({ params: courseIdParamSchema }),
+  async (req, res) => {
+    try {
+      const programId = req.params.id;
+      const { file, filename, contentType } = req.body as { file?: string; filename?: string; contentType?: string };
+      if (!file || !filename || !contentType) {
+        return res.status(400).json({ error: 'file (base64), filename, and contentType are required' });
+      }
+      if (!contentType.startsWith('image/')) {
+        return res.status(400).json({ error: 'Only image files are allowed for program thumbnail' });
+      }
+      const program = await prisma.program.findUnique({ where: { id: programId }, select: { id: true, createdBy: true } });
+      if (!program) return res.status(404).json({ error: 'Program not found' });
+      const userId = (req as any).user?.id;
+      if (program.createdBy !== userId) return res.status(403).json({ error: 'Only the program owner can upload a thumbnail' });
+
+      const fileBuffer = Buffer.from(file, 'base64');
+      let fileUrl: string;
+      if (isCloudflareImagesConfigured()) {
+        const result = await uploadImageToCloudflareImages(fileBuffer, filename, contentType);
+        fileUrl = result.url;
+      } else {
+        const uploadResult = await r2Service.uploadFile({
+          file: fileBuffer,
+          filename,
+          contentType,
+          programId,
+          type: 'image',
+        });
+        fileUrl = uploadResult.url;
+      }
+      await prisma.program.update({
+        where: { id: programId },
+        data: { thumbnailUrl: fileUrl },
+      });
+      const { deleteCache } = await import('../../../../utils/cache');
+      const { cacheKeys } = await import('../../../../utils/cache');
+      await deleteCache(cacheKeys.program(programId));
+      res.json({ success: true, thumbnailUrl: fileUrl });
+    } catch (err) {
+      res.status(500).json({ error: (err as Error).message || 'Failed to upload thumbnail' });
     }
   }
 );

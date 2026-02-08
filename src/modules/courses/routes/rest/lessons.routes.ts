@@ -4,9 +4,24 @@ import { requireRole } from '../../../../middleware/roles';
 import { requireSubscription } from '../../../../middleware/subscription';
 import { prisma } from '../../../../utils/prisma';
 import { logger } from '../../../../utils/logger';
+import { isCloudflareImagesConfigured, deleteCloudflareImage } from '../../../../utils/cloudflare-images';
 import { emailService } from '../../../users/services/email.service';
 import { ProgramsService } from '../../services/service';
 import { getStudentPrice } from '../../services/monetization.service';
+
+/** Extract Cloudflare Images image ID from imagedelivery.net URL for delete. */
+function getCloudflareImageIdFromUrl(url: string | undefined): string | null {
+  if (!url || typeof url !== 'string') return null;
+  try {
+    const u = new URL(url);
+    if (!u.hostname.endsWith('imagedelivery.net')) return null;
+    const segments = u.pathname.split('/').filter(Boolean);
+    if (segments.length >= 2) return segments[1];
+    return null;
+  } catch {
+    return null;
+  }
+}
 
 const router = Router();
 const service = new ProgramsService();
@@ -667,6 +682,20 @@ router.put('/modules/:id', requireAuth, requireRole('TEACHER'), async (req, res)
     if (description !== undefined) contentUpdate.description = description;
     if (moduleId !== undefined) contentUpdate.sectionId = moduleId;
     updateData.content = contentUpdate;
+
+    // When thumbnail is being removed, delete the image from Cloudflare Images if applicable
+    const previousThumbnailUrl = existingContent?.thumbnailUrl;
+    const newThumbnailUrl = contentUpdate?.thumbnailUrl;
+    if (previousThumbnailUrl && !newThumbnailUrl && isCloudflareImagesConfigured()) {
+      const imageId = getCloudflareImageIdFromUrl(previousThumbnailUrl);
+      if (imageId) {
+        try {
+          await deleteCloudflareImage(imageId);
+        } catch (err) {
+          logger.warn('Could not delete module thumbnail from Cloudflare Images', { imageId, err });
+        }
+      }
+    }
 
     // Update module using service (this will handle cache invalidation for programs)
     const updatedModule = await service.updateModule(id, updateData);

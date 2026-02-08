@@ -92,24 +92,48 @@ router.get('/modules/:moduleId/resources', requireAuth, async (req, res) => {
       // Videos for this module: Video records with moduleId, or programId (standalone modules)
       prisma.video.findMany({
         where: { OR: [{ moduleId }, { programId: moduleId }] },
-        select: { id: true, streamId: true, title: true, playbackUrl: true, status: true, createdAt: true },
+        select: { id: true, streamId: true, title: true, playbackUrl: true, thumbnailUrl: true, duration: true, status: true, createdAt: true },
         orderBy: { createdAt: 'desc' },
       }),
     ]);
 
-    // Map Video records to same shape as resources so UI can show them (id, title, type, fileUrl, url=streamId, mimeType)
-    const videoAsResources = videoRecords.map((v) => ({
-      id: v.id,
-      moduleId,
-      title: v.title,
-      type: 'video',
-      fileUrl: v.playbackUrl ?? null,
-      url: v.streamId,
-      filename: null,
-      size: null,
-      mimeType: 'video/mp4',
-      createdAt: v.createdAt,
-    }));
+    // Map Video records to same shape as resources; backfill duration from Cloudflare Stream when missing
+    const videoAsResources = await Promise.all(
+      videoRecords.map(async (v) => {
+        let duration: number | undefined = v.duration ?? undefined;
+        const hasStreamId = v.streamId != null && String(v.streamId).trim() !== '';
+        if ((duration == null || duration === 0) && hasStreamId) {
+          try {
+            const streamVideo = await streamService.getVideo(v.streamId!);
+            const streamDuration = streamVideo.duration;
+            if (streamDuration != null && streamDuration > 0) {
+              const durationSeconds = Math.round(Number(streamDuration));
+              duration = durationSeconds;
+              await prisma.video.update({
+                where: { id: v.id },
+                data: { duration: durationSeconds },
+              });
+            }
+          } catch (err) {
+            logger.warn(`Could not backfill duration for video ${v.id}: ${(err as Error).message}`);
+          }
+        }
+        return {
+          id: v.id,
+          moduleId,
+          title: v.title,
+          type: 'video',
+          fileUrl: v.playbackUrl ?? null,
+          url: v.streamId,
+          filename: null,
+          size: null,
+          mimeType: 'video/mp4',
+          duration: duration != null && duration > 0 ? duration : undefined,
+          thumbnailUrl: v.thumbnailUrl ?? undefined,
+          createdAt: v.createdAt,
+        };
+      })
+    );
 
     const data = [...moduleResources, ...lessonResources, ...videoAsResources].sort(
       (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
@@ -700,6 +724,8 @@ router.get('/modules/:moduleId/videos/:resourceId/status', requireAuth, async (r
           fileUrl: updated.fileUrl,
           streamId,
           status: streamVideo.status,
+          duration: streamVideo.duration ?? undefined,
+          thumbnailUrl: streamVideo.thumbnailUrl ?? undefined,
         },
       });
     }
@@ -713,13 +739,14 @@ router.get('/modules/:moduleId/videos/:resourceId/status', requireAuth, async (r
     }
     const streamVideo = await streamService.getVideo(video.streamId);
     const playbackUrl = streamVideo.playbackUrl || undefined;
+    const duration = streamVideo.duration ?? undefined;
     const updatedVideo = await prisma.video.update({
       where: { id: resourceId },
       data: {
         playbackUrl: playbackUrl || null,
         status: streamVideo.status,
         thumbnailUrl: streamVideo.thumbnailUrl || undefined,
-        duration: streamVideo.duration ?? undefined,
+        duration: duration ?? undefined,
       },
     });
 
@@ -732,6 +759,8 @@ router.get('/modules/:moduleId/videos/:resourceId/status', requireAuth, async (r
         fileUrl: updatedVideo.playbackUrl,
         streamId: updatedVideo.streamId,
         status: updatedVideo.status,
+        duration: updatedVideo.duration ?? duration,
+        thumbnailUrl: updatedVideo.thumbnailUrl ?? undefined,
       },
     });
   } catch (error) {

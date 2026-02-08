@@ -74,7 +74,7 @@ Create an R2 bucket and **R2 API token** (read/write) in the dashboard.
 
 ## How course videos work (different from profile photos)
 
-**Profile photos** use a single step: the client sends the image (e.g. base64) to your API, and the API uploads it to Cloudflare Images or R2 and returns a URL.
+**Profile photos** use a single step: the client sends the image (e.g. base64) to your API, and the API uploads it to Cloudflare Images or R2 and returns a URL. **Module thumbnails** use the same flow (upload via `/modules/:id/resources/upload`). When a teacher removes a module thumbnail in the editor, the backend deletes the image from **Cloudflare Images** if the stored URL is from `imagedelivery.net` (so storage is cleaned up). Thumbnails stored on R2 are only unreferenced; they are not deleted.
 
 **Course videos** use **Cloudflare Stream** and a **direct-upload** flow (videos are not sent through your API):
 

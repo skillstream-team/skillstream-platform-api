@@ -154,14 +154,29 @@ export class LearningService {
       },
       });
 
-      // Link module to program
-      await prisma.programModule.create({
-        data: {
-          programId: program.id,
-          moduleId: module.id,
-          order: data.order,
-        },
+      // Ensure the same module is not already in this program
+      const alreadyInProgram = await prisma.programModule.findUnique({
+        where: { programId_moduleId: { programId: program.id, moduleId: module.id } },
       });
+      if (alreadyInProgram) {
+        throw new Error('This module is already in the program');
+      }
+
+      // Link module to program
+      try {
+        await prisma.programModule.create({
+          data: {
+            programId: program.id,
+            moduleId: module.id,
+            order: data.order,
+          },
+        });
+      } catch (err: any) {
+        if (err?.code === 'P2002') {
+          throw new Error('This module is already in the program');
+        }
+        throw err;
+      }
 
       return { ...module, lessons: [] } as unknown as CourseModuleResponseDto;
     } catch (error) {

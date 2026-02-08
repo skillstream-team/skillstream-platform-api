@@ -1022,14 +1022,29 @@ export class CollectionsService {
             data: moduleData
         });
         
-        // Add module to program via ProgramModule
-        await prisma.programModule.create({
-            data: {
-                programId: data.programId,
-                moduleId: module.id,
-                order: data.order,
-            }
+        // Ensure the same module is not already in this program (e.g. if linking existing module in future)
+        const alreadyInProgram = await prisma.programModule.findUnique({
+            where: { programId_moduleId: { programId: data.programId, moduleId: module.id } },
         });
+        if (alreadyInProgram) {
+            throw new Error('This module is already in the program');
+        }
+
+        // Add module to program via ProgramModule
+        try {
+            await prisma.programModule.create({
+                data: {
+                    programId: data.programId,
+                    moduleId: module.id,
+                    order: data.order,
+                }
+            });
+        } catch (err: any) {
+            if (err?.code === 'P2002') {
+                throw new Error('This module is already in the program');
+            }
+            throw err;
+        }
         
         // Invalidate both program and sections cache
         await Promise.all([

@@ -1619,7 +1619,9 @@ export class MessagingService {
 
   private mapConversationToDto(conversation: any): ConversationResponseDto {
     const activeParticipants = (conversation.participants || []).filter((p: any) => !p.leftAt);
-    
+    // For direct conversations, include all participants so the client can show the other user's name even if they left
+    const participantsToMap = conversation.type === 'direct' ? (conversation.participants || []) : activeParticipants;
+
     return {
       id: conversation.id,
       type: conversation.type,
@@ -1628,7 +1630,7 @@ export class MessagingService {
       createdBy: conversation.createdBy,
       creator: conversation.creator,
       participantIds: activeParticipants.map((p: any) => p.userId),
-      participants: activeParticipants.map((p: any) => ({
+      participants: participantsToMap.map((p: any) => ({
         id: p.user?.id || p.userId,
         userId: p.userId,
         username: p.user?.username || '',
